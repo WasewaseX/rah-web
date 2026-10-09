@@ -60,3 +60,4 @@ server.log
 # runtime data - not for the public repo
 db/custom.db
 /rah-web-export/
+/rah-repo/
