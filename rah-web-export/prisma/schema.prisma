@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Single-learner app state. Rah serves one learner per deployment.
+model Learner {
+  id             String  @id @default("me")
+  name           String  @default("Learner")
+  dailyGoal      Int     @default(20)
+  retention      Float   @default(0.9)
+  newPerDay      Int     @default(10)
+  streak         Int     @default(0)
+  lastActiveDay  Int     @default(-1)
+  level          String  @default("?")
+  placementPhase String  @default("none") // none | quiz | writing | done
+  focusSkill     String  @default("vocabulary")
+  createdAt      DateTime @default(now())
+}
+
+// FSRS-5 memory state per card. Keys mirror the verified Rust core.
+model CardState {
+  cardId    String  @id
+  s         Float   @default(0)
+  d         Float   @default(0)
+  due       Int     @default(0)
+  last      Int     @default(-1)
+  lapses    Int     @default(0)
+  reps      Int     @default(0)
+  state     String  @default("new")
+  lastivl   Int     @default(0)
+  dir       String  @default("") // last retrieval direction used
+  suspended Boolean @default(false)
+}
+
+model ReviewLog {
+  id     Int      @id @default(autoincrement())
+  cardId String
+  grade  Int
+  ivl    Int
+  day    Int
+  at     DateTime @default(now())
+}
+
+model Placement {
+  id           String   @id @default("main")
+  answers      String   @default("[]")
+  phase        String   @default("quiz")
+  level        String   @default("?")
+  writingLevel String   @default("?")
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatMsg {
+  id      Int      @id @default(autoincrement())
+  role    String
+  content String
+  at      DateTime @default(now())
+}
+
+model WritingSub {
+  id     Int      @id @default(autoincrement())
+  prompt String
+  text   String
+  result String
+  at     DateTime @default(now())
+}
+
+model SpeakSession {
+  id         Int      @id @default(autoincrement())
+  prompt     String
+  transcript String
+  round      Int      @default(1)
+  result     String
+  at         DateTime @default(now())
+}
+
+model DailyStat {
+  day     Int @id
+  reviews Int @default(0)
+  correct Int @default(0)
+  xp      Int @default(0)
+  spoken  Int @default(0)
+  written Int @default(0)
+  listened Int @default(0)
+}
+
+model QuizItem {
+  id   Int      @id @default(autoincrement())
+  src  String // text | reading:rd1 | chat
+  quiz String // full JSON
+  at   DateTime @default(now())
+}
