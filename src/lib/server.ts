@@ -75,10 +75,18 @@ export async function buildProfile(): Promise<ProfileJson> {
 
   // Persistent mistake families: production corrections across chat, essays
   // and speaking, keyed by trap tag. These drive what the tutor hunts and what
-  // exams prioritize - memory instead of rediscovery.
+  // exams prioritize - memory instead of rediscovery. Resolved families are
+  // excluded (activeOnly): healing must silence the steering, that is the
+  // learner-visible reward for getting past a weakness.
   let mistakes: { tag: string; count: number; label: string }[] = [];
+  let mistakesHealed = 0;
   try {
-    mistakes = (await topMistakes(5)).map((m) => ({ tag: m.tag, count: m.count, label: m.label }));
+    const all = await topMistakes(50);
+    mistakes = all
+      .filter((m) => !m.resolvedAt)
+      .slice(0, 5)
+      .map((m) => ({ tag: m.tag, count: m.count, label: m.label }));
+    mistakesHealed = all.filter((m) => m.resolvedAt).length;
   } catch {
     // Fresh database or table not yet migrated: the profile works without it.
   }
@@ -91,6 +99,7 @@ export async function buildProfile(): Promise<ProfileJson> {
     recentTraps: traps.slice(0, 4),
     weakSkills: weakSkills.length ? weakSkills : ["collocation"],
     mistakes,
+    mistakesHealed,
   };
 }
 

@@ -5,7 +5,7 @@
 // grading.
 
 import { useState } from "react";
-import { Check, X, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, X, Loader2, ChevronDown, ChevronUp, Target } from "lucide-react";
 import type { ExamClient, ExamResult } from "@/lib/agent/types";
 import { Btn, Card } from "./ui";
 
@@ -128,6 +128,7 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
             <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">{exam.title}</div>
             <div className="text-xs font-semibold text-[#8b96a9]">
               {exam.count} questions · about {exam.spec.minutes} min · {exam.spec.targetSkills.length === 1 ? `focus: ${exam.spec.targetSkills[0]}` : `mixed: ${exam.spec.targetSkills.join(", ")}`}
+              {exam.spec.weakTags?.length ? <span className="text-[#ffb02e]"> · hunting: {exam.spec.weakTags.join(", ")}</span> : null}
             </div>
           </div>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[var(--rah-primary)]/40 text-[11px] font-black text-[#9dc0ff]">
@@ -147,6 +148,11 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
                   {it.skill}
                 </span>
               </div>
+              {it.tag ? (
+                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#ffb02e]/30 bg-[#ffb02e]/[0.08] px-2 py-0.5 text-[10px] font-bold text-[#ffd08a]">
+                  <Target className="h-3 w-3" /> your recurring weak spot — get this right twice and it retires
+                </div>
+              ) : null}
               {it.type === "mcq" && it.choices ? (
                 <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   {it.choices.map((c) => {

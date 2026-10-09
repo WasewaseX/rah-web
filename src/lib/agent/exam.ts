@@ -9,6 +9,7 @@ import type { ProfileJson } from "@/lib/ai";
 import { gradeAnswer } from "./fuzzy";
 import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace } from "./types";
 import { updateSkillLevels } from "./levels";
+import { noteExamAnswer } from "@/lib/mistakes";
 
 function newId(): string {
   return `ex${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -24,6 +25,7 @@ interface RawItem {
   mustInclude?: string[];
   mustNotInclude?: string[];
   why?: string;
+  tag?: string;
 }
 
 interface RawExam {
@@ -90,10 +92,11 @@ function examSystem(p: ProfileJson, spec: ExamSpec, fresh: Freshness): string {
     fresh.bannedA.length ? `BANNED answers (do not make any of these the correct answer or a distractor again): ${fresh.bannedA.join("; ")}` : "",
     `AVOID these worn-out templates entirely: ${OVERUSED.map((t) => JSON.stringify(t)).join("; ")}`,
   ].filter(Boolean).join("\n\n");
+  const quota = spec.weakTags.length ? Math.min(4, Math.max(1, Math.ceil(spec.plannedCount / 3))) : 0;
   return `You are the examiner inside Rah, an English app for Farsi speakers. Build ONE exam targeted at ${spec.level} level, focused on: ${spec.targetSkills.join(", ")}.
 
 The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ") || "general B2 range"}. Push at the edge of ${spec.level} toward C1: collocations, register, precise verbs, Farsi interference traps (articles, countability, prepositions, present perfect, question order).
-${p.mistakes.length ? `PRIORITY: this learner keeps making these mistakes (tag x count): ${p.mistakes.map((m) => `${m.tag} x${m.count}`).join(", ")}. Build several items that force these exact weaknesses into play. The ban lists still apply: fresh sentences, same weakness.` : ""}
+${spec.weakTags.length ? `WEAKNESS QUOTA: this learner has these recurring mistake families on file: ${p.mistakes.map((m) => `${m.tag} x${m.count}`).join(", ")}. At least ${quota} items MUST carry a "tag" field naming the family they hunt (one of: ${spec.weakTags.join(", ")}), and the item must genuinely force that exact weakness into play with a FRESH sentence - the ban lists still apply. Never invent a tag outside the list; items not built for a family simply omit the tag field.` : ""}
 
 Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 
@@ -112,6 +115,7 @@ CRITICAL answer-key rules, the grader is mechanical:
 - "accept" lists every variant you would hand-grade as correct: synonyms ("heavy rain" accepts "pouring rain"), inflections ("rains", "raining" where the sentence allows), spelling variants. Give 2 to 5 accept entries for cloze and short items.
 - rewrite items: "mustInclude" lists the target patterns that ALL have to appear in the learner's sentence (e.g. ["take advantage of"]), and "a" is one model answer.
 - "skill" is exactly one of: grammar, vocabulary, collocation, writing, reading, listening.
+${spec.weakTags.length ? `- "tag" (optional) is exactly one of: ${spec.weakTags.join(", ")} - set it only on items built to hunt that mistake family, omit it everywhere else.` : ""}
 - "why" is one short English sentence teaching the point (max 18 words). No Farsi anywhere in the exam.
 
 Output ONE JSON object, nothing else:
@@ -132,6 +136,7 @@ export async function generateExam(
     plannedCount: Math.max(4, Math.min(20, count)),
     minutes: Math.max(5, Math.round(count * 1.1)),
     title: "",
+    weakTags: p.mistakes.map((m) => m.tag).slice(0, 3),
   };
 
   emit("Calibrating difficulty", `level ${spec.level}, edge of ${spec.level} toward C1`);
@@ -163,6 +168,9 @@ export async function generateExam(
       if (!spec.targetSkills.includes(skill)) continue;
       // Broken-item guard: no question may reference a text it fails to carry.
       if (DANGLING_TEXT_REF.test(q) && q.length < 220) continue;
+      // Weakness tags are validated against the exam's family list so the
+      // model can never invent a tag and poison the healing loop.
+      const weakTag = spec.weakTags.includes(String(r.tag ?? "").trim().toLowerCase()) ? String(r.tag).trim().toLowerCase() : undefined;
       batchCount += 1;
       items.push({
         id: `i${batchStart + batchCount}`,
@@ -175,6 +183,7 @@ export async function generateExam(
         mustInclude: Array.isArray(r.mustInclude) ? r.mustInclude.map(String).filter(Boolean) : [],
         mustNotInclude: Array.isArray(r.mustNotInclude) ? r.mustNotInclude.map(String).filter(Boolean) : [],
         why: String(r.why ?? "").trim() || "Target pattern practice.",
+        tag: weakTag,
       });
       seen.add(q);
     }
@@ -213,7 +222,7 @@ export async function generateExam(
     title,
     spec,
     count: finalItems.length,
-    items: finalItems.map((it) => ({ id: it.id, type: it.type, skill: it.skill, q: it.q, choices: it.choices })),
+    items: finalItems.map((it) => ({ id: it.id, type: it.type, skill: it.skill, q: it.q, choices: it.choices, tag: it.tag })),
   };
 
   await db.exam.create({
@@ -237,6 +246,18 @@ export async function gradeExamSubmission(
     const correct = gradeAnswer({ given, type: it.type, a: it.a, accept: it.accept, mustInclude: it.mustInclude, mustNotInclude: it.mustNotInclude, choices: it.choices });
     return { itemId: it.id, given, correct, key: it.a, why: it.why, skill: it.skill };
   });
+
+  // Healing loop: every weakness-targeted item reports its outcome back to the
+  // mistake memory. Correct answers extend the family's clean streak toward
+  // retirement; misses count as relapse evidence and reopen it.
+  await Promise.allSettled(
+    items
+      .filter((it) => it.tag)
+      .map((it) => {
+        const v = verdicts.find((x) => x.itemId === it.id);
+        return noteExamAnswer(it.tag!, v?.given ?? "", it.a, v?.correct ?? false);
+      }),
+  );
 
   const total = items.length;
   const answered = verdicts.filter((v) => v.given.length > 0).length;

@@ -132,4 +132,9 @@ model MistakeFamily {
   evidence  String   // latest wrong -> right example
   lastSeen  DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // Healing loop: exam items tagged with this family report back. Two clean
+  // hits retire the family (resolvedAt set, prompt steering stops); any new
+  // production mistake or exam miss reopens it and resets the streak.
+  streakClean Int     @default(0)
+  resolvedAt  DateTime?
 }

@@ -13,6 +13,7 @@ export interface ProfileJson {
   recentTraps: string[];
   weakSkills: string[];
   mistakes: { tag: string; count: number; label: string }[];
+  mistakesHealed: number;
 }
 
 function cleanEmDash(s: string): string {

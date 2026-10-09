@@ -99,7 +99,7 @@ export const POWER_SKILLS: SkillDef[] = [
     run: async (ctx) => {
       const steps: StepTrace[] = [];
       steps.push({ label: "Mining corrections", detail: "chat turns, essays, speaking rounds" });
-      const families = await topMistakes(6);
+      const families = await topMistakes(8);
       if (families.length === 0) {
         return {
           skill: "mistakes",
@@ -109,11 +109,17 @@ export const POWER_SKILLS: SkillDef[] = [
           steps,
         };
       }
-      const lines = families.map((f, i) => `${i + 1}. ${f.label} - seen ${f.count}x in your ${f.kind}. Latest: "${f.evidence}"`);
-      const top = families[0];
+      const active = families.filter((f) => !f.resolvedAt);
+      const healed = families.filter((f) => f.resolvedAt);
+      const lines = active.map((f, i) => `${i + 1}. ${f.label} - seen ${f.count}x in your ${f.kind}${f.streakClean > 0 ? ` (${f.streakClean}/2 clean hits in exams)` : ""}. Latest: "${f.evidence}"`);
+      const healedLines = healed.map((f) => `- ${f.label} - fixed, retired after 2 clean exam hits`);
+      const top = active[0] ?? families[0];
+      const loop = active.length
+        ? `\n\nThis is the memory the tutor and the examiner both aim with. Exams now build items that hunt these exact weak spots; answer two of them correctly and I retire the family for good. Say "focus on ${top.tag}" to drill the worst one, or "generate a 6 question grammar only exam" to test it under pressure.`
+        : `\n\nEvery active family is healed right now: two clean exam hits each retired them. They reopen automatically if the mistake shows up in your English again.`;
       return {
         skill: "mistakes",
-        reply: `Your leaks, most persistent first:\n${lines.join("\n")}\n\nThis is the memory the tutor and the examiner both aim with. Say "focus on ${top.tag}" to drill the worst one, or "generate a 6 question grammar only exam" to test it under pressure.`,
+        reply: `${active.length ? `Your leaks, most persistent first:\n${lines.join("\n")}` : ""}${healed.length ? `\n${active.length ? "\n" : ""}Healed and retired:\n${healedLines.join("\n")}` : ""}${loop}`,
         corrections: [],
         fa_note: "",
         steps,
