@@ -137,3 +137,23 @@ Stage Summary:
 - The coach is an agent now: 22 skills, slash routing, step traces, exam engine with synonym-mercy grading, per-skill bands, 5-pass deep analysis, theme plugin. No scripted strings left (grepped: old fingerprints gone).
 - Preview freshness is guaranteed and verifiable: /api/version matches on localhost and preview-chat-d027ce73-...space-z.ai, and every push to WasewaseX/rah-web (private, CI green) doubles as disaster recovery.
 - Screenshots: download/screenshots/agent-01..08 (chat, exam card, graded, violet repaint, midnight reset, preview live).
+
+---
+Task ID: 8
+Agent: Super Z (main)
+Task: Fix the AI exam bug from the user's transcript ("generate a 12 question vocab only exam" returned a mixed exam), make the repo PUBLIC, keep the preview fresh.
+
+Work Log:
+- Root-caused the exam focus bug: skills-power.ts parsed requested skills with /vocabular\w*/, which does NOT match the bare word "vocab" in "vocab only exam"; the empty match silently fell back to the default collocation+grammar+vocabulary mix. ExamCard then labeled the exam "mixed: collocation, grammar, vocabulary" while the model also slipped writing-tagged rewrites inside.
+- Fix 1 (parser): regex now /vocab\w*/ and the normalizer maps vocab/vocabulary alike, so "vocab only" yields exactly ["vocabulary"].
+- Fix 2 (exam.ts): HARD FOCUS RULE in the examiner prompt (every item's skill field must be in targetSkills; a rewrite in a vocab exam is a vocabulary item); harvest() drops off-focus items and dedupes; one locked top-up generation round keeps announced count == graded count without shrinking silently.
+- Fix 3 (ExamCard): single-skill exams now read "focus: vocabulary" instead of "mixed: vocabulary".
+- Live regression scripts/test-exam-focus.ts: vocab-only 12q PASS (all items vocabulary), grammar-only 6q PASS (all items grammar); test-fuzzy.ts 15/15; test-all-ai.ts all endpoints PASS (chat, writing, quiz, listen, speak).
+- Public-release hygiene: swept all git history and tracked files for the PAT (clean), untracked db/custom.db (user chat logs must not publish going forward; local file intact) and stale rah-web-export/ (106 files), removed the stray rah-repo gitlink so the /api/version beacon reads dirty:0.
+- PATCHed repo visibility via API: WasewaseX/rah-web is now PUBLIC.
+- Pushed 387e70b and 5d17af3 to main; remote main sha verified == local; /api/version identical on localhost and the preview URL (5d17af35070f, dirty 0).
+
+Stage Summary:
+- "vocab only exam" and every other "<skill> only" request now produces a strictly focused exam with matching label; announced count always equals graded count.
+- Repo public at https://github.com/WasewaseX/rah-web (CI green), no secrets in history, runtime DB no longer published with future pushes.
+- Preview serves the exact pushed commit: verifiable via /api/version on both origins.
