@@ -176,9 +176,16 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {/* Mistake memory */}
       {state.profile?.mistakes && state.profile.mistakes.length > 0 && (
         <Card>
-          <div className="mb-1 text-sm font-extrabold tracking-tight text-[#f2f5fa]">Recurring mistakes</div>
+          <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
+            Recurring mistakes
+            {!!state.profile?.mistakesHealed && (
+              <span className="rounded-full border border-[#3ccb7f]/30 bg-[#3ccb7f]/[0.1] px-2 py-0.5 text-[10px] font-black text-[#7fe0ac]">
+                {state.profile.mistakesHealed} healed
+              </span>
+            )}
+          </div>
           <div className="mb-4 text-xs font-medium text-[#7d889c]">
-            Mined from your corrections. The tutor hunts these first; exams build items around them.
+            Mined from your corrections. The tutor hunts these first; exams build items around them. Two clean exam hits retire a family.
           </div>
           <div className="flex flex-col gap-2.5">
             {state.profile.mistakes.map((m) => (

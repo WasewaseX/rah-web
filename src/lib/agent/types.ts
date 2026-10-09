@@ -48,6 +48,7 @@ export interface ExamItem {
   mustInclude?: string[];
   mustNotInclude?: string[];
   why: string;
+  tag?: string; // mistake-family tag when the item deliberately hunts a weak spot
 }
 
 export interface ExamSpec {
@@ -56,6 +57,7 @@ export interface ExamSpec {
   plannedCount: number;
   minutes: number;
   title: string;
+  weakTags: string[]; // active mistake families this exam was built to hunt
 }
 
 // Client-facing exam: items WITHOUT answer keys.
@@ -64,7 +66,7 @@ export interface ExamClient {
   title: string;
   spec: ExamSpec;
   count: number;
-  items: { id: string; type: string; skill: string; q: string; choices?: string[] }[];
+  items: { id: string; type: string; skill: string; q: string; choices?: string[]; tag?: string }[];
 }
 
 export interface ExamVerdict {
