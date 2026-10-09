@@ -40,10 +40,24 @@ export const POWER_SKILLS: SkillDef[] = [
       steps.push({ label: "Reading your profile", detail: `level ${ctx.profile.level}, leaks: ${ctx.profile.weakSkills.join(", ") || "none flagged"}` });
       const countMatch = ctx.text.match(/(\d{1,2})\s*(questions?|items?|q\b)/i) ?? ctx.args.match(/(\d{1,2})/);
       const count = countMatch ? parseInt(countMatch[1], 10) : 10;
-      const skillMatch = ctx.text.match(/(collocation|grammar|vocab\w*|writing|reading|listening|phrasal)/gi) ?? [];
-      const targetSkills = skillMatch.length
-        ? [...new Set(skillMatch.map((s) => s.toLowerCase().replace(/vocab\w*/, "vocabulary").replace(/phrasal/, "vocabulary")))]
-        : ["collocation", "grammar", "vocabulary"];
+      // Skill words, tolerant of spelling ("grammer" is a real user spelling)
+      // and of NEGATION: "vocab only no grammar" must exclude grammar, not
+      // include it just because the word appeared. Negated mentions are
+      // stripped before matching and collected into an exclusion set.
+      const SKILL_WORD = /\b(?:collocation|gram\w*|vocab\w*|writing|reading|listening|phrasal)/gi;
+      const NEGATION = /\b(?:anything\s+but|no|not|without|zero|except(?:\s+for)?|other\s+than|aside\s+from|excluding)\s+(?:(?:about|on|for|of|the|a|any)\s+)?(?:collocation|gram\w*|vocab\w*|writing|reading|listening|phrasal)\w*/gi;
+      const normalizeSkill = (s: string) => s.toLowerCase().replace(/vocab\w*/, "vocabulary").replace(/gram\w*/, "grammar").replace(/phrasal/, "vocabulary");
+      const excluded = new Set<string>();
+      for (const m of ctx.text.matchAll(NEGATION)) {
+        const hit = m[0].match(SKILL_WORD);
+        if (hit) excluded.add(normalizeSkill(hit[0]));
+      }
+      const positiveText = ctx.text.replace(NEGATION, " ");
+      const skillMatch = [...positiveText.matchAll(SKILL_WORD)].map((m) => m[0]);
+      const targetSkills = (skillMatch.length
+        ? [...new Set(skillMatch.map(normalizeSkill))]
+        : ["collocation", "grammar", "vocabulary"]
+      ).filter((s) => !excluded.has(s));
       const { client, spec } = await generateExam(ctx.profile, targetSkills, count, (l, d) => steps.push({ label: l, detail: d }));
       return {
         skill: "generate-exam",
@@ -122,7 +136,7 @@ export const POWER_SKILLS: SkillDef[] = [
         `You are the diagnostic engine inside Rah, an English app for Farsi speakers. Mine these PRODUCTION errors (chat corrections, review lapses). Find repeating error families and cite one concrete example per family. Output ONE JSON object: {"patterns": ["max 5 concrete findings"]}. No em dashes.`,
         [{ role: "user", content: prodEvidence.slice(0, 5000) }],
         () => ({ patterns: [] }),
-        true,
+        { deep: true },
       );
 
       // 3. Domain pass B: composed language from essays and speaking.
@@ -136,7 +150,7 @@ export const POWER_SKILLS: SkillDef[] = [
         `You are the diagnostic engine inside Rah. Mine these COMPOSED texts (essays, speaking transcripts) from a Farsi speaker. Judge range, cohesion, register, and Farsi transfer at TEXT level; ignore ASR noise in transcripts. Cite one concrete example per finding. Output ONE JSON object: {"patterns": ["max 5 concrete findings"]}. No em dashes.`,
         [{ role: "user", content: compEvidence.slice(0, 5000) }],
         () => ({ patterns: [] }),
-        true,
+        { deep: true },
       );
       const patterns = [...prod.patterns, ...comp.patterns].slice(0, 8);
       steps.push({ label: "Patterns mined", detail: `${patterns.length} findings across both domains` });
@@ -150,21 +164,21 @@ Output ONE JSON object: {"summary": "max 70 words, direct, second person", "band
           { role: "user", content: `Patterns: ${JSON.stringify(patterns)}\nMeasured levels: ${JSON.stringify(levels.filter((l) => l.samples > 0))}\nLearner profile: ${JSON.stringify(ctx.profile)}` },
         ],
         () => ({ summary: "Analysis complete.", bands: [], priorities: [], plan: [] }),
-        true,
+        { deep: true },
       );
       steps.push({ label: "Pass 4: verification", detail: "checking the plan against the evidence" });
       const check = await aiJson<{ plan: string[]; priorities: string[] }>(
         `You are Rah's quality gate. Given the coach's plan and the mined patterns, reject any plan line that is not backed by a pattern or a measured weakness, tighten vague lines, and keep exactly 5. Same for priorities (max 3). Output ONE JSON object: {"plan": ["Day 1: ...", ...], "priorities": ["..."]}. No em dashes. No Farsi.`,
         [{ role: "user", content: `Patterns: ${JSON.stringify(patterns)}\nPlan: ${JSON.stringify(synth.plan)}\nPriorities: ${JSON.stringify(synth.priorities)}` }],
         () => ({ plan: synth.plan, priorities: synth.priorities }),
-        true,
+        { deep: true },
       );
       steps.push({ label: "Pass 5: the coaching note", detail: "what would move each band fastest" });
       const note = await aiJson<{ note: string }>(
         `You are Rah's head coach writing a 3-sentence personal note to a Farsi speaker after a deep review. Reference their strongest and weakest band by name and name the ONE habit that would move the weakest fastest. Output ONE JSON object: {"note": "max 60 words, direct, warm, second person"}. No em dashes. No Farsi.`,
         [{ role: "user", content: `Patterns: ${JSON.stringify(patterns)}\nMeasured: ${JSON.stringify(levels.filter((l) => l.samples > 0))}\nSynthesis: ${synth.summary}` }],
         () => ({ note: "" }),
-        true,
+        { deep: true },
       );
       // Only skills the synthesis actually scored move the bands: a 0 for an
       // untouched skill must never drag a measured band down.
