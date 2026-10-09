@@ -40,9 +40,9 @@ export const POWER_SKILLS: SkillDef[] = [
       steps.push({ label: "Reading your profile", detail: `level ${ctx.profile.level}, leaks: ${ctx.profile.weakSkills.join(", ") || "none flagged"}` });
       const countMatch = ctx.text.match(/(\d{1,2})\s*(questions?|items?|q\b)/i) ?? ctx.args.match(/(\d{1,2})/);
       const count = countMatch ? parseInt(countMatch[1], 10) : 10;
-      const skillMatch = ctx.text.match(/(collocation|grammar|vocabular\w*|writing|reading|listening|phrasal)/gi) ?? [];
+      const skillMatch = ctx.text.match(/(collocation|grammar|vocab\w*|writing|reading|listening|phrasal)/gi) ?? [];
       const targetSkills = skillMatch.length
-        ? [...new Set(skillMatch.map((s) => s.toLowerCase().replace(/vocabular.*/, "vocabulary").replace(/phrasal/, "vocabulary")))]
+        ? [...new Set(skillMatch.map((s) => s.toLowerCase().replace(/vocab\w*/, "vocabulary").replace(/phrasal/, "vocabulary")))]
         : ["collocation", "grammar", "vocabulary"];
       const { client, spec } = await generateExam(ctx.profile, targetSkills, count, (l, d) => steps.push({ label: l, detail: d }));
       return {

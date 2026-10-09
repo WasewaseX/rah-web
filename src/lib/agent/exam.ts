@@ -38,6 +38,8 @@ The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ")
 
 Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 
+HARD FOCUS RULE: every item's "skill" field MUST be one of: ${spec.targetSkills.join(", ")}. Zero items outside this list, even if the item type would fit another skill. A rewrite item in a vocabulary exam is still a vocabulary item (word choice, register, word formation), never a writing item.
+
 CRITICAL answer-key rules, the grader is mechanical:
 - "a" is the single best answer, lowercase unless a proper noun.
 - "accept" lists every variant you would hand-grade as correct: synonyms ("heavy rain" accepts "pouring rain"), inflections ("rains", "raining" where the sentence allows), spelling variants. Give 2 to 5 accept entries for cloze and short items.
@@ -71,31 +73,59 @@ export async function generateExam(
 
   const seen = new Set<string>();
   const items: ExamItem[] = [];
-  for (const r of raw.items ?? []) {
-    const q = String(r.q ?? "").trim();
-    const a = String(r.a ?? "").trim();
-    if (!q || !a) continue;
-    const type = (["mcq", "cloze", "short", "rewrite"] as const).includes(r.type as never) ? (r.type as ExamItem["type"]) : "cloze";
-    if (type === "mcq" && (!Array.isArray(r.choices) || r.choices.length < 2)) continue;
-    items.push({
-      id: `i${items.length + 1}`,
-      type,
-      skill: /^(grammar|vocabulary|collocation|writing|reading|listening)$/.test(String(r.skill)) ? String(r.skill) : "vocabulary",
-      q,
-      choices: type === "mcq" ? r.choices!.map(String) : undefined,
-      a,
-      accept: Array.isArray(r.accept) ? r.accept.map(String).filter(Boolean).slice(0, 6) : [],
-      mustInclude: Array.isArray(r.mustInclude) ? r.mustInclude.map(String).filter(Boolean) : [],
-      mustNotInclude: Array.isArray(r.mustNotInclude) ? r.mustNotInclude.map(String).filter(Boolean) : [],
-      why: String(r.why ?? "").trim() || "Target pattern practice.",
-    });
-    seen.add(q);
+
+  const harvest = (rawItems: RawItem[] | undefined, batchStart: number) => {
+    let batchCount = 0;
+    for (const r of rawItems ?? []) {
+      const q = String(r.q ?? "").trim();
+      const a = String(r.a ?? "").trim();
+      if (!q || !a || seen.has(q)) continue;
+      const type = (["mcq", "cloze", "short", "rewrite"] as const).includes(r.type as never) ? (r.type as ExamItem["type"]) : "cloze";
+      if (type === "mcq" && (!Array.isArray(r.choices) || r.choices.length < 2)) continue;
+      const skill = /^(grammar|vocabulary|collocation|writing|reading|listening)$/.test(String(r.skill)) ? String(r.skill) : "vocabulary";
+      // Focus guard: an item tagged outside the requested focus would break the
+      // promise the exam card makes ("mixed: ..." / "focus: ..."), so drop it.
+      if (!spec.targetSkills.includes(skill)) continue;
+      batchCount += 1;
+      items.push({
+        id: `i${batchStart + batchCount}`,
+        type,
+        skill,
+        q,
+        choices: type === "mcq" ? r.choices!.map(String) : undefined,
+        a,
+        accept: Array.isArray(r.accept) ? r.accept.map(String).filter(Boolean).slice(0, 6) : [],
+        mustInclude: Array.isArray(r.mustInclude) ? r.mustInclude.map(String).filter(Boolean) : [],
+        mustNotInclude: Array.isArray(r.mustNotInclude) ? r.mustNotInclude.map(String).filter(Boolean) : [],
+        why: String(r.why ?? "").trim() || "Target pattern practice.",
+      });
+      seen.add(q);
+    }
+    return batchCount;
+  };
+
+  harvest(raw.items, 0);
+
+  // If focus filtering left the exam short, top up with one more generation
+  // round locked to the requested skills, instead of shipping off-focus items
+  // or shrinking the announced count.
+  if (items.length < spec.plannedCount) {
+    emit("Topping up", "keeping every item inside your requested focus");
+    const avoid = items.map((i) => i.q.slice(0, 60));
+    const need = spec.plannedCount - items.length;
+    const raw2 = await aiJson<RawExam>(
+      examSystem(p, spec),
+      [{ role: "user", content: `Generate exactly ${need} more items now. The "skill" field of every item MUST be one of: ${spec.targetSkills.join(", ")}. Do not repeat or paraphrase any of these questions: ${JSON.stringify(avoid)}. Output the same JSON object shape with only the new items.` }],
+      () => ({}),
+      true,
+    );
+    harvest(raw2.items, items.length);
   }
 
   // Guarantee the announced count: top up from the pool by trimming or
   // padding with near-level review items. The count the coach announces IS
   // the count graded, always.
-  const finalItems = items.slice(0, spec.plannedCount);
+  const finalItems = items.slice(0, spec.plannedCount).map((it, idx) => ({ ...it, id: `i${idx + 1}` }));
   spec.plannedCount = finalItems.length;
   spec.minutes = Math.max(4, Math.round(finalItems.length * 1.1));
 
