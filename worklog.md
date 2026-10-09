@@ -174,3 +174,22 @@ Work Log:
 Stage Summary:
 - Exams are now moderated for freshness, focus, count, and self-contained reading items; the eval suite makes regressions visible instead of anecdotal.
 - Audit response: adopted its P0 "automated evaluations" in the exam domain; learner memory of recurring mistakes and multi-skill orchestration are the next slices, graded quality gates before new skills.
+
+---
+Task ID: 10
+Agent: Super Z (main)
+Task: Point the user to the live site, make the deployment permanent ("never let this happen again"), and continue the roadmap (learner memory P0).
+
+Work Log:
+- Live link verified: https://preview-chat-d027ce73-8b7f-4fc0-910a-b2c665a663c0.space-z.ai/ (the old preview-16721396 short link is dead; chat-id form is the live one). Beacon matches on both origins.
+- DEPLOY ROOT CAUSE FOUND by reading /start.sh (PID 1 = tini -- /start.sh): the platform boots the dev server ONCE with no supervision; if it dies, nothing revives it until a full reboot. This is the origin of every historical 404. Also discovered the official hook: /start.sh runs /home/z/my-project/.zscripts/dev.sh instead of the default flow when it exists.
+- Deploy guarantee installed: .zscripts/dev.sh is a platform-owned self-healing supervisor (bun install, db push, restart-on-exit, restart after 60s of failed /api/version health checks, stale next-server cleanup). It activates at every platform boot from now on.
+- Sandbox constraint discovered and documented: processes spawned from agent tool calls are reaped within ~20s (setsid/nohup do not survive), so a resident watchdog daemon is impossible; the boot-level supervisor is the correct layer. scripts/ensure-server.sh (idempotent reviver), scripts/watchdog.sh (optional), scripts/deploy.sh (one command: revive, verify, push, print proof) all kept for manual and agent use. A deliberate kill-test proved the reaper constraint and the reviver path.
+- Mistake memory (audit P0 'genuine learner memory', slice 1): MistakeFamily model keyed kind:tag over the existing Farsi-interference trap taxonomy (statives, articles, prepositions, perfect, ...). recordMistakes upserts families with count + latest evidence; hooks on chat corrections (coachTurn, fire-and-forget), essay errors (/api/writing) and spoken errors (/api/speak). buildProfile carries the top 5 families; tutorSystem hunts them (a family at 3+ hits earns a dedicated turn); the examiner prompt prioritizes items that force those weaknesses into play, still under the freshness ban lists.
+- New surfaces: /mistakes skill (counts + evidence + next action), GET /api/mistakes, 'Recurring mistakes' card on the progress page.
+- Evals: scripts/test-mistake-memory.ts ALL PASS (two 'I am knowing' turns -> chat:statives x2, /mistakes names it, profile carries it); scripts/test-all-ai.ts all endpoints PASS; tsc and eslint clean.
+- Pushed e474abd to WasewaseX/rah-web (public); remote main verified; deploy.sh printed matching beacons for local and preview, dirty 0.
+
+Stage Summary:
+- The site's permanent supervisor now lives at the layer the platform actually controls (boot), so the dead-server 404 class is structurally closed; within-session revives stay one command away (ensure-server.sh / deploy.sh).
+- The coach remembers: recurring production mistakes now persist, surface, and steer every future prompt instead of being rediscovered from zero each session.
