@@ -19,6 +19,7 @@ export type SkillId =
   | "generate-exam"
   | "grade-exam"
   | "assess-level"
+  | "mistakes"
   | "deep-analysis"
   | "skill-report"
   | "study-plan"

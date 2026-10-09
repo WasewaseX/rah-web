@@ -93,6 +93,7 @@ function examSystem(p: ProfileJson, spec: ExamSpec, fresh: Freshness): string {
   return `You are the examiner inside Rah, an English app for Farsi speakers. Build ONE exam targeted at ${spec.level} level, focused on: ${spec.targetSkills.join(", ")}.
 
 The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ") || "general B2 range"}. Push at the edge of ${spec.level} toward C1: collocations, register, precise verbs, Farsi interference traps (articles, countability, prepositions, present perfect, question order).
+${p.mistakes.length ? `PRIORITY: this learner keeps making these mistakes (tag x count): ${p.mistakes.map((m) => `${m.tag} x${m.count}`).join(", ")}. Build several items that force these exact weaknesses into play. The ban lists still apply: fresh sentences, same weakness.` : ""}
 
 Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 

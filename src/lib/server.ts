@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { DECK, cardById } from "@/lib/content";
 import { dayIndex } from "@/lib/fsrs";
+import { topMistakes } from "@/lib/mistakes";
 import type { ProfileJson } from "@/lib/ai";
 
 export async function getLearner() {
@@ -72,6 +73,16 @@ export async function buildProfile(): Promise<ProfileJson> {
     .slice(0, 2)
     .map((x) => x.skill);
 
+  // Persistent mistake families: production corrections across chat, essays
+  // and speaking, keyed by trap tag. These drive what the tutor hunts and what
+  // exams prioritize - memory instead of rediscovery.
+  let mistakes: { tag: string; count: number; label: string }[] = [];
+  try {
+    mistakes = (await topMistakes(5)).map((m) => ({ tag: m.tag, count: m.count, label: m.label }));
+  } catch {
+    // Fresh database or table not yet migrated: the profile works without it.
+  }
+
   return {
     level: l.level === "?" ? "B2" : l.level,
     streak: l.streak,
@@ -79,6 +90,7 @@ export async function buildProfile(): Promise<ProfileJson> {
     due,
     recentTraps: traps.slice(0, 4),
     weakSkills: weakSkills.length ? weakSkills : ["collocation"],
+    mistakes,
   };
 }
 

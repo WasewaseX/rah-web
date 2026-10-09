@@ -12,6 +12,7 @@ export interface ProfileJson {
   due: number;
   recentTraps: string[];
   weakSkills: string[];
+  mistakes: { tag: string; count: number; label: string }[];
 }
 
 function cleanEmDash(s: string): string {
@@ -175,7 +176,12 @@ Never use the em dash character anywhere in your output.
 
 ## Learner profile (live data from the app)
 
-${profileBlock(p)}`;
+${profileBlock(p)}
+
+## Recurring mistake families (mined from this learner's corrections)
+
+${p.mistakes.length ? p.mistakes.map((m) => `- ${m.label} (seen ${m.count}x, tag: ${m.tag})`).join("\n") : "- none recorded yet"}
+When one of these families appears in the learner's message, it jumps the correction queue: hunt it, drill it, make them produce the correct form. A family seen 3 or more times earns its own dedicated turn until they beat it.`;
 }
 
 // Writing coach: CEFR four dimension grading.
