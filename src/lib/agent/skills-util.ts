@@ -3,7 +3,6 @@
 
 import { aiJson } from "@/lib/ai";
 import type { ProfileJson } from "@/lib/ai";
-import { recordMistakes } from "@/lib/mistakes";
 import type { CoachEnvelope, SkillContext, StepTrace, Correction } from "./types";
 
 export interface TurnResult {
@@ -113,19 +112,8 @@ export async function coachTurn(
     fa_note: String(out.fa_note ?? "").trim(),
     praised: Boolean(out.praised),
   };
-  // Mistake memory: every tagged correction feeds a persistent family, so the
-  // tutor's next turns and future exams hunt the recurring weakness. Fire and
-  // forget: memory must never delay or break the coaching turn.
-  if (turn.corrections.length > 0) {
-    void recordMistakes(
-      turn.corrections.map((c) => ({
-        kind: "chat" as const,
-        tag: String((c as { trap?: string }).trap ?? "none"),
-        wrong: String(c.wrong ?? ""),
-        right: String(c.right ?? ""),
-      })),
-    ).catch(() => undefined);
-  }
+  // Memory feeding happens once at the agent boundary (/api/chat), so every
+  // skill's corrections feed the same families without double counting.
   return turn;
 }
 

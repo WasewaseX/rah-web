@@ -25,6 +25,17 @@ export type SkillId =
   | "study-plan"
   | "exam-history"
   | "theme-control"
+  | "remediate"
+  | "repair-drill"
+  | "roleplay"
+  | "socratic"
+  | "explain"
+  | "debate"
+  | "daily-challenge"
+  | "coach-report"
+  | "minimal-pairs"
+  | "summarize"
+  | "exit-mode"
   | "navigate"
   | "focus-skill"
   | "settings";
@@ -76,6 +87,8 @@ export interface ExamVerdict {
   key: string;
   why: string;
   skill: string;
+  acceptedAI?: boolean; // mechanical grader said no, the arbiter said yes
+  coach?: { rule: string; fa: string }; // teaching note attached to a real miss
 }
 
 export interface ExamResult {

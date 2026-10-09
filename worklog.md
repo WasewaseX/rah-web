@@ -193,3 +193,40 @@ Work Log:
 Stage Summary:
 - The site's permanent supervisor now lives at the layer the platform actually controls (boot), so the dead-server 404 class is structurally closed; within-session revives stay one command away (ensure-server.sh / deploy.sh).
 - The coach remembers: recurring production mistakes now persist, surface, and steer every future prompt instead of being rediscovered from zero each session.
+
+---
+Task ID: 11
+Agent: Super Z (main)
+Task: Mistake-memory slice 2 - close the healing loop (weakness quota in exams, resolution, relapse reopening); keep deploying.
+
+Work Log:
+- Pushed 02526ec (file-mode normalization + worklog sync), then 38a942f with the healing loop; /api/version matched on localhost and the preview URL, dirty 0, after each push.
+- Schema: MistakeFamily += streakClean, resolvedAt. Learner += mode, modeData (for Task 12).
+- mistakes.ts: topMistakes(limit, activeOnly); noteExamAnswer(tag, wrong, right, correct) - correct answers extend the clean streak, 2 clean hits resolve the family, any new production mistake or exam miss reopens it (recordMistakes update now also clears resolvedAt/streakClean).
+- Exam engine: spec.weakTags from the learner's active families (top 3); examiner prompt upgraded from a soft PRIORITY line to a WEAKNESS QUOTA (>= ceil(count/3) items must carry a validated "tag"); harvest drops model-invented tags; client items expose tag; grading reports every tagged item's outcome to noteExamAnswer.
+- buildProfile filters resolved families out of prompt steering (activeOnly) and surfaces mistakesHealed; Progress card shows a "N healed" badge; /mistakes skill shows active leaks with clean-hit progress plus a "Healed and retired" section.
+
+Stage Summary:
+- The mistake loop is closed: mistake -> family -> exam items that hunt it -> two clean hits -> family retired -> prompts fall silent -> relapse reopens. Verified live end to end (Task 12's eval).
+
+---
+Task ID: 12
+Agent: Super Z (main)
+Task: Fix the grading failures from the user's transcript ("answered correctly but marked wrong", typos nuked, no coaching), and make the agent architecture 10/10 with 10 new super-agent skills.
+
+Work Log:
+- Fuzzy grader: slash/semicolon/or-separated answers are now graded as separate candidates ("Biology/echology" -> two shots); one-edit typo mercy on 7+ letter keys ("echology" -> "ecology" passes, advise/advice stays strict); inflection mercy unchanged (15/15 fuzzy suite).
+- Hybrid grading (exam-ai.ts): every mechanical miss goes through one batched AI arbitration pass. GOLDEN RULE: if a native could naturally produce the learner's word in the blank, it MUST be accepted ("combine" for "blend" now accepted); rejection requires grammatical breakage, meaning change, term questions, or non-idiomatic collocation ("carbon usage" for "carbon footprint" still coaches). Every rejected miss gets a coaching card (rule + Farsi takeaway + trap tag). Stats recompute after arbitration, so the learner is never punished for regex blindness. Grading never stalls: deterministic fallback per miss.
+- Every exam miss feeds the mistake memory: item tag first, arbiter's trap tag as fallback - so untagged misses land in families too, and the remediation loop has material.
+- ExamCard: accepted items show "accepted: your wording works here"; misses show an amber coaching card with the rule and a right-to-left Farsi line.
+- Repair loop (drill.ts): generateRepairDrill rebuilds the SAME teaching points in FRESH sentences (ban list covers old sentences, never the keys). remediate skill ("practice my misses") reads the last 3 graded exams' misses; repair-drill skill ("/drill prepositions") aims at named families.
+- Mode machinery: Learner.mode/modeData persist conversation state across reloads; run.ts consults runModeFlow before skill routing (slash commands still win); every mode has clean exits with wrap-up. roleplay (6 preset scenes + custom, in-character partner, corrections on cards), debate (opponent takes the other side, 3 rounds, scored verdict), socratic (questions only, correction cards still reveal), daily challenge (one item built from the weakest spot, graded on the spot via the fuzzy engine, feeds the memory).
+- 10 new skills: remediate, repair-drill, roleplay, socratic, explain (the one lecturing mode, with Farsi tail), debate, daily-challenge, coach-report (deterministic weekly numbers), minimal-pairs (curated Farsi-phonology pairs: th, w/v, clusters, ng, stress), summarize (fidelity + language check, corrections feed memory), plus exit-mode (/end /exit /stop).
+- Central memory hook moved to the agent boundary: /api/chat records corrections from ANY skill envelope once (roleplay/debate/socratic/summarize all feed the same families; per-skill hook removed to avoid double counting).
+- Evals: test-grading.ts replays the user's transcript (10 mechanical checks + 7 arbiter checks) ALL PASS; test-mistake-loop.ts (14 checks: seed -> steering -> tagged quota items -> clean hit 1 -> resolution -> steering silenced -> healed surfaced -> relapse reopen) ALL PASS; test-skills-smoke.ts (12 checks incl. roleplay continue-in-character and clean exits) ALL PASS; test-fuzzy 15/15; tsc + eslint clean.
+- Live-AI regression note: test-mistake-memory's two chat turns hit provider 429s during the final battery; the same pipeline is covered by test-mistake-loop (recordMistakes + profile) and by the smoke test's roleplay correction landing as chat:prepositions x1. Rerun when the quota window resets.
+- Supabase-style restart lesson recorded: the running dev server held the pre-db:push Prisma client, so new columns silently failed in noteExamAnswer until the server restarted (supervisor auto-revived it in ~3s, proving the boot guard again).
+
+Stage Summary:
+- Grading now has two brains: a deterministic regex layer that is fast and strict about patterns, and an arbiter that is generous about meaning and coaches every miss in Farsi. "All wrong" nukings of natural answers are structurally over.
+- The agent grew from 22 to 33 skills with persistent conversation modes and a closed remediation loop; every new capability has a replayable assertion.

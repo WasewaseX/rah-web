@@ -10,6 +10,7 @@ import { gradeAnswer } from "./fuzzy";
 import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace } from "./types";
 import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
+import { arbitrateMisses } from "./exam-ai";
 
 function newId(): string {
   return `ex${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -247,16 +248,44 @@ export async function gradeExamSubmission(
     return { itemId: it.id, given, correct, key: it.a, why: it.why, skill: it.skill };
   });
 
+  // Hybrid grading, stage 2: every mechanical miss goes to the AI arbiter,
+  // which accepts meaning-equal answers the regex was blind to ("combine" for
+  // "blend") and writes a coaching note (rule + Farsi takeaway) for real
+  // misses. Then stats are computed from the FINAL verdicts, so the learner
+  // is never punished for the regex's blindness.
+  const misses = items
+    .filter((it) => {
+      const v = verdicts.find((x) => x.itemId === it.id);
+      return v && !v.correct && v.given.length > 0;
+    })
+    .map((it) => {
+      const v = verdicts.find((x) => x.itemId === it.id)!;
+      return { id: it.id, type: it.type, skill: it.skill, q: it.q, a: it.a, given: v.given, why: it.why };
+    });
+  const arb = await arbitrateMisses(misses);
+  for (const [id, v] of arb) {
+    const verdict = verdicts.find((x) => x.itemId === id);
+    if (!verdict) continue;
+    if (v.accept) {
+      verdict.correct = true;
+      verdict.acceptedAI = true;
+    } else {
+      verdict.coach = { rule: v.rule, fa: v.fa };
+    }
+  }
+
   // Healing loop: every weakness-targeted item reports its outcome back to the
-  // mistake memory. Correct answers extend the family's clean streak toward
-  // retirement; misses count as relapse evidence and reopen it.
+  // mistake memory - item tag first, arbiter's trap tag as the fallback so an
+  // untagged miss still lands in a family. Correct answers (including
+  // arbiter-accepted ones) extend the clean streak toward retirement; misses
+  // count as relapse evidence and reopen the family.
   await Promise.allSettled(
-    items
-      .filter((it) => it.tag)
-      .map((it) => {
-        const v = verdicts.find((x) => x.itemId === it.id);
-        return noteExamAnswer(it.tag!, v?.given ?? "", it.a, v?.correct ?? false);
-      }),
+    items.map((it) => {
+      const v = verdicts.find((x) => x.itemId === it.id)!;
+      const tag = it.tag ?? arb.get(it.id)?.tag;
+      if (!tag) return Promise.resolve();
+      return noteExamAnswer(tag, v.given, it.a, v.correct);
+    }),
   );
 
   const total = items.length;

@@ -59,6 +59,33 @@ export function containsPattern(text: string, pattern: string): boolean {
   return false;
 }
 
+// Classic Levenshtein distance, small strings only.
+export function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+// Learners often offer several attempts in one answer: "biology/echology",
+// "usage; footprint", "combine or blend". Each part is a real candidate.
+export function candidates(given: string): string[] {
+  return given
+    .split(/\s*[/;|]\s*|\s+or\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export interface GradeInput {
   given: string;
   type: string;
@@ -88,14 +115,24 @@ export function gradeAnswer(inp: GradeInput): boolean {
     return allIn && !banned;
   }
 
-  // cloze / short
-  const g = normalize(given);
-  if (g.length === 0) return false;
-  const keys = [inp.a, ...(inp.accept ?? [])].map(normalize);
-  if (keys.some((k) => k.length > 0 && (g === k || similarity(g, k) >= 0.85))) return true;
-  // Single-token keys: allow inflection slips ("rains" for "rain").
-  if (tokenSet(inp.a).length === 1 && tokenSet(given).length === 1) {
-    return stem(tokenSet(given)[0]) === stem(tokenSet(inp.a)[0]);
-  }
-  return false;
+  // cloze / short. Every offered candidate ("biology/echology") gets its own
+  // shot: offering two guesses is honest effort, not cheating.
+  const keys = [inp.a, ...(inp.accept ?? [])].map(normalize).filter((k) => k.length > 0);
+  const keyTokens = tokenSet(inp.a);
+  return candidates(given).some((cand) => {
+    const g = normalize(cand);
+    if (g.length === 0) return false;
+    if (keys.some((k) => g === k || similarity(g, k) >= 0.85)) return true;
+    // Single-token keys: inflection slips ("rains" for "rain") and one-letter
+    // typos on long words ("echology" for "ecology") both pass. One edit on a
+    // 7+ letter word is a typo; on short words it is usually a different word
+    // (advise/advice), so those stay strict.
+    if (keyTokens.length === 1 && tokenSet(cand).length === 1) {
+      const kw = keyTokens[0];
+      const gw = tokenSet(cand)[0];
+      if (stem(gw) === stem(kw)) return true;
+      if (kw.length >= 7 && editDistance(gw, kw) <= 1) return true;
+    }
+    return false;
+  });
 }

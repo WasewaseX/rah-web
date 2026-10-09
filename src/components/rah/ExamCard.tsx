@@ -107,6 +107,19 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
                             <span className="font-black text-[#7fe0ac]">{v.key}</span>
                           </div>
                         )}
+                        {v.acceptedAI && (
+                          <div className="mt-1.5 inline-flex rounded-full border border-[#3ccb7f]/30 bg-[#3ccb7f]/[0.1] px-2 py-0.5 text-[10px] font-bold text-[#7fe0ac]">
+                            accepted: your wording works here ({v.given} ≈ {v.key})
+                          </div>
+                        )}
+                        {!v.correct && v.coach?.rule ? (
+                          <div className="mt-2 rounded-xl border border-[#ffb02e]/25 bg-[#ffb02e]/[0.07] p-2">
+                            <div className="leading-relaxed text-[#ffd08a]">{v.coach.rule}</div>
+                            {v.coach.fa ? (
+                              <div dir="rtl" className="mt-1 leading-relaxed text-[#c4cddc]">{v.coach.fa}</div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="mt-1 leading-relaxed text-[#8b96a9]">{v.why}</div>
                       </div>
                     </div>

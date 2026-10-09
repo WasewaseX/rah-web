@@ -38,7 +38,7 @@ export function verifyEnvelope(env: CoachEnvelope): CoachEnvelope {
   if (out.reply.length > 1600) out.reply = out.reply.slice(0, 1570).replace(/\s\S*$/, "") + " ...";
 
   // Farsi tail only when corrections exist (or the skill legitimately explains).
-  const explainers = new Set(["correct", "translate", "chat"]);
+  const explainers = new Set(["correct", "translate", "chat", "explain", "minimal-pairs", "coach-report", "summarize", "daily-challenge", "socratic", "roleplay", "debate"]);
   if ((out.corrections?.length ?? 0) === 0 && !explainers.has(out.skill)) out.fa_note = "";
 
   // Exam consistency: announced count IS graded count, always.
