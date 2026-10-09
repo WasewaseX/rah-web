@@ -1,0 +1,3963 @@
+{
+ "version": 1,
+ "cards": [
+  {
+   "id": "col001",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The board will ___ a decision on Friday.",
+   "answer": "make",
+   "alt": [],
+   "en": "make a decision",
+   "fa": "تصمیم گرفتن",
+   "note": "make + decision. Never 'do a decision'.",
+   "traps": [],
+   "distractors": [
+    "do",
+    "take"
+   ]
+  },
+  {
+   "id": "col002",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Founders must ___ a risk to grow.",
+   "answer": "take",
+   "alt": [],
+   "en": "take a risk",
+   "fa": "ریسک کردن",
+   "note": "take a risk, take risks",
+   "traps": [],
+   "distractors": [
+    "make",
+    "do"
+   ]
+  },
+  {
+   "id": "col003",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Please ___ attention to the deadline.",
+   "answer": "pay",
+   "alt": [],
+   "en": "pay attention",
+   "fa": "توجه کردن",
+   "note": "pay attention to something",
+   "traps": [],
+   "distractors": [
+    "give",
+    "put"
+   ]
+  },
+  {
+   "id": "col004",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Our team ___ research on battery life.",
+   "answer": "does",
+   "alt": [],
+   "en": "do research",
+   "fa": "تحقیق کردن",
+   "note": "do research (never 'make research')",
+   "traps": [],
+   "distractors": [
+    "makes",
+    "takes"
+   ]
+  },
+  {
+   "id": "col005",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "You have ___ progress this month.",
+   "answer": "made",
+   "alt": [],
+   "en": "make progress",
+   "fa": "پیشرفت کردن",
+   "note": "make progress",
+   "traps": [],
+   "distractors": [
+    "taken",
+    "done"
+   ]
+  },
+  {
+   "id": "col006",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "A manager should ___ responsibility for mistakes.",
+   "answer": "take",
+   "alt": [],
+   "en": "take responsibility",
+   "fa": "مسئولیت پذیرفتن",
+   "note": "take responsibility for something",
+   "traps": [],
+   "distractors": [
+    "make",
+    "give"
+   ]
+  },
+  {
+   "id": "col007",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We shipped on time and ___ the deadline.",
+   "answer": "met",
+   "alt": [],
+   "en": "meet a deadline",
+   "fa": "ضرب‌الاجل را رعایت کردن",
+   "note": "meet a deadline (past: met)",
+   "traps": [],
+   "distractors": [
+    "took",
+    "caught"
+   ]
+  },
+  {
+   "id": "col008",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She always ___ her promises.",
+   "answer": "keeps",
+   "alt": [],
+   "en": "keep a promise",
+   "fa": "به قول عمل کردن",
+   "note": "keep a promise",
+   "traps": [],
+   "distractors": [
+    "makes",
+    "does"
+   ]
+  },
+  {
+   "id": "col009",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "It is hard to ___ a habit overnight.",
+   "answer": "break",
+   "alt": [],
+   "en": "break a habit",
+   "fa": "ترک عادت کردن",
+   "note": "break a habit",
+   "traps": [],
+   "distractors": [
+    "cut",
+    "destroy"
+   ]
+  },
+  {
+   "id": "col010",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The final will ___ place on Sunday.",
+   "answer": "take",
+   "alt": [],
+   "en": "take place",
+   "fa": "برگزار شدن",
+   "note": "take place = happen",
+   "traps": [],
+   "distractors": [
+    "make",
+    "hold"
+   ]
+  },
+  {
+   "id": "col011",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Small teams ___ a big role in open source.",
+   "answer": "play",
+   "alt": [],
+   "en": "play a role",
+   "fa": "نقش داشتن",
+   "note": "play a role in something",
+   "traps": [],
+   "distractors": [
+    "make",
+    "take"
+   ]
+  },
+  {
+   "id": "col012",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "If you ___ an effort, your writing improves fast.",
+   "answer": "make",
+   "alt": [],
+   "en": "make an effort",
+   "fa": "تلاش کردن",
+   "note": "make an effort",
+   "traps": [],
+   "distractors": [
+    "do",
+    "take"
+   ]
+  },
+  {
+   "id": "col013",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Two hundred students ___ part in the contest.",
+   "answer": "took",
+   "alt": [],
+   "en": "take part",
+   "fa": "شرکت کردن",
+   "note": "take part in",
+   "traps": [],
+   "distractors": [
+    "made",
+    "gave"
+   ]
+  },
+  {
+   "id": "col014",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "After the data came in, we ___ to a conclusion.",
+   "answer": "came",
+   "alt": [],
+   "en": "come to a conclusion",
+   "fa": "به نتیجه رسیدن",
+   "note": "come to / reach a conclusion",
+   "traps": [],
+   "distractors": [
+    "went",
+    "arrived"
+   ]
+  },
+  {
+   "id": "col015",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The report ___ a question about safety.",
+   "answer": "raises",
+   "alt": [],
+   "en": "raise a question",
+   "fa": "سؤالی مطرح کردن",
+   "note": "raise a question",
+   "traps": [],
+   "distractors": [
+    "gives",
+    "asks out"
+   ]
+  },
+  {
+   "id": "col016",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Both sides finally ___ an agreement.",
+   "answer": "reached",
+   "alt": [],
+   "en": "reach an agreement",
+   "fa": "به توافق رسیدن",
+   "note": "reach an agreement",
+   "traps": [],
+   "distractors": [
+    "got",
+    "took"
+   ]
+  },
+  {
+   "id": "col017",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I have an ___ with the dentist at five.",
+   "answer": "appointment",
+   "alt": [],
+   "en": "make an appointment",
+   "fa": "وقت گرفتن",
+   "note": "make an appointment with",
+   "traps": [],
+   "distractors": [
+    "rendezvous",
+    "arrangement"
+   ]
+  },
+  {
+   "id": "col018",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Smoking does ___ to your lungs.",
+   "answer": "harm",
+   "alt": [],
+   "en": "do harm",
+   "fa": "آسیب رساندن",
+   "note": "do harm (never 'make harm')",
+   "traps": [],
+   "distractors": [
+    "damage word: hurts",
+    "make"
+   ]
+  },
+  {
+   "id": "col019",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He ___ money by repairing bikes.",
+   "answer": "makes",
+   "alt": [],
+   "en": "make money",
+   "fa": "پول درآوردن",
+   "note": "make money",
+   "traps": [],
+   "distractors": [
+    "does",
+    "takes"
+   ]
+  },
+  {
+   "id": "col020",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Let's ___ a break before the next module.",
+   "answer": "take",
+   "alt": [],
+   "en": "take a break",
+   "fa": "استراحت کردن",
+   "note": "take a break",
+   "traps": [],
+   "distractors": [
+    "make",
+    "have on"
+   ]
+  },
+  {
+   "id": "col021",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "It is easy to ___ friends at a new job.",
+   "answer": "make",
+   "alt": [],
+   "en": "make friends",
+   "fa": "دوست پیدا کردن",
+   "note": "make friends with someone",
+   "traps": [],
+   "distractors": [
+    "do",
+    "get"
+   ]
+  },
+  {
+   "id": "col022",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We should ___ in touch after the course.",
+   "answer": "keep",
+   "alt": [],
+   "en": "keep in touch",
+   "fa": "در تماس بودن",
+   "note": "keep in touch with someone",
+   "traps": [],
+   "distractors": [
+    "stay touch",
+    "hold"
+   ]
+  },
+  {
+   "id": "col023",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I lost ___ of time while reading.",
+   "answer": "track",
+   "alt": [],
+   "en": "lose track of time",
+   "fa": "حس زمان را از دست دادن",
+   "note": "lose track of",
+   "traps": [],
+   "distractors": [
+    "line",
+    "watch"
+   ]
+  },
+  {
+   "id": "col024",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Your explanation doesn't ___ sense.",
+   "answer": "make",
+   "alt": [],
+   "en": "make sense",
+   "fa": "منطقی بودن",
+   "note": "make sense; questions: does it make sense?",
+   "traps": [],
+   "distractors": [
+    "do",
+    "have"
+   ]
+  },
+  {
+   "id": "col025",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "This change will ___ a difference to air quality.",
+   "answer": "make",
+   "alt": [],
+   "en": "make a difference",
+   "fa": "تأثیر گذاشتن",
+   "note": "make a difference",
+   "traps": [],
+   "distractors": [
+    "do",
+    "give"
+   ]
+  },
+  {
+   "id": "col026",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Engineers must ___ these costs into account.",
+   "answer": "take",
+   "alt": [],
+   "en": "take into account",
+   "fa": "در نظر گرفتن",
+   "note": "take something into account",
+   "traps": [],
+   "distractors": [
+    "make",
+    "put"
+   ]
+  },
+  {
+   "id": "col027",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ the truth, she was nervous.",
+   "answer": "Telling",
+   "alt": [],
+   "en": "tell the truth",
+   "fa": "راستش را بخواهی",
+   "note": "tell the truth / to tell you the truth",
+   "traps": [],
+   "distractors": [
+    "Saying",
+    "Speaking"
+   ]
+  },
+  {
+   "id": "col028",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Could you ___ me a favor?",
+   "answer": "do",
+   "alt": [],
+   "en": "do someone a favor",
+   "fa": "لطفی کردن",
+   "note": "do someone a favor",
+   "traps": [],
+   "distractors": [
+    "make",
+    "give"
+   ]
+  },
+  {
+   "id": "col029",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Please ___ care of the invoices today.",
+   "answer": "take",
+   "alt": [],
+   "en": "take care of",
+   "fa": "رسیدگی کردن",
+   "note": "take care of something",
+   "traps": [],
+   "distractors": [
+    "make",
+    "hold"
+   ]
+  },
+  {
+   "id": "col030",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The new chip will ___ the lead in speed.",
+   "answer": "take",
+   "alt": [],
+   "en": "take the lead",
+   "fa": "پیشتاز شدن",
+   "note": "take the lead in",
+   "traps": [],
+   "distractors": [
+    "make",
+    "get over"
+   ]
+  },
+  {
+   "id": "col031",
+   "unit": "colloc_core",
+   "skill": "collocation",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Wages failed to ___ pace with rent.",
+   "answer": "keep",
+   "alt": [],
+   "en": "keep pace with",
+   "fa": "هم‌قدم بودن با",
+   "note": "keep pace with something",
+   "traps": [],
+   "distractors": [
+    "make pace",
+    "catch"
+   ]
+  },
+  {
+   "id": "col032",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Two years of patience finally ___ fruit.",
+   "answer": "bore",
+   "alt": [],
+   "en": "bear fruit",
+   "fa": "ثمر دادن، نتیجه دادن",
+   "note": "bear fruit (past: bore)",
+   "traps": [],
+   "distractors": [
+    "made",
+    "gave"
+   ]
+  },
+  {
+   "id": "col033",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The minister ___ under pressure to resign.",
+   "answer": "came",
+   "alt": [],
+   "en": "come under pressure",
+   "fa": "تحت فشار قرار گرفتن",
+   "note": "come under pressure to do something",
+   "traps": [],
+   "distractors": [
+    "took",
+    "felt on"
+   ]
+  },
+  {
+   "id": "col034",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The protest movement is ___ momentum.",
+   "answer": "gaining",
+   "alt": [],
+   "en": "gain momentum",
+   "fa": "شتاب گرفتن",
+   "note": "gain/lose momentum",
+   "traps": [],
+   "distractors": [
+    "taking",
+    "doing"
+   ]
+  },
+  {
+   "id": "col035",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The design fails to ___ the second criterion.",
+   "answer": "meet",
+   "alt": [],
+   "en": "meet a criterion",
+   "fa": "معیار را برآورده کردن",
+   "note": "meet criteria/standards",
+   "traps": [],
+   "distractors": [
+    "reach",
+    "fill"
+   ]
+  },
+  {
+   "id": "col036",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Rising costs ___ a challenge to exporters.",
+   "answer": "pose",
+   "alt": [],
+   "en": "pose a challenge",
+   "fa": "چالشی ایجاد کردن",
+   "note": "pose a challenge/threat/question",
+   "traps": [],
+   "distractors": [
+    "make",
+    "raise up"
+   ]
+  },
+  {
+   "id": "col037",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The campaign ___ awareness about water use.",
+   "answer": "raised",
+   "alt": [],
+   "en": "raise awareness",
+   "fa": "آگاهی‌بخشی کردن",
+   "note": "raise awareness of something",
+   "traps": [],
+   "distractors": [
+    "gave",
+    "lifted"
+   ]
+  },
+  {
+   "id": "col038",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Her lecture ___ light on an obscure dispute.",
+   "answer": "shed",
+   "alt": [],
+   "en": "shed light on",
+   "fa": "روشن کردن یک موضوع",
+   "note": "shed light on (past: shed)",
+   "traps": [],
+   "distractors": [
+    "lit",
+    "threw on"
+   ]
+  },
+  {
+   "id": "col039",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "A mediator can ___ the gap between the sides.",
+   "answer": "bridge",
+   "alt": [],
+   "en": "bridge the gap",
+   "fa": "شکاف را پر کردن",
+   "note": "bridge/narrow the gap",
+   "traps": [],
+   "distractors": [
+    "fill over",
+    "tie"
+   ]
+  },
+  {
+   "id": "col040",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The bank moved to ___ inflation.",
+   "answer": "curb",
+   "alt": [],
+   "en": "curb inflation",
+   "fa": "مهار تورم",
+   "note": "curb = restrain",
+   "traps": [],
+   "distractors": [
+    "cut down",
+    "stopper"
+   ]
+  },
+  {
+   "id": "col041",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "She ___ the opportunity to study abroad.",
+   "answer": "seized",
+   "alt": [],
+   "en": "seize the opportunity",
+   "fa": "از فرصت استفاده کردن",
+   "note": "seize an opportunity",
+   "traps": [],
+   "distractors": [
+    "caught",
+    "grabbed on"
+   ]
+  },
+  {
+   "id": "col042",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Chairmen ___ influence through the board.",
+   "answer": "wield",
+   "alt": [],
+   "en": "wield influence",
+   "fa": "نفوذ اعمال کردن",
+   "note": "wield influence/power",
+   "traps": [],
+   "distractors": [
+    "carry on",
+    "swing"
+   ]
+  },
+  {
+   "id": "col043",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Analysts ___ doubts about the forecast.",
+   "answer": "harbor",
+   "alt": [],
+   "en": "harbor doubts",
+   "fa": "تردید در دل داشتن",
+   "note": "harbor doubts/reservations",
+   "traps": [],
+   "distractors": [
+    "keep in",
+    "feed"
+   ]
+  },
+  {
+   "id": "col044",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The delay ___ additional costs.",
+   "answer": "incurred",
+   "alt": [],
+   "en": "incur costs",
+   "fa": "هزینه‌ای تحمیل کردن",
+   "note": "incur costs/losses (past: incurred)",
+   "traps": [],
+   "distractors": [
+    "charged",
+    "brought in"
+   ]
+  },
+  {
+   "id": "col045",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The state may ___ a tax on sugary drinks.",
+   "answer": "levy",
+   "alt": [],
+   "en": "levy a tax",
+   "fa": "مالیات وضع کردن",
+   "note": "levy a tax on",
+   "traps": [],
+   "distractors": [
+    "put",
+    "raise on"
+   ]
+  },
+  {
+   "id": "col046",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Hedging can ___ losses in volatile markets.",
+   "answer": "offset",
+   "alt": [],
+   "en": "offset losses",
+   "fa": "جبران زیان",
+   "note": "offset something with/by",
+   "traps": [],
+   "distractors": [
+    "outweigh",
+    "repair"
+   ]
+  },
+  {
+   "id": "col047",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The teaser was designed to ___ interest.",
+   "answer": "pique",
+   "alt": [],
+   "en": "pique interest",
+   "fa": "کنجکاوی برانگیختن",
+   "note": "pique interest/curiosity",
+   "traps": [],
+   "distractors": [
+    "pick",
+    "rise"
+   ]
+  },
+  {
+   "id": "col048",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The methodology will not ___ scrutiny.",
+   "answer": "stand",
+   "alt": [],
+   "en": "stand scrutiny",
+   "fa": "زیر ذره‌بین دوام آوردن",
+   "note": "stand/bear scrutiny",
+   "traps": [],
+   "distractors": [
+    "carry",
+    "hold up on"
+   ]
+  },
+  {
+   "id": "col049",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Patient investors ___ the benefits later.",
+   "answer": "reaped",
+   "alt": [],
+   "en": "reap benefits",
+   "fa": "برداشت کردن از نتایج",
+   "note": "reap rewards/benefits",
+   "traps": [],
+   "distractors": [
+    "cut",
+    "collected up"
+   ]
+  },
+  {
+   "id": "col050",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Years of drought are ___ their toll on farms.",
+   "answer": "taking",
+   "alt": [],
+   "en": "take its toll on",
+   "fa": "تلفات و آسیب وارد کردن",
+   "note": "take its toll on something",
+   "traps": [],
+   "distractors": [
+    "making",
+    "paying"
+   ]
+  },
+  {
+   "id": "col051",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The candidate ___ support from rural voters.",
+   "answer": "garnered",
+   "alt": [],
+   "en": "garner support",
+   "fa": "حمایت جلب کردن",
+   "note": "garner support/attention",
+   "traps": [],
+   "distractors": [
+    "garnished",
+    "collected in"
+   ]
+  },
+  {
+   "id": "col052",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The survey ___ a strong response from users.",
+   "answer": "elicited",
+   "alt": [],
+   "en": "elicit a response",
+   "fa": "واکنش برانگیختن",
+   "note": "elicit a response/reply",
+   "traps": [],
+   "distractors": [
+    "illicited",
+    "asked out"
+   ]
+  },
+  {
+   "id": "col053",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Mentors ___ knowledge as well as skills.",
+   "answer": "impart",
+   "alt": [],
+   "en": "impart knowledge",
+   "fa": "دانش منتقل کردن",
+   "note": "impart knowledge/wisdom to",
+   "traps": [],
+   "distractors": [
+    "import",
+    "give away"
+   ]
+  },
+  {
+   "id": "col054",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Whether to rebrand remains a ___ point.",
+   "answer": "moot",
+   "alt": [],
+   "en": "a moot point",
+   "fa": "موضوع بحث‌برانگیز و بی‌نتیجه",
+   "note": "a moot point = debatable",
+   "traps": [],
+   "distractors": [
+    "mute",
+    "closed"
+   ]
+  },
+  {
+   "id": "col055",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Telemedicine is a ___ alternative for villages.",
+   "answer": "viable",
+   "alt": [],
+   "en": "a viable alternative",
+   "fa": "جانشین عملی و شدنی",
+   "note": "viable alternative/option",
+   "traps": [],
+   "distractors": [
+    "variable",
+    "able"
+   ]
+  },
+  {
+   "id": "col056",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The deal had the minister's ___ approval.",
+   "answer": "tacit",
+   "alt": [],
+   "en": "tacit approval",
+   "fa": "رضایت ضمنی",
+   "note": "tacit = understood without words",
+   "traps": [],
+   "distractors": [
+    "tactic",
+    "silent word: mute"
+   ]
+  },
+  {
+   "id": "col057",
+   "unit": "colloc_c1",
+   "skill": "collocation",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Safety is a matter of ___ importance.",
+   "answer": "utmost",
+   "alt": [],
+   "en": "utmost importance",
+   "fa": "اهمیت حداکثری",
+   "note": "of the utmost importance",
+   "traps": [],
+   "distractors": [
+    "uttermist",
+    "highest word: most"
+   ]
+  },
+  {
+   "id": "phr058",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The lab will ___ out the tests next week.",
+   "answer": "carry",
+   "alt": [],
+   "en": "carry out",
+   "fa": "انجام دادن",
+   "note": "carry out research/tests/a plan",
+   "traps": [],
+   "distractors": [
+    "bring",
+    "hold"
+   ]
+  },
+  {
+   "id": "phr059",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "They ___ off the launch until March.",
+   "answer": "put",
+   "alt": [],
+   "en": "put off",
+   "fa": "به تعویق انداختن",
+   "note": "put off = postpone",
+   "traps": [],
+   "distractors": [
+    "took",
+    "left"
+   ]
+  },
+  {
+   "id": "phr060",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "My laptop ___ down twice this week.",
+   "answer": "broke",
+   "alt": [],
+   "en": "break down",
+   "fa": "از کار افتادن",
+   "note": "break down = stop working",
+   "traps": [],
+   "distractors": [
+    "fell",
+    "went"
+   ]
+  },
+  {
+   "id": "phr061",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She ___ up a small studio in Tehran.",
+   "answer": "set",
+   "alt": [],
+   "en": "set up",
+   "fa": "راه‌اندازی کردن",
+   "note": "set up a business/system",
+   "traps": [],
+   "distractors": [
+    "stood",
+    "built in"
+   ]
+  },
+  {
+   "id": "phr062",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I had to ___ down their offer.",
+   "answer": "turn",
+   "alt": [],
+   "en": "turn down",
+   "fa": "رد کردن",
+   "note": "turn down an offer",
+   "traps": [],
+   "distractors": [
+    "cut",
+    "put"
+   ]
+  },
+  {
+   "id": "phr063",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We need to ___ up with a better name.",
+   "answer": "come",
+   "alt": [],
+   "en": "come up with",
+   "fa": "به ایده‌ای رسیدن",
+   "note": "come up with an idea",
+   "traps": [],
+   "distractors": [
+    "get",
+    "bring"
+   ]
+  },
+  {
+   "id": "phr064",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The auditors will ___ into the missing funds.",
+   "answer": "look",
+   "alt": [],
+   "en": "look into",
+   "fa": "رسیدگی کردن",
+   "note": "look into a matter",
+   "traps": [],
+   "distractors": [
+    "search",
+    "see"
+   ]
+  },
+  {
+   "id": "phr065",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He ___ out two flaws in the design.",
+   "answer": "pointed",
+   "alt": [],
+   "en": "point out",
+   "fa": "اشاره کردن، گوشزد کردن",
+   "note": "point out a problem",
+   "traps": [],
+   "distractors": [
+    "showed up",
+    "said"
+   ]
+  },
+  {
+   "id": "phr066",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The new policy ___ about real change.",
+   "answer": "brought",
+   "alt": [],
+   "en": "bring about",
+   "fa": "به وجود آوردن",
+   "note": "bring about a change",
+   "traps": [],
+   "distractors": [
+    "carried",
+    "came"
+   ]
+  },
+  {
+   "id": "phr067",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Don't ___ up; the syntax is almost right.",
+   "answer": "give",
+   "alt": [],
+   "en": "give up",
+   "fa": "تسلیم شدن",
+   "note": "give up doing something",
+   "traps": [],
+   "distractors": [
+    "leave",
+    "put"
+   ]
+  },
+  {
+   "id": "phr068",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I can't ___ out why the test fails.",
+   "answer": "figure",
+   "alt": [],
+   "en": "figure out",
+   "fa": "سر در آوردن",
+   "note": "figure out a puzzle/why",
+   "traps": [],
+   "distractors": [
+    "work on",
+    "solve out"
+   ]
+  },
+  {
+   "id": "phr069",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I ___ into an old classmate at the bazaar.",
+   "answer": "ran",
+   "alt": [],
+   "en": "run into",
+   "fa": "به‌طور تصادفی دیدن",
+   "note": "run into someone",
+   "traps": [],
+   "distractors": [
+    "bumped on",
+    "met with"
+   ]
+  },
+  {
+   "id": "phr070",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "It is hard to ___ up with the news cycle.",
+   "answer": "keep",
+   "alt": [],
+   "en": "keep up with",
+   "fa": "هم‌قدم ماندن با",
+   "note": "keep up with something",
+   "traps": [],
+   "distractors": [
+    "catch on",
+    "follow up"
+   ]
+  },
+  {
+   "id": "phr071",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Try to ___ down on sugar this month.",
+   "answer": "cut",
+   "alt": [],
+   "en": "cut down on",
+   "fa": "کاهش دادن",
+   "note": "cut down on something",
+   "traps": [],
+   "distractors": [
+    "lower",
+    "drop off"
+   ]
+  },
+  {
+   "id": "phr072",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I ___ across an old letter in the drawer.",
+   "answer": "came",
+   "alt": [],
+   "en": "come across",
+   "fa": "به‌طور تصادفی پیدا کردن",
+   "note": "come across something",
+   "traps": [],
+   "distractors": [
+    "found over",
+    "met"
+   ]
+  },
+  {
+   "id": "phr073",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Who will ___ with angry customers?",
+   "answer": "deal",
+   "alt": [],
+   "en": "deal with",
+   "fa": "رسیدگی کردن به",
+   "note": "deal with a problem/person",
+   "traps": [],
+   "distractors": [
+    "do up",
+    "treat with"
+   ]
+  },
+  {
+   "id": "phr074",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He ___ up teaching and went into finance.",
+   "answer": "gave",
+   "alt": [],
+   "en": "give up",
+   "fa": "رها کردن",
+   "note": "give up a career",
+   "traps": [],
+   "distractors": [
+    "left from",
+    "dropped off"
+   ]
+  },
+  {
+   "id": "phr075",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We ___ up paying more than we planned.",
+   "answer": "ended",
+   "alt": [],
+   "en": "end up",
+   "fa": "در نهایت به جایی رسیدن",
+   "note": "end up doing something",
+   "traps": [],
+   "distractors": [
+    "finished to",
+    "closed"
+   ]
+  },
+  {
+   "id": "phr076",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The deal ___ through at the last minute.",
+   "answer": "fell",
+   "alt": [],
+   "en": "fall through",
+   "fa": "خوانده نشدن، شکست خوردن",
+   "note": "fall through = fail",
+   "traps": [],
+   "distractors": [
+    "dropped",
+    "broke"
+   ]
+  },
+  {
+   "id": "phr077",
+   "unit": "phrasal",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Do you ___ along with your coworkers?",
+   "answer": "get",
+   "alt": [],
+   "en": "get along with",
+   "fa": "کنار آمدن با",
+   "note": "get along/on with someone",
+   "traps": [],
+   "distractors": [
+    "go along to",
+    "walk"
+   ]
+  },
+  {
+   "id": "phr078",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Please ___ in your assignment by Thursday.",
+   "answer": "hand",
+   "alt": [],
+   "en": "hand in",
+   "fa": "تحویل دادن",
+   "note": "hand in work",
+   "traps": [],
+   "distractors": [
+    "give in to",
+    "deliver"
+   ]
+  },
+  {
+   "id": "phr079",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "___ on a moment, I am almost done.",
+   "answer": "Hold",
+   "alt": [],
+   "en": "hold on",
+   "fa": "صبر کردن",
+   "note": "hold on = wait",
+   "traps": [],
+   "distractors": [
+    "Stay",
+    "Keep"
+   ]
+  },
+  {
+   "id": "phr080",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "I ___ forward to seeing the final cut.",
+   "answer": "look",
+   "alt": [],
+   "en": "look forward to",
+   "fa": "بی‌صبرانه منتظر بودن",
+   "note": "look forward to + ing",
+   "traps": [],
+   "distractors": [
+    "wait forward",
+    "hope"
+   ]
+  },
+  {
+   "id": "phr081",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The kids ___ up an excuse about traffic.",
+   "answer": "made",
+   "alt": [],
+   "en": "make up",
+   "fa": "داستان‌سرایی کردن، جعل کردن",
+   "note": "make up an excuse/story",
+   "traps": [],
+   "distractors": [
+    "invented out",
+    "built"
+   ]
+  },
+  {
+   "id": "phr082",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Do not ___ up such a rare offer.",
+   "answer": "pass",
+   "alt": [],
+   "en": "pass up",
+   "fa": "از دست دادن یک فرصت",
+   "note": "pass up an opportunity",
+   "traps": [],
+   "distractors": [
+    "throw",
+    "miss down"
+   ]
+  },
+  {
+   "id": "phr083",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "She ___ off the presentation despite nerves.",
+   "answer": "pulled",
+   "alt": [],
+   "en": "pull off",
+   "fa": "با موفقیت انجام دادن کار سختی",
+   "note": "pull off something difficult",
+   "traps": [],
+   "distractors": [
+    "carried off to",
+    "managed to"
+   ]
+  },
+  {
+   "id": "phr084",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "I will not ___ up with rude reviews.",
+   "answer": "put",
+   "alt": [],
+   "en": "put up with",
+   "fa": "تحمل کردن",
+   "note": "put up with something",
+   "traps": [],
+   "distractors": [
+    "tolerate up",
+    "stand with"
+   ]
+  },
+  {
+   "id": "phr085",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The police ___ out sabotage early on.",
+   "answer": "ruled",
+   "alt": [],
+   "en": "rule out",
+   "fa": "مسترد کردن، کنار گذاشتن",
+   "note": "rule out a possibility",
+   "traps": [],
+   "distractors": [
+    "excluded out",
+    "denied"
+   ]
+  },
+  {
+   "id": "phr086",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "We ___ out of printer paper again.",
+   "answer": "ran",
+   "alt": [],
+   "en": "run out of",
+   "fa": "تمام شدن موجودی",
+   "note": "run out of something",
+   "traps": [],
+   "distractors": [
+    "finished from",
+    "ended"
+   ]
+  },
+  {
+   "id": "phr087",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Let's ___ out the schedule for Friday.",
+   "answer": "sort",
+   "alt": [],
+   "en": "sort out",
+   "fa": "مرتب و حل کردن",
+   "note": "sort out a problem",
+   "traps": [],
+   "distractors": [
+    "solve out",
+    "arrange up"
+   ]
+  },
+  {
+   "id": "phr088",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The logo ___ for quality in this market.",
+   "answer": "stands",
+   "alt": [],
+   "en": "stand for",
+   "fa": "نماد بودن، به معنای بودن",
+   "note": "stand for something",
+   "traps": [],
+   "distractors": [
+    "means for",
+    "signs"
+   ]
+  },
+  {
+   "id": "phr089",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Her deputy will ___ over while she is away.",
+   "answer": "take",
+   "alt": [],
+   "en": "take over",
+   "fa": "جای کسی را گرفتن",
+   "note": "take over a role/company",
+   "traps": [],
+   "distractors": [
+    "get over",
+    "hold"
+   ]
+  },
+  {
+   "id": "phr090",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Do not ___ away the receipts; we need them.",
+   "answer": "throw",
+   "alt": [],
+   "en": "throw away",
+   "fa": "دور انداختن",
+   "note": "throw away",
+   "traps": [],
+   "distractors": [
+    "put out",
+    "give off"
+   ]
+  },
+  {
+   "id": "phr091",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "We should ___ out the beta with a small group.",
+   "answer": "try",
+   "alt": [],
+   "en": "try out",
+   "fa": "امتحان کردن",
+   "note": "try out a product",
+   "traps": [],
+   "distractors": [
+    "test on",
+    "prove"
+   ]
+  },
+  {
+   "id": "phr092",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "He ___ up late to the interview.",
+   "answer": "turned",
+   "alt": [],
+   "en": "turn up",
+   "fa": "سر رسیدن، حاضر شدن",
+   "note": "turn up = appear",
+   "traps": [],
+   "distractors": [
+    "showed in",
+    "came over"
+   ]
+  },
+  {
+   "id": "phr093",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Cheap cables ___ out within months.",
+   "answer": "wear",
+   "alt": [],
+   "en": "wear out",
+   "fa": "از پا افتادن، فرسوده شدن",
+   "note": "wear out",
+   "traps": [],
+   "distractors": [
+    "tear off",
+    "use over"
+   ]
+  },
+  {
+   "id": "phr094",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The numbers ___ out; we can ship Friday.",
+   "answer": "work",
+   "alt": [],
+   "en": "work out",
+   "fa": "درست از آب درآمدن",
+   "note": "work out = resolve/succeed",
+   "traps": [],
+   "distractors": [
+    "count up",
+    "come to"
+   ]
+  },
+  {
+   "id": "phr095",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Always ___ up the database before updates.",
+   "answer": "back",
+   "alt": [],
+   "en": "back up",
+   "fa": "نسخه پشتیبان گرفتن",
+   "note": "back up files",
+   "traps": [],
+   "distractors": [
+    "support",
+    "copy under"
+   ]
+  },
+  {
+   "id": "phr096",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "I need to ___ up on my French before June.",
+   "answer": "brush",
+   "alt": [],
+   "en": "brush up on",
+   "fa": "تمرین دوباره کردن",
+   "note": "brush up on a skill",
+   "traps": [],
+   "distractors": [
+    "polish",
+    "refresh on"
+   ]
+  },
+  {
+   "id": "phr097",
+   "unit": "phrasal_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Stay late and ___ up with the backlog.",
+   "answer": "catch",
+   "alt": [],
+   "en": "catch up with",
+   "fa": "عقب‌ماندگی را جبران کردن",
+   "note": "catch up with/on",
+   "traps": [],
+   "distractors": [
+    "chase",
+    "reach"
+   ]
+  },
+  {
+   "id": "awl098",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "A close ___ of the data reveals a flaw.",
+   "answer": "analysis",
+   "alt": [],
+   "en": "analysis",
+   "fa": "تحلیل",
+   "note": "analysis (n), analyse (v)",
+   "traps": [],
+   "distractors": [
+    "analyze",
+    "analyses"
+   ]
+  },
+  {
+   "id": "awl099",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Her ___ to the problem is refreshingly simple.",
+   "answer": "approach",
+   "alt": [],
+   "en": "approach",
+   "fa": "رویکرد",
+   "note": "approach to something",
+   "traps": [],
+   "distractors": [
+    "method to",
+    "way of treat"
+   ]
+  },
+  {
+   "id": "awl100",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We must ___ the risks before launch.",
+   "answer": "assess",
+   "alt": [],
+   "en": "assess",
+   "fa": "ارزیابی کردن",
+   "note": "assess a situation",
+   "traps": [],
+   "distractors": [
+    "judge for",
+    "estimate"
+   ]
+  },
+  {
+   "id": "awl101",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ that the server is down, what then?",
+   "answer": "Assuming",
+   "alt": [],
+   "en": "assume",
+   "fa": "فرض کردن",
+   "note": "assuming (that) = if we suppose",
+   "traps": [],
+   "distractors": [
+    "Supposing in",
+    "Taking"
+   ]
+  },
+  {
+   "id": "awl102",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Only the ___ can declare war here.",
+   "answer": "authority",
+   "alt": [],
+   "en": "authority",
+   "fa": "مرجع قدرت",
+   "note": "the authorities",
+   "traps": [],
+   "distractors": [
+    "government word: author",
+    "author"
+   ]
+  },
+  {
+   "id": "awl103",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The archive is freely ___ to students.",
+   "answer": "available",
+   "alt": [],
+   "en": "available",
+   "fa": "در دسترس",
+   "note": "available to someone",
+   "traps": [],
+   "distractors": [
+    "accessible for",
+    "handy"
+   ]
+  },
+  {
+   "id": "awl104",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Regular sleep has clear health ___ .",
+   "answer": "benefits",
+   "alt": [],
+   "en": "benefit",
+   "fa": "منفعت",
+   "note": "benefit from something",
+   "traps": [],
+   "distractors": [
+    "profits in",
+    "goods"
+   ]
+  },
+  {
+   "id": "awl105",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The course builds on three core ___ .",
+   "answer": "concepts",
+   "alt": [],
+   "en": "concept",
+   "fa": "مفهوم",
+   "note": "a concept of/behind",
+   "traps": [],
+   "distractors": [
+    "concepts word: ideas only",
+    "conception"
+   ]
+  },
+  {
+   "id": "awl106",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The committee ___ of nine members.",
+   "answer": "consists",
+   "alt": [],
+   "en": "consist of",
+   "fa": "تشکیل شدن از",
+   "note": "consist of (no passive)",
+   "traps": [],
+   "distractors": [
+    "composes of",
+    "contains of"
+   ]
+  },
+  {
+   "id": "awl107",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Words change meaning depending on ___ .",
+   "answer": "context",
+   "alt": [],
+   "en": "context",
+   "fa": "بافت و زمینه",
+   "note": "in the context of",
+   "traps": [],
+   "distractors": [
+    "texture",
+    "contest"
+   ]
+  },
+  {
+   "id": "awl108",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The trial will ___ over six months.",
+   "answer": "run",
+   "alt": [],
+   "en": "run over a period",
+   "fa": "در طول بودن",
+   "note": "over a period of six months",
+   "traps": [],
+   "distractors": [
+    "during",
+    "within of"
+   ]
+  },
+  {
+   "id": "awl109",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The state will ___ the new rules next year.",
+   "answer": "implement",
+   "alt": [],
+   "en": "implement",
+   "fa": "اجرا کردن",
+   "note": "implement a policy",
+   "traps": [],
+   "distractors": [
+    "inplement",
+    "realize"
+   ]
+  },
+  {
+   "id": "awl110",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Scientists ___ a link between sleep and memory.",
+   "answer": "identify",
+   "alt": [],
+   "en": "identify",
+   "fa": "شناسایی کردن",
+   "note": "identify a link/cause",
+   "traps": [],
+   "distractors": [
+    "prove up",
+    "detect on"
+   ]
+  },
+  {
+   "id": "awl111",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The survey ___ widespread dissatisfaction.",
+   "answer": "indicates",
+   "alt": [],
+   "en": "indicate",
+   "fa": "نشان دادن",
+   "note": "indicate that",
+   "traps": [],
+   "distractors": [
+    "signals out",
+    "points"
+   ]
+  },
+  {
+   "id": "awl112",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Two factors ___ in the price surge.",
+   "answer": "involved",
+   "alt": [],
+   "en": "be involved in",
+   "fa": "درگیر بودن در",
+   "note": "be involved in something",
+   "traps": [],
+   "distractors": [
+    "included to",
+    "concerned of"
+   ]
+  },
+  {
+   "id": "awl113",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Access to clean water is a human ___ .",
+   "answer": "issue",
+   "alt": [],
+   "en": "issue",
+   "fa": "مسئله مهم",
+   "note": "a key/pressing issue",
+   "traps": [],
+   "distractors": [
+    "topic paper",
+    "output"
+   ]
+  },
+  {
+   "id": "awl114",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The law requires ___ consent from parents.",
+   "answer": "explicit",
+   "alt": [],
+   "en": "explicit",
+   "fa": "صریح",
+   "note": "explicit consent",
+   "traps": [],
+   "distractors": [
+    "expressive",
+    "implicit"
+   ]
+  },
+  {
+   "id": "awl115",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Cost is a major ___ in the decision.",
+   "answer": "factor",
+   "alt": [],
+   "en": "factor",
+   "fa": "عامل",
+   "note": "a factor in something",
+   "traps": [],
+   "distractors": [
+    "fact",
+    "agent"
+   ]
+  },
+  {
+   "id": "awl116",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Their estimate ___ the real cost by half.",
+   "answer": "understates",
+   "alt": [],
+   "en": "understate",
+   "fa": "کم‌نمایی کردن",
+   "note": "understate/overstate",
+   "traps": [],
+   "distractors": [
+    "lowerstates",
+    "misstate"
+   ]
+  },
+  {
+   "id": "awl117",
+   "unit": "awl",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "There is ___ evidence for the claim.",
+   "answer": "little",
+   "alt": [],
+   "en": "little evidence",
+   "fa": "اندک شواهدی",
+   "note": "little + uncountable",
+   "traps": [],
+   "distractors": [
+    "few",
+    "a few of"
+   ]
+  },
+  {
+   "id": "awl118",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The word ___ two related meanings in law.",
+   "answer": "carries",
+   "alt": [],
+   "en": "carry a meaning",
+   "fa": "معنایی را حمل کردن",
+   "note": "carry a meaning/connotation",
+   "traps": [],
+   "distractors": [
+    "holds in",
+    "takes"
+   ]
+  },
+  {
+   "id": "awl119",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The finding has been widely ___ in the field.",
+   "answer": "cited",
+   "alt": [],
+   "en": "cite",
+   "fa": "استناد کردن",
+   "note": "cite a source",
+   "traps": [],
+   "distractors": [
+    "sited",
+    "quoted in"
+   ]
+  },
+  {
+   "id": "awl120",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The data ___ the earlier hypothesis.",
+   "answer": "contradicts",
+   "alt": [],
+   "en": "contradict",
+   "fa": "نقض کردن",
+   "note": "contradict a claim",
+   "traps": [],
+   "distractors": [
+    "contrast to",
+    "deny of"
+   ]
+  },
+  {
+   "id": "awl121",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Oil revenues ___ the entire budget.",
+   "answer": "dominate",
+   "alt": [],
+   "en": "dominate",
+   "fa": "چیره بودن بر",
+   "note": "dominate a market",
+   "traps": [],
+   "distractors": [
+    "rule over to",
+    "master"
+   ]
+  },
+  {
+   "id": "awl122",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The rule no longer ___ to freelancers.",
+   "answer": "applies",
+   "alt": [],
+   "en": "apply to",
+   "fa": "شامل شدن، مصداق داشتن",
+   "note": "apply to someone",
+   "traps": [],
+   "distractors": [
+    "fit to",
+    "belong"
+   ]
+  },
+  {
+   "id": "awl123",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The two effects are hard to ___ .",
+   "answer": "isolate",
+   "alt": [],
+   "en": "isolate",
+   "fa": "جدا کردن",
+   "note": "isolate a variable",
+   "traps": [],
+   "distractors": [
+    "island",
+    "seclude"
+   ]
+  },
+  {
+   "id": "awl124",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The theorem was later ___ by another team.",
+   "answer": "verified",
+   "alt": [],
+   "en": "verify",
+   "fa": "راستی‌آزمایی کردن",
+   "note": "verify a result",
+   "traps": [],
+   "distractors": [
+    "verity",
+    "confirmed in"
+   ]
+  },
+  {
+   "id": "awl125",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "A ___ of studies supports the method.",
+   "answer": "body",
+   "alt": [],
+   "en": "a body of evidence",
+   "fa": "پیکره‌ای از شواهد",
+   "note": "a body of work/evidence",
+   "traps": [],
+   "distractors": [
+    "bunch",
+    "collection of a"
+   ]
+  },
+  {
+   "id": "awl126",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The sample was ___ small to be conclusive.",
+   "answer": "too",
+   "alt": [],
+   "en": "too small to",
+   "fa": "برای نتیجه‌گیری خیلی کوچک",
+   "note": "too + adj + to",
+   "traps": [],
+   "distractors": [
+    "so",
+    "very to"
+   ]
+  },
+  {
+   "id": "awl127",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The curve ___ sharply after 2010.",
+   "answer": "steepens",
+   "alt": [],
+   "en": "steepen",
+   "fa": "تندتر شدن",
+   "note": "a steep rise",
+   "traps": [],
+   "distractors": [
+    "stiffens",
+    "sharps"
+   ]
+  },
+  {
+   "id": "awl128",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The drug is ___ administered twice daily.",
+   "answer": "typically",
+   "alt": [],
+   "en": "typically",
+   "fa": "به‌طور معمول",
+   "note": "typically = usually",
+   "traps": [],
+   "distractors": [
+    "typical",
+    "type"
+   ]
+  },
+  {
+   "id": "awl129",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The effect size was ___ significant.",
+   "answer": "marginally",
+   "alt": [],
+   "en": "marginally",
+   "fa": "در حد مرز، اندک",
+   "note": "marginally significant",
+   "traps": [],
+   "distractors": [
+    "marginal",
+    "margin"
+   ]
+  },
+  {
+   "id": "awl130",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The author ___ a bolder interpretation.",
+   "answer": "adopts",
+   "alt": [],
+   "en": "adopt",
+   "fa": "پذیرفتن یک رویکرد",
+   "note": "adopt an approach",
+   "traps": [],
+   "distractors": [
+    "adapt",
+    "accept in"
+   ]
+  },
+  {
+   "id": "awl131",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Critics ___ the methodology as flawed.",
+   "answer": "characterize",
+   "alt": [],
+   "en": "characterize as",
+   "fa": "توصیف کردن به عنوان",
+   "note": "characterize something as",
+   "traps": [],
+   "distractors": [
+    "character",
+    "qualify of"
+   ]
+  },
+  {
+   "id": "awl132",
+   "unit": "awl_c1",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The two datasets are directly ___ .",
+   "answer": "comparable",
+   "alt": [],
+   "en": "comparable",
+   "fa": "مقایسه‌پذیر",
+   "note": "comparable with/to",
+   "traps": [],
+   "distractors": [
+    "comparative",
+    "compatible"
+   ]
+  },
+  {
+   "id": "grm133",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We watched ___ film about the Silk Road.",
+   "answer": "a",
+   "alt": [],
+   "en": "a film",
+   "fa": "یک فیلم (نامعین)",
+   "note": "First mention takes a/an.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "the",
+    "one of"
+   ]
+  },
+  {
+   "id": "grm134",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She is ___ engineer at a telecom firm.",
+   "answer": "an",
+   "alt": [],
+   "en": "an engineer",
+   "fa": "مهندس (قبل از حرف صدادار an)",
+   "note": "an before vowel sounds.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "a",
+    "the"
+   ]
+  },
+  {
+   "id": "grm135",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ moon looked enormous last night.",
+   "answer": "The",
+   "alt": [],
+   "en": "the moon",
+   "fa": "ماه (یگانه: the)",
+   "note": "Unique things take the.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "A",
+    "One"
+   ]
+  },
+  {
+   "id": "grm136",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I saw ___ movie yesterday; it was dull.",
+   "answer": "the",
+   "alt": [],
+   "en": "the movie",
+   "fa": "فیلم را دیدم (معین)",
+   "note": "Persian has no articles: second mention takes the.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "a",
+    "one"
+   ]
+  },
+  {
+   "id": "grm137",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ honesty is the best policy.",
+   "answer": "",
+   "alt": [],
+   "en": "Honesty",
+   "fa": "صداقت (بی‌حرف تعریف)",
+   "note": "Abstract nouns take no article.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "The",
+    "An"
+   ]
+  },
+  {
+   "id": "grm138",
+   "unit": "grm_articles",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He was sent to ___ prison for fraud.",
+   "answer": "",
+   "alt": [],
+   "en": "to prison",
+   "fa": "به زندان رفتن (به‌عنوان نهاد)",
+   "note": "go to prison = as a prisoner; the prison = the building.",
+   "traps": [
+    "articles"
+   ],
+   "distractors": [
+    "the",
+    "a"
+   ]
+  },
+  {
+   "id": "grm139",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She gave me a useful piece of ___ .",
+   "answer": "advice",
+   "alt": [],
+   "en": "advice",
+   "fa": "توصیه (شمارش‌ناپذیر)",
+   "note": "advice is uncountable: a piece of advice.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "advices",
+    "advise"
+   ]
+  },
+  {
+   "id": "grm140",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "How much ___ do you get per week?",
+   "answer": "homework",
+   "alt": [],
+   "en": "homework",
+   "fa": "تکلیف (شمارش‌ناپذیر)",
+   "note": "homework is uncountable.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "homeworks",
+    "a homework"
+   ]
+  },
+  {
+   "id": "grm141",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The article contains several sharp ___ .",
+   "answer": "criticisms",
+   "alt": [],
+   "en": "criticism",
+   "fa": "نقد (جمع بی‌قاعده معنایی)",
+   "note": "criticism uncountable; criticisms = specific critiques.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "criticism s",
+    "critiques s"
+   ]
+  },
+  {
+   "id": "grm142",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "How ___ books did you read last year?",
+   "answer": "many",
+   "alt": [],
+   "en": "many",
+   "fa": "چند (برای قابل‌شمارش)",
+   "note": "many + countable; much + uncountable.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "much",
+    "lot"
+   ]
+  },
+  {
+   "id": "grm143",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ students failed than last term.",
+   "answer": "Fewer",
+   "alt": [],
+   "en": "fewer",
+   "fa": "کمتر (قابل‌شمارش)",
+   "note": "fewer for countable, less for uncountable.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "Less",
+    "Few of"
+   ]
+  },
+  {
+   "id": "grm144",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I bought two ___ for the trip.",
+   "answer": "books",
+   "alt": [],
+   "en": "books",
+   "fa": "کتاب (بعد از عدد جمع می‌آید)",
+   "note": "English marks plural after numbers; Persian does not: do ketab.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "book",
+    "bookes"
+   ]
+  },
+  {
+   "id": "grm145",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Ten ___ ago we had no smartphones.",
+   "answer": "years",
+   "alt": [],
+   "en": "years",
+   "fa": "سال (جمع بعد از عدد)",
+   "note": "ten years ago",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "year",
+    "yaers"
+   ]
+  },
+  {
+   "id": "grm146",
+   "unit": "grm_count",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The news ___ better than expected.",
+   "answer": "was",
+   "alt": [],
+   "en": "was",
+   "fa": "خبر بود (مفرد)",
+   "note": "news is singular in English.",
+   "traps": [
+    "countability",
+    "plurals"
+   ],
+   "distractors": [
+    "were",
+    "is being"
+   ]
+  },
+  {
+   "id": "grm147",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He ___ a teacher at a girls' school.",
+   "answer": "is",
+   "alt": [],
+   "en": "is",
+   "fa": "است (فعل بودن حال)",
+   "note": "Persian attaches the copula as a suffix (-e); English needs is/are.",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "nothing",
+    "be"
+   ]
+  },
+  {
+   "id": "grm148",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "This book ___ interesting so far.",
+   "answer": "is",
+   "alt": [],
+   "en": "is",
+   "fa": "است",
+   "note": "English needs an explicit verb in present.",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "being",
+    "looks as"
+   ]
+  },
+  {
+   "id": "grm149",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I ___ the answer right now.",
+   "answer": "know",
+   "alt": [],
+   "en": "know",
+   "fa": "می‌دانم (حال ساده)",
+   "note": "Stative verbs resist -ing: I know, not I am knowing.",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "am knowing",
+    "do know to"
+   ]
+  },
+  {
+   "id": "grm150",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She ___ her coffee at the moment.",
+   "answer": "enjoys",
+   "alt": [],
+   "en": "enjoy",
+   "fa": "لذت می‌برد",
+   "note": "Enjoy is not stative: she is enjoying is fine. Careful set.",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "is enjoying her",
+    "enjoy"
+   ]
+  },
+  {
+   "id": "grm151",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "They ___ to leave early today.",
+   "answer": "want",
+   "alt": [],
+   "en": "want",
+   "fa": "می‌خواهند",
+   "note": "want is stative: I want, never I am wanting.",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "are wanting",
+    "do want to"
+   ]
+  },
+  {
+   "id": "grm152",
+   "unit": "grm_copula",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "This sauce ___ garlic.",
+   "answer": "tastes of",
+   "alt": [],
+   "en": "taste of",
+   "fa": "طعم چیزی را دادن",
+   "note": "taste of = has the flavor (stative use).",
+   "traps": [
+    "copula",
+    "statives"
+   ],
+   "distractors": [
+    "is tasting of",
+    "tastes like of"
+   ]
+  },
+  {
+   "id": "grm153",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The meeting is ___ Monday morning.",
+   "answer": "on",
+   "alt": [],
+   "en": "on Monday",
+   "fa": "روی/در روزها: on",
+   "note": "English uses on for days; Persian 'dar' covers all.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "at"
+   ]
+  },
+  {
+   "id": "grm154",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I stayed ___ home and studied.",
+   "answer": "at",
+   "alt": [],
+   "en": "at home",
+   "fa": "در خانه: at",
+   "note": "at home is the fixed phrase.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "on"
+   ]
+  },
+  {
+   "id": "grm155",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She is married ___ an architect.",
+   "answer": "to",
+   "alt": [],
+   "en": "married to",
+   "fa": "متأهل با: married to",
+   "note": "married to someone (never 'married with').",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "with",
+    "by"
+   ]
+  },
+  {
+   "id": "grm156",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Success depends ___ consistent practice.",
+   "answer": "on",
+   "alt": [],
+   "en": "depend on",
+   "fa": "بستگی داشتن به",
+   "note": "depend on someone/something.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "of",
+    "from"
+   ]
+  },
+  {
+   "id": "grm157",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "We arrived ___ the airport at dawn.",
+   "answer": "at",
+   "alt": [],
+   "en": "arrive at",
+   "fa": "رسیدن به (مکان)",
+   "note": "arrive at a point, arrive in a city.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "to"
+   ]
+  },
+  {
+   "id": "grm158",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He is good ___ explaining hard ideas.",
+   "answer": "at",
+   "alt": [],
+   "en": "good at",
+   "fa": "خوب بودن در",
+   "note": "good at something/doing.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "on"
+   ]
+  },
+  {
+   "id": "grm159",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The office is ___ the third floor.",
+   "answer": "on",
+   "alt": [],
+   "en": "on the floor",
+   "fa": "در طبقه: on",
+   "note": "on the third floor.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "at"
+   ]
+  },
+  {
+   "id": "grm160",
+   "unit": "grm_prep",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I will travel ___ Friday morning.",
+   "answer": "on",
+   "alt": [],
+   "en": "on Friday",
+   "fa": "روز جمعه: on",
+   "note": "on Friday morning.",
+   "traps": [
+    "prepositions"
+   ],
+   "distractors": [
+    "in",
+    "at"
+   ]
+  },
+  {
+   "id": "grm161",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I ___ him at the conference yesterday.",
+   "answer": "saw",
+   "alt": [],
+   "en": "saw",
+   "fa": "دیدم (گذشته ساده)",
+   "note": "Finished time words (yesterday) take simple past; Persian rafte-am misleads.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "have seen",
+    "had seen"
+   ]
+  },
+  {
+   "id": "grm162",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I ___ here since Monday.",
+   "answer": "have been",
+   "alt": [],
+   "en": "have been",
+   "fa": "هستم (از دوشنبه تا حالا)",
+   "note": "since + present perfect; Persian uses present: az doshanbe hastam.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "am",
+    "was"
+   ]
+  },
+  {
+   "id": "grm163",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She ___ her keys; she cannot get in.",
+   "answer": "has lost",
+   "alt": [],
+   "en": "has lost",
+   "fa": "گم کرده (نتیجه حال حاضر)",
+   "note": "Present perfect for present result.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "lost",
+    "had lost"
+   ]
+  },
+  {
+   "id": "grm164",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "When ___ you buy that jacket?",
+   "answer": "did",
+   "alt": [],
+   "en": "did you buy",
+   "fa": "کی خریدی؟",
+   "note": "Questions about finished time use did.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "have",
+    "were"
+   ]
+  },
+  {
+   "id": "grm165",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "This is the best film I ___ this year.",
+   "answer": "have seen",
+   "alt": [],
+   "en": "have seen",
+   "fa": "دیده‌ام (تا حالا)",
+   "note": "Superlative + ever/this year takes present perfect.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "saw",
+    "had seen"
+   ]
+  },
+  {
+   "id": "grm166",
+   "unit": "grm_tense",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "By the time we arrived, the talk ___ .",
+   "answer": "had ended",
+   "alt": [],
+   "en": "had ended",
+   "fa": "تمام شده بود (گذشته پیشین)",
+   "note": "Earlier past takes past perfect.",
+   "traps": [
+    "perfect"
+   ],
+   "distractors": [
+    "has ended",
+    "ended already"
+   ]
+  },
+  {
+   "id": "grm167",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "Do you know where the station ___ ?",
+   "answer": "is",
+   "alt": [],
+   "en": "where the station is",
+   "fa": "کجاست (ترتیب غیرمستقیم)",
+   "note": "Embedded questions drop do/does and keep subject+verb order.",
+   "traps": [
+    "question_order"
+   ],
+   "distractors": [
+    "is the station",
+    "does the station is"
+   ]
+  },
+  {
+   "id": "grm168",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "I wonder where she ___ last night.",
+   "answer": "went",
+   "alt": [],
+   "en": "where she went",
+   "fa": "کجا رفت",
+   "note": "No aux in embedded questions.",
+   "traps": [
+    "question_order"
+   ],
+   "distractors": [
+    "did go",
+    "did she go"
+   ]
+  },
+  {
+   "id": "grm169",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "He asked me where I ___ .",
+   "answer": "lived",
+   "alt": [],
+   "en": "where I lived",
+   "fa": "کجا زندگی می‌کردم",
+   "note": "Persian 'ke' is not English 'that' here.",
+   "traps": [
+    "question_order"
+   ],
+   "distractors": [
+    "do live",
+    "that I lived"
+   ]
+  },
+  {
+   "id": "grm170",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "___ is important to review daily.",
+   "answer": "It",
+   "alt": [],
+   "en": "It is important",
+   "fa": "این مهم است",
+   "note": "English needs a dummy subject; Persian drops it.",
+   "traps": [
+    "that_omission"
+   ],
+   "distractors": [
+    "That",
+    "This is"
+   ]
+  },
+  {
+   "id": "grm171",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "It was an ___ film about memory.",
+   "answer": "interesting",
+   "alt": [],
+   "en": "an interesting film",
+   "fa": "فیلم جالبی",
+   "note": "Adjective precedes the noun; Persian puts it after.",
+   "traps": [
+    "adjectives"
+   ],
+   "distractors": [
+    "film interesting",
+    "interested"
+   ]
+  },
+  {
+   "id": "grm172",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "She wore a ___ jacket to the interview.",
+   "answer": "beautiful leather",
+   "alt": [],
+   "en": "a beautiful leather jacket",
+   "fa": "کت چرمی زیبا",
+   "note": "Opinion before material: beautiful leather.",
+   "traps": [
+    "adjectives"
+   ],
+   "distractors": [
+    "leather beautiful",
+    "leathered beautiful"
+   ]
+  },
+  {
+   "id": "grm173",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "The engineer ___ designed the bridge won a prize.",
+   "answer": "who",
+   "alt": [],
+   "en": "who",
+   "fa": "که (فاعل)",
+   "note": "who for people as subject; which for things.",
+   "traps": [],
+   "distractors": [
+    "which",
+    "whom"
+   ]
+  },
+  {
+   "id": "grm174",
+   "unit": "grm_struct",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "cloze",
+   "prompt": "A ___ of birds settled on the wire.",
+   "answer": "flock",
+   "alt": [],
+   "en": "a flock of birds",
+   "fa": "دسته‌ای از پرندگان",
+   "note": "Collective: a flock of birds.",
+   "traps": [],
+   "distractors": [
+    "group bird",
+    "herd"
+   ]
+  },
+  {
+   "id": "reg175",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "In formal reports, ___ obtain is preferred to get.",
+   "answer": "formal",
+   "alt": [],
+   "en": "obtain (formal)",
+   "fa": "به دست آوردن (رسمی)",
+   "note": "get is fine in speech; obtain in writing.",
+   "traps": [],
+   "distractors": [
+    "slang",
+    "casual"
+   ]
+  },
+  {
+   "id": "reg176",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The committee will ___ the findings next week.",
+   "answer": "consider",
+   "alt": [],
+   "en": "consider",
+   "fa": "بررسی و مد نظر قرار دادن",
+   "note": "think about → consider in writing.",
+   "traps": [],
+   "distractors": [
+    "think over on",
+    "ponder of"
+   ]
+  },
+  {
+   "id": "reg177",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "We must ___ the data before publishing.",
+   "answer": "verify",
+   "alt": [],
+   "en": "verify",
+   "fa": "راستی‌آزمایی کردن",
+   "note": "check → verify in formal register.",
+   "traps": [],
+   "distractors": [
+    "check out",
+    "vet out"
+   ]
+  },
+  {
+   "id": "reg178",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The contract was ___ by both parties.",
+   "answer": "terminated",
+   "alt": [],
+   "en": "terminated",
+   "fa": "فسخ شد",
+   "note": "end → terminate in legal register.",
+   "traps": [],
+   "distractors": [
+    "terminated up",
+    "ended off"
+   ]
+  },
+  {
+   "id": "reg179",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "___ the figures rose, morale fell.",
+   "answer": "Whereas",
+   "alt": [],
+   "en": "whereas",
+   "fa": "در حالی که (مقایسه رسمی)",
+   "note": "whereas links contrast in writing.",
+   "traps": [],
+   "distractors": [
+    "While that",
+    "Where as"
+   ]
+  },
+  {
+   "id": "reg180",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The results were ___; no action is needed.",
+   "answer": "inconclusive",
+   "alt": [],
+   "en": "inconclusive",
+   "fa": "بی‌نتیجه",
+   "note": "in- + conclusive.",
+   "traps": [],
+   "distractors": [
+    "unconclusive",
+    "nonconclusive"
+   ]
+  },
+  {
+   "id": "reg181",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "___ the delay, the shipment arrived intact.",
+   "answer": "Despite",
+   "alt": [],
+   "en": "despite",
+   "fa": "علی‌رغم (بدون of)",
+   "note": "despite + noun (no of); in spite of + noun.",
+   "traps": [],
+   "distractors": [
+    "Despite of",
+    "Although"
+   ]
+  },
+  {
+   "id": "reg182",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The drug is safe, ___ expensive to produce.",
+   "answer": "albeit",
+   "alt": [],
+   "en": "albeit",
+   "fa": "هرچند (ادبی)",
+   "note": "albeit = although, formal single word.",
+   "traps": [],
+   "distractors": [
+    "allbeit",
+    "through"
+   ]
+  },
+  {
+   "id": "reg183",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Costs fell, ___ boosting quarterly profit.",
+   "answer": "thereby",
+   "alt": [],
+   "en": "thereby",
+   "fa": "بدین ترتیب (رسمی)",
+   "note": "thereby + ing shows result.",
+   "traps": [],
+   "distractors": [
+    "there for",
+    "hence of"
+   ]
+  },
+  {
+   "id": "reg184",
+   "unit": "register",
+   "skill": "grammar",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "___ , the two studies agree on the basics.",
+   "answer": "On balance",
+   "alt": [],
+   "en": "on balance",
+   "fa": "در مجموع",
+   "note": "on balance = after weighing everything.",
+   "traps": [],
+   "distractors": [
+    "In balance",
+    "At balance"
+   ]
+  },
+  {
+   "id": "wb185",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The ___ of the bridge took three years.",
+   "answer": "construction",
+   "alt": [],
+   "en": "construction",
+   "fa": "ساخت",
+   "note": "construct (v) → construction (n).",
+   "traps": [],
+   "distractors": [
+    "constructing word",
+    "construct"
+   ]
+  },
+  {
+   "id": "wb186",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Their ___ was visible after the first win.",
+   "answer": "confidence",
+   "alt": [],
+   "en": "confidence",
+   "fa": "اطمینان",
+   "note": "confident (adj) → confidence (n).",
+   "traps": [],
+   "distractors": [
+    "confidency",
+    "confide"
+   ]
+  },
+  {
+   "id": "wb187",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The plan died from pure ___ .",
+   "answer": "neglect",
+   "alt": [],
+   "en": "neglect",
+   "fa": "بی‌مهری و رها شدن",
+   "note": "neglect (n and v).",
+   "traps": [],
+   "distractors": [
+    "neglection",
+    "neglectment"
+   ]
+  },
+  {
+   "id": "wb188",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "He answered with surprising ___ .",
+   "answer": "honesty",
+   "alt": [],
+   "en": "honesty",
+   "fa": "صداقت",
+   "note": "honest → honesty.",
+   "traps": [],
+   "distractors": [
+    "honestness",
+    "honestation"
+   ]
+  },
+  {
+   "id": "wb189",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "There is strong ___ for the new policy.",
+   "answer": "opposition",
+   "alt": [],
+   "en": "opposition",
+   "fa": "مخالفت",
+   "note": "oppose → opposition.",
+   "traps": [],
+   "distractors": [
+    "opposal",
+    "opposing"
+   ]
+  },
+  {
+   "id": "wb190",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "They measured the ___ of the canyon.",
+   "answer": "depth",
+   "alt": [],
+   "en": "depth",
+   "fa": "عمق",
+   "note": "deep → depth; long → length; wide → width.",
+   "traps": [],
+   "distractors": [
+    "deepness",
+    "deepth"
+   ]
+  },
+  {
+   "id": "wb191",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The ___ of the law took decades.",
+   "answer": "enforcement",
+   "alt": [],
+   "en": "enforcement",
+   "fa": "اجرای قانون",
+   "note": "enforce → enforcement.",
+   "traps": [],
+   "distractors": [
+    "enforcing word",
+    "enforcity"
+   ]
+  },
+  {
+   "id": "wb192",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "It is ___ to park across two spaces.",
+   "answer": "illegal",
+   "alt": [],
+   "en": "illegal",
+   "fa": "غیرقانونی",
+   "note": "il- before l: illegal.",
+   "traps": [],
+   "distractors": [
+    "unlegal",
+    "dislegal"
+   ]
+  },
+  {
+   "id": "wb193",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "Her excuse was completely ___ .",
+   "answer": "implausible",
+   "alt": [],
+   "en": "implausible",
+   "fa": "باورنکردنی",
+   "note": "im- before p: implausible.",
+   "traps": [],
+   "distractors": [
+    "unplausible",
+    "displausible"
+   ]
+  },
+  {
+   "id": "wb194",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The survey found growing ___ with the app.",
+   "answer": "dissatisfaction",
+   "alt": [],
+   "en": "dissatisfaction",
+   "fa": "نارضایتی",
+   "note": "dis- + satisfaction.",
+   "traps": [],
+   "distractors": [
+    "unsatisfaction",
+    "missatisfaction"
+   ]
+  },
+  {
+   "id": "wb195",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "The two accounts are ___ inconsistent.",
+   "answer": "mutually",
+   "alt": [],
+   "en": "mutually",
+   "fa": "به‌طور متقابل",
+   "note": "mutual → mutually.",
+   "traps": [],
+   "distractors": [
+    "mutuality",
+    "mutual"
+   ]
+  },
+  {
+   "id": "wb196",
+   "unit": "wordbuild",
+   "skill": "vocabulary",
+   "level": "C1",
+   "kind": "cloze",
+   "prompt": "___ speaking, the second draft is stronger.",
+   "answer": "Broadly",
+   "alt": [],
+   "en": "broadly speaking",
+   "fa": "در مجموع، کلی‌گفته",
+   "note": "broadly speaking = in general.",
+   "traps": [],
+   "distractors": [
+    "Broad",
+    "Broady"
+   ]
+  },
+  {
+   "id": "ef197",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "to achieve",
+   "fa": "به دست آوردن، محقق کردن",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef198",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "reliable",
+   "fa": "قابل اعتماد",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef199",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "to postpone",
+   "fa": "به تعویق انداختن",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef200",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "a deadline",
+   "fa": "ضرب‌الاجل",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef201",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "to afford",
+   "fa": "از پس هزینه‌ای برآمدن",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef202",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "an advantage",
+   "fa": "مزیت",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef203",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "to improve",
+   "fa": "بهبود بخشیدن",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef204",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "surprising",
+   "fa": "شگفت‌انگیز",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef205",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "necessary",
+   "fa": "ضروری",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef206",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "to suggest",
+   "fa": "پیشنهاد دادن، نشان دادن",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef207",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "eventually",
+   "fa": "سرانجام",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "ef208",
+   "unit": "ef_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "ef",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "careless",
+   "fa": "بی‌دقت، سهل‌انگار",
+   "note": "recall the Farsi meaning, then check",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae209",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "discuss",
+   "fa": "بحث کردن درباره",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae210",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "available",
+   "fa": "در دسترس",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae211",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "calm",
+   "fa": "خونسرد، آرام",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae212",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "experience",
+   "fa": "تجربه",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae213",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "opportunity",
+   "fa": "فرصت",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae214",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "responsible",
+   "fa": "مسئولیت‌پذیر",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae215",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "improvement",
+   "fa": "بهبود",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "fae216",
+   "unit": "fae_core",
+   "skill": "vocabulary",
+   "level": "B2",
+   "kind": "fae",
+   "prompt": "",
+   "answer": "",
+   "alt": [],
+   "en": "difficult",
+   "fa": "دشوار، سخت",
+   "note": "produce the English word",
+   "traps": [],
+   "distractors": []
+  },
+  {
+   "id": "sent217",
+   "unit": "sent_core",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "sent",
+   "prompt": "Type the full sentence: 'I / see / that movie / twice' (present perfect)",
+   "answer": "I have seen that movie twice.",
+   "alt": [],
+   "en": "I have seen that movie twice.",
+   "fa": "آن فیلم را دوبار دیده‌ام.",
+   "note": "Present perfect with twice.",
+   "traps": [
+    "I seen that movie twice.",
+    "I have saw that movie twice."
+   ],
+   "distractors": []
+  },
+  {
+   "id": "sent218",
+   "unit": "sent_core",
+   "skill": "grammar",
+   "level": "B2",
+   "kind": "sent",
+   "prompt": "Type the full sentence: 'Do you know / where / is / the exit?' (embedded)",
+   "answer": "Do you know where the exit is?",
+   "alt": [],
+   "en": "Do you know where the exit is?",
+   "fa": "می‌دانی خروجی کجاست؟",
+   "note": "Embedded question word order.",
+   "traps": [
+    "Do you know where is the exit?",
+    "Do you know where is exit?"
+   ],
+   "distractors": []
+  }
+ ]
+}

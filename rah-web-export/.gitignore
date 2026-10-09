@@ -52,7 +52,3 @@ prompt
 server.log
 # Skills directory
 /skills/
-# env secrets - never commit
-.env
-.env.local
-.env*.local

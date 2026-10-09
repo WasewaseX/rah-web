@@ -1,0 +1,653 @@
+     1→// Rah UI. Vanilla JS, no dependencies. Talks to the local operon server.
+     2→// Keyboard: Enter to check, 1-4 to grade, u undo, Ctrl+1..9 navigate.
+     3→
+     4→const $ = (id) => document.getElementById(id);
+     5→let STATE = null;
+     6→let CURRENT_CARD = null;
+     7→let REVIEW_TOTAL = 0;
+     8→let REVIEW_DONE = 0;
+     9→let CHAT_TASK = null;
+    10→let PLACEMENT = null;
+    11→
+    12→function toast(msg, isErr) {
+    13→  const t = $("toast");
+    14→  t.textContent = msg;
+    15→  t.classList.toggle("err", !!isErr);
+    16→  t.classList.remove("hidden");
+    17→  clearTimeout(t._h);
+    18→  t._h = setTimeout(() => t.classList.add("hidden"), 3200);
+    19→}
+    20→
+    21→async function api(path, body) {
+    22→  const res = await fetch("/api/" + path, {
+    23→    method: "POST",
+    24→    headers: { "Content-Type": "application/json" },
+    25→    body: JSON.stringify(body || {})
+    26→  });
+    27→  const data = await res.json();
+    28→  if (data && data.ok === false && data.error) toast(data.error, true);
+    29→  return data;
+    30→}
+    31→
+    32→// ---------- navigation
+    33→const SCREENS = ["home", "chat", "review", "writing", "quiz", "reading", "decks", "stats", "settings", "placement"];
+    34→function go(name) {
+    35→  for (const s of SCREENS) $(`scr-${s}`).classList.add("hidden");
+    36→  $(`scr-${name}`).classList.remove("hidden");
+    37→  document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.go === name));
+    38→  if (name === "home") renderHome();
+    39→  if (name === "chat") renderChat();
+    40→  if (name === "review") reviewNext();
+    41→  if (name === "decks") renderDeck();
+    42→  if (name === "stats") renderStats();
+    43→  if (name === "settings") renderSettings();
+    44→  if (name === "reading") renderReadings();
+    45→}
+    46→document.querySelectorAll(".navbtn").forEach(b => b.onclick = () => go(b.dataset.go));
+    47→document.addEventListener("click", (e) => {
+    48→  const t = e.target.closest("[data-go]");
+    49→  if (t) go(t.dataset.go);
+    50→});
+    51→document.addEventListener("keydown", (e) => {
+    52→  if (e.ctrlKey && e.key >= "1" && e.key <= "9") {
+    53→    const s = SCREENS[parseInt(e.key) - 1];
+    54→    if (s) { e.preventDefault(); go(s); }
+    55→  }
+    56→});
+    57→
+    58→// ---------- home
+    59→async function renderHome() {
+    60→  STATE = await api("state");
+    61→  if (!STATE || STATE.ok !== true) return;
+    62→  $("navstreak").textContent = (STATE.streak || 0) + "d";
+    63→  $("navxp").textContent = (STATE.xp || 0) + " xp";
+    64→  const lv = STATE.levels || {};
+    65→  const order = ["vocabulary", "grammar", "reading", "writing", "fluency"];
+    66→  $("home-levels").innerHTML = order.map(s => {
+    67→    const one = lv[s] || { cefr: "B2", pct: 0 };
+    68→    return `<div class="levelcard"><div class="nm">${s}</div><div class="lv">${one.cefr}</div>
+    69→      <div class="levelbar"><div style="width:${one.pct || 0}%"></div></div></div>`;
+    70→  }).join("");
+    71→  const p = STATE.plan || {};
+    72→  const items = (p.items || []).map(i => {
+    73→    const n = i.n != null ? `<b>${i.n}</b>` : "";
+    74→    return `<div class="planitem"><span>${i.label}</span>${n}</div>`;
+    75→  }).join("");
+    76→  $("home-plan").innerHTML = items + `<div class="planitem dim"><span>focus trap</span><b>${p.focus_trap || "none yet"}</b></div>`;
+    77→  $("onboard").classList.toggle("hidden", !!STATE.onboarded);
+    78→}
+    79→
+    80→// ---------- placement
+    81→$("btn-onboard").onclick = startPlacement;
+    82→async function startPlacement() {
+    83→  go("placement");
+    84→  $("placement-body").innerHTML = "<p class='dim'>Loading items...</p>";
+    85→  const r = await api("placement/start");
+    86→  if (!r || r.ok !== true) { $("placement-body").innerHTML = "<p>Could not start.</p>"; return; }
+    87→  PLACEMENT = { sec: r.sec, item: r.item };
+    88→  renderPlacementItem(r.item, r.passage);
+    89→}
+    90→
+    91→function renderPlacementItem(item, passage) {
+    92→  const secNames = { grammar: "Grammar", vocab: "Vocabulary", collocation: "Collocation", reading: "Reading" };
+    93→  let html = `<p class="dim">Section: ${secNames[PLACEMENT.sec] || PLACEMENT.sec}</p>`;
+    94→  if (passage) html += `<div class="glossary">${passage}</div>`;
+    95→  html += `<p style="font-size:18px">${item.q}</p>`;
+    96→  html += item.choices.map((c, i) => `<button class="choice" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
+    97→  $("placement-body").innerHTML = html;
+    98→  document.querySelectorAll("#placement-body .choice").forEach(b => b.onclick = () => answerPlacement(b));
+    99→}
+   100→
+   101→async function answerPlacement(btn) {
+   102→  const choice = btn.dataset.c;
+   103→  document.querySelectorAll("#placement-body .choice").forEach(b => b.disabled = true);
+   104→  const r = await api("placement/answer", { item: PLACEMENT.item.id, choice });
+   105→  if (!r || r.ok !== true) return;
+   106→  btn.classList.add(r.correct ? "right" : "wrong");
+   107→  await new Promise(res => setTimeout(res, 550));
+   108→  if (r.section_done && r.writing) { renderPlacementWriting(r.prompt); return; }
+   109→  if (r.section_done) {
+   110→    PLACEMENT.sec = r.sec;
+   111→    renderPlacementItem(r.next, r.passage);
+   112→    return;
+   113→  }
+   114→  if (r.next) renderPlacementItem(r.next, r.passage);
+   115→}
+   116→
+   117→function renderPlacementWriting(prompt) {
+   118→  $("placement-body").innerHTML = `
+   119→    <p class="dim">Final section: writing. This one is graded by your AI model, so configure one in Settings if none is set.</p>
+   120→    <p style="font-size:17px">${escapeHtml(prompt || "Write about 200 words on a topic you know well.")}</p>
+   121→    <textarea id="pw-text" rows="9" placeholder="Write at least 40 words..."></textarea>
+   122→    <button id="pw-submit" class="primary" style="margin-top:10px">Submit sample</button>`;
+   123→  $("pw-submit").onclick = async () => {
+   124→    const text = $("pw-text").value;
+   125→    $("pw-submit").disabled = true;
+   126→    const r = await api("placement/writing", { text, prompt: prompt || "" });
+   127→    if (!r || r.ok !== true) { $("pw-submit").disabled = false; return; }
+   128→    pollPlacement(r.task, 0);
+   129→  };
+   130→}
+   131→
+   132→async function pollPlacement(task, tries) {
+   133→  if (tries > 240) { toast("Grading timed out", true); return; }
+   134→  const r = await api("placement/poll", { task });
+   135→  if (!r) return;
+   136→  if (r.status !== "done") { setTimeout(() => pollPlacement(task, tries + 1), 1500); return; }
+   137→  if (r.ok !== true) { toast(r.error || "grading failed", true); $("placement-body").innerHTML += `<p>Your sections were saved. Levels use section scores.</p>`; return; }
+   138→  const lv = r.levels || {};
+   139→  const rows = Object.keys(lv).map(s => `<div class="planitem"><span>${s}</span><b>${lv[s].cefr}</b></div>`).join("");
+   140→  $("placement-body").innerHTML = `
+   141→    <h2>Your starting levels</h2>${rows}
+   142→    <p class="dim">${escapeHtml(r.reasons || "")}</p>
+   143→    <button class="primary" onclick="location.reload()">Start learning</button>`;
+   144→}
+   145→
+   146→// ---------- review
+   147→async function reviewNext() {
+   148→  CURRENT_CARD = null;
+   149→  $("review-card").classList.add("hidden");
+   150→  $("review-done").classList.add("hidden");
+   151→  const r = await api("review/next");
+   152→  if (!r || r.ok !== true) return;
+   153→  if (r.done) {
+   154→    $("review-done").classList.remove("hidden");
+   155→    $("review-donestats").textContent = `Reviewed ${r.reviews_today || 0} today. Goal: ${r.goal || 0}.`;
+   156→    return;
+   157→  }
+   158→  CURRENT_CARD = r.card;
+   159→  REVIEW_TOTAL = Math.max(REVIEW_TOTAL, r.remaining || 0);
+   160→  REVIEW_DONE = Math.max(0, REVIEW_TOTAL - (r.remaining || 0));
+   161→  $("review-progressfill").style.width = (100 * REVIEW_DONE / Math.max(1, r.remaining + REVIEW_DONE)) + "%";
+   162→  $("review-meta").textContent = `${r.remaining} in queue | ${r.card.skill} | ${unitLabel(r.card.unit)} | ${r.card.level}`;
+   163→  $("review-kind").textContent = r.card.recall;
+   164→  $("review-prompt").innerHTML = formatPrompt(r.card.prompt);
+   165→  $("review-hint").textContent = r.card.hint || "";
+   166→  $("review-typewrap").classList.add("hidden");
+   167→  $("review-revealwrap").classList.add("hidden");
+   168→  $("review-gradewrap").classList.add("hidden");
+   169→  $("review-choicewrap").classList.add("hidden");
+   170→  $("review-answer").textContent = "";
+   171→  $("review-note").textContent = "";
+   172→  $("review-fa").textContent = "";
+   173→  $("review-card").classList.remove("hidden");
+   174→  _cardShownAt = Date.now();
+   175→  if (r.card.recall === "cloze" || r.card.recall === "sent") {
+   176→    $("review-typewrap").classList.remove("hidden");
+   177→    $("review-type").value = "";
+   178→    $("review-type").focus();
+   179→  } else if (r.card.recall === "gap") {
+   180→    renderGap(r.card);
+   181→  } else {
+   182→    $("review-revealwrap").classList.remove("hidden");
+   183→    $("review-gradewrap").classList.remove("hidden");
+   184→    loadPreview();
+   185→  }
+   186→}
+   187→let _cardShownAt = Date.now();
+   188→
+   189→function formatPrompt(text) {
+   190→  return escapeHtml(text).replace(/_{3,}/g, '<span style="color:var(--accent)">____</span>');
+   191→}
+   192→
+   193→function renderGap(card) {
+   194→  const wrap = $("review-choicewrap");
+   195→  wrap.innerHTML = (card.choices || []).map(c => `<button class="choice" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
+   196→  wrap.classList.remove("hidden");
+   197→  wrap.querySelectorAll("button").forEach(b => b.onclick = () => gradeCard(0, b.dataset.c));
+   198→}
+   199→
+   200→async function loadPreview() {
+   201→  if (!CURRENT_CARD) return;
+   202→  const r = await api("review/preview", { id: CURRENT_CARD.id });
+   203→  if (!r || !r.ivls) return;
+   204→  const names = ["Again", "Hard", "Good", "Easy"];
+   205→  document.querySelectorAll("#review-gradewrap .grade").forEach((b, i) => {
+   206→    b.querySelector("span").textContent = fmtIvl(r.ivls[i]);
+   207→  });
+   208→}
+   209→
+   210→function fmtIvl(d) {
+   211→  if (d == null) return "";
+   212→  if (d < 1) return "10m";
+   213→  if (d < 30) return d + "d";
+   214→  if (d < 365) return Math.round(d / 30) + "mo";
+   215→  return Math.round(d / 365) + "y";
+   216→}
+   217→
+   218→async function gradeCard(rating, typed) {
+   219→  if (!CURRENT_CARD) return;
+   220→  typed = typed != null ? typed : ($("review-type").value || "");
+   221→  const ms = Date.now() - _cardShownAt;
+   222→  const r = await api("review/grade", {
+   223→    id: CURRENT_CARD.id, rating: rating || 0, recall: CURRENT_CARD.recall, typed, ms
+   224→  });
+   225→  if (!r || r.ok !== true) return;
+   226→  if (r.correct === false) {
+   227→    $("review-hint").textContent = "";
+   228→    $("review-typewrap").classList.add("hidden");
+   229→    $("review-revealwrap").classList.remove("hidden");
+   230→    $("review-gradewrap").classList.remove("hidden");
+   231→    $("review-answer").textContent = r.answer;
+   232→    $("review-answer").classList.add("miss");
+   233→    $("review-fa").textContent = r.fa || "";
+   234→    $("review-note").textContent = r.note || "";
+   235→    loadPreview();
+   236→    return;
+   237→  }
+   238→  reviewNext();
+   239→}
+   240→
+   241→async function undoReview() {
+   242→  await api("review/undo");
+   243→  reviewNext();
+   244→}
+   245→
+   246→// review keyboard
+   247→$("review-type").addEventListener("keydown", (e) => {
+   248→  if (e.key === "Enter") { e.preventDefault(); gradeCard(0); }
+   249→});
+   250→document.addEventListener("keydown", (e) => {
+   251→  if ($("scr-review").classList.contains("hidden") || !CURRENT_CARD) return;
+   252→  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+   253→    if (e.key === "u" && e.ctrlKey) { e.preventDefault(); undoReview(); }
+   254→    return;
+   255→  }
+   256→  if ($("review-gradewrap").classList.contains("hidden")) return;
+   257→  if (e.key === "1") gradeCard(1);
+   258→  if (e.key === "2") gradeCard(2);
+   259→  if (e.key === "3") gradeCard(3);
+   260→  if (e.key === "4") gradeCard(4);
+   261→  if (e.key === "u") undoReview();
+   262→});
+   263→
+   264→// ---------- chat
+   265→async function renderChat() {
+   266→  const r = await api("chat/history");
+   267→  const hist = (r && r.ok) ? (r.history || []) : [];
+   268→  $("chat-thread").innerHTML = "";
+   269→  hist.forEach(m => appendMsg(m.role, m.content, m.corrections, m.fa_note));
+   270→  const empty = $("chat-empty");
+   271→  if (!hist.length) {
+   272→    empty.classList.remove("hidden");
+   273→    const ai = await api("state");
+   274→    const ready = ai && ai.ok && (ai.providers || []).length > 0;
+   275→    $("chat-empty-ai").classList.toggle("hidden", !!ready);
+   276→  } else {
+   277→    empty.classList.add("hidden");
+   278→  }
+   279→  $("chat-thread").scrollTop = 1e9;
+   280→}
+   281→
+   282→function appendMsg(role, text, corrections, faNote) {
+   283→  const div = document.createElement("div");
+   284→  div.className = "msg " + role;
+   285→  div.textContent = text;
+   286→  let html = `<div class="msgtext">${escapeHtml(text)}</div>`;
+   287→  if (corrections && corrections.length) {
+   288→    html += `<div class="corrections">` + corrections.map(c => `
+   289→      <div class="corr">
+   290→        <div><span class="wrong">${escapeHtml(c.wrong)}</span> <span class="right">${escapeHtml(c.right)}</span></div>
+   291→        ${c.trap && c.trap !== "none" ? `<div class="trap">${escapeHtml(c.trap)}</div>` : ""}
+   292→        <div class="fa">${escapeHtml(c.fa || "")}</div>
+   293→      </div>`).join("") + `</div>`;
+   294→  }
+   295→  if (faNote) html += `<div class="fanote">${escapeHtml(faNote)}</div>`;
+   296→  div.innerHTML = html;
+   297→  $("chat-thread").appendChild(div);
+   298→  $("chat-thread").scrollTop = 1e9;
+   299→  return div;
+   300→}
+   301→
+   302→async function sendChat() {
+   303→  const input = $("chat-input");
+   304→  const text = input.value.trim();
+   305→  if (!text) return;
+   306→  input.value = "";
+   307→  appendMsg("user", text);
+   308→  const think = appendMsg("assistant", "...");
+   309→  think.classList.add("thinking");
+   310→  const r = await api("chat/send", { text });
+   311→  if (!r || r.ok !== true) { think.remove(); return; }
+   312→  pollChat(r.task, 0, think);
+   313→}
+   314→
+   315→async function pollChat(task, tries, think) {
+   316→  if (tries > 400) { think.textContent = "The model took too long. Try again."; return; }
+   317→  const r = await api("chat/poll", { task });
+   318→  if (!r) return;
+   319→  if (r.status !== "done") { setTimeout(() => pollChat(task, tries + 1, think), 1200); return; }
+   320→  think.remove();
+   321→  if (r.ok !== true) { toast(r.error || "model call failed", true); return; }
+   322→  appendMsg("assistant", r.reply, r.corrections, r.fa_note);
+   323→  STATE = await api("state");
+   324→  $("navstreak").textContent = (STATE.streak || 0) + "d";
+   325→}
+   326→$("chat-send").onclick = sendChat;
+   327→$("chat-input").addEventListener("keydown", (e) => {
+   328→  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+   329→});
+   330→
+   331→// ---------- writing
+   332→$("writing-submit").onclick = async () => {
+   333→  const text = $("writing-text").value;
+   334→  const prompt = $("writing-prompt").value;
+   335→  if (text.trim().split(/\s+/).length < 30) { toast("Write at least 30 words", true); return; }
+   336→  $("writing-submit").disabled = true;
+   337→  const r = await api("writing/submit", { text, prompt });
+   338→  if (!r || r.ok !== true) { $("writing-submit").disabled = false; return; }
+   339→  $("writing-result").innerHTML = "<p class='dim'>Grading against CEFR B2 and C1 descriptors...</p>";
+   340→  pollGeneric(r.task, "writing", $("writing-result"), renderWritingGrade);
+   341→  $("writing-submit").disabled = false;
+   342→};
+   343→
+   344→function renderWritingGrade(g) {
+   345→  const s = g.scores || {};
+   346→  const order = ["task", "organization", "range", "accuracy"];
+   347→  let html = `<h3>Level: <span style="color:var(--good)">${escapeHtml(g.level || "B2")}</span></h3>
+   348→    <div class="rubric">` + order.map(k => `<div class="levelcard"><div class="nm">${k}</div><b>${s[k] != null ? s[k] : "-"}</b>/10</div>`).join("") + `</div>
+   349→    <p>${escapeHtml(g.verdict || "")}</p>`;
+   350→  if (g.errors && g.errors.length) {
+   351→    html += `<h3>Errors that matter</h3>` + g.errors.map(e => `
+   352→      <div class="errrow"><span class="wrong" style="color:var(--bad)">${escapeHtml(e.bad)}</span>
+   353→      <span style="color:var(--good)">${escapeHtml(e.good)}</span>
+   354→      ${e.type && e.type !== "none" ? `<span class="pill">${escapeHtml(e.type)}</span>` : ""}
+   355→      <div class="rtl">${escapeHtml(e.fa || "")}</div></div>`).join("");
+   356→  }
+   357→  if (g.upgrades && g.upgrades.length) {
+   358→    html += `<h3>Upgrades toward C1</h3>` + g.upgrades.map(u2 => `
+   359→      <div class="uprow">${escapeHtml(u2.plain)} <span class="dim">becomes</span>
+   360→      <b style="color:var(--accent)">${escapeHtml(u2.c1)}</b>
+   361→      <div class="rtl">${escapeHtml(u2.fa || "")}</div></div>`).join("");
+   362→  }
+   363→  if (g.next_focus) html += `<p class="dim">Next focus: ${escapeHtml(g.next_focus)}</p>`;
+   364→  return html;
+   365→}
+   366→
+   367→// ---------- quiz
+   368→$("quiz-generate").onclick = async () => {
+   369→  const text = $("quiz-text").value;
+   370→  if (text.trim().split(/\s+/).length < 60) { toast("Paste at least 60 words", true); return; }
+   371→  $("quiz-generate").disabled = true;
+   372→  const r = await api("quiz/generate", { text });
+   373→  if (!r || r.ok !== true) { $("quiz-generate").disabled = false; return; }
+   374→  $("quiz-area").innerHTML = "<p class='dim'>Building the quiz...</p>";
+   375→  pollGeneric(r.task, "quiz", $("quiz-area"), renderQuiz);
+   376→  $("quiz-generate").disabled = false;
+   377→};
+   378→
+   379→function renderQuiz(q) {
+   380→  let html = `<h3>${escapeHtml(q.title || "Quiz")}</h3>`;
+   381→  (q.items || []).forEach((it, i) => {
+   382→    html += `<div class="qblock" data-i="${i}"><p><b>${i + 1}.</b> ${escapeHtml(it.q)}</p>`;
+   383→    if (it.type === "mcq") {
+   384→      html += (it.choices || []).map(c => `<button class="choice qopt" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join(" ");
+   385→    } else {
+   386→      html += `<input class="qin" placeholder="your answer"> <button class="qcheck">Check</button>`;
+   387→    }
+   388→    html += `<div class="qout dim"></div><div class="qfa rtl"></div></div>`;
+   389→  });
+   390→  return html;
+   391→}
+   392→
+   393→document.addEventListener("click", async (e) => {
+   394→  const opt = e.target.closest(".qopt");
+   395→  if (!opt || !$("quiz-area").contains(opt)) return;
+   396→  const block = opt.closest(".qblock");
+   397→  const i = parseInt(block.dataset.i);
+   398→  await answerQuiz(i, opt.dataset.c, block, opt);
+   399→});
+   400→
+   401→document.addEventListener("click", async (e) => {
+   402→  if (!e.target.classList.contains("qcheck")) return;
+   403→  const block = e.target.closest(".qblock");
+   404→  const i = parseInt(block.dataset.i);
+   405→  await answerQuiz(i, block.querySelector(".qin").value, block, null);
+   406→});
+   407→
+   408→async function answerQuiz(i, choice, block, btn) {
+   409→  const q = _currentQuiz; if (!q) return;
+   410→  const r = await api("quiz/answer", { qid: q.id, i, choice });
+   411→  if (!r || r.ok !== true) return;
+   412→  block.querySelector(".qout").innerHTML = (r.correct ? "Correct. " : "Answer: <b>" + escapeHtml(r.answer) + "</b>. ") + escapeHtml(r.why || "");
+   413→  block.querySelector(".qfa").textContent = (q.items[i] && q.items[i].fa) || "";
+   414→  if (btn) btn.classList.add(r.correct ? "right" : "wrong");
+   415→}
+   416→
+   417→// ---------- generic polling for AI jobs
+   418→let _currentQuiz = null;
+   419→async function pollGeneric(task, kind, el, render) {
+   420→  const r = await api("poll", { task, kind });
+   421→  if (!r) return;
+   422→  if (r.status !== "done") { setTimeout(() => pollGeneric(task, kind, el, render), 1500); return; }
+   423→  if (r.ok !== true) { el.innerHTML = `<p style="color:var(--bad)">${escapeHtml(r.error || "failed")}</p>`; return; }
+   424→  if (kind === "quiz") { _currentQuiz = r.quiz; el.innerHTML = render(r.quiz); }
+   425→  else el.innerHTML = render(r.grade);
+   426→}
+   427→
+   428→// ---------- readings
+   429→async function renderReadings() {
+   430→  const r = await api("reading/list");
+   431→  if (!r || !r.ok) return;
+   432→  $("reading-list").innerHTML = (r.readings || []).map(rd => {
+   433→    const first = String(rd.text || "").split(/(?<=[.!?])\s/)[0] || "";
+   434→    const teaser = first.length > 110 ? first.slice(0, 107).trimEnd() + "..." : first;
+   435→    return `
+   436→    <div class="levelcard readcard" data-id="${rd.id}">
+   437→      <div class="nm">${rd.level} | ${rd.minutes} min</div>
+   438→      <div class="lv" style="font-size:16px">${escapeHtml(rd.title)}</div>
+   439→      <div class="dim" style="font-size:13px; margin-top:6px">${escapeHtml(teaser)}</div>
+   440→    </div>`;
+   441→  }).join("");
+   442→  document.querySelectorAll(".readcard").forEach(c => c.onclick = () => openReading(c.dataset.id));
+   443→  $("reading-view").classList.add("hidden");
+   444→  $("reading-list").classList.remove("hidden");
+   445→}
+   446→
+   447→async function openReading(id) {
+   448→  const r = await api("reading/get", { id });
+   449→  if (!r || !r.ok) return;
+   450→  const rd = r.reading;
+   451→  $("reading-list").classList.add("hidden");
+   452→  $("reading-view").classList.remove("hidden");
+   453→  let html = `<h2>${escapeHtml(rd.title)} <span class="pill">${rd.level}</span></h2>`;
+   454→  html += `<div id="reading-text">${rd.text.split("\n").map(p => `<p>${escapeHtml(p)}</p>`).join("")}</div>`;
+   455→  html += `<div class="glossary"><b>Glossary</b>` + (rd.glossary || []).map(g =>
+   456→    `<div class="planitem"><span>${escapeHtml(g.w)}</span><span class="rtl">${escapeHtml(g.fa)}</span></div>`).join("") + `</div>`;
+   457→  html += `<h3>Check your understanding</h3>`;
+   458→  (rd.questions || []).forEach((q, i) => {
+   459→    html += `<div class="qblock" data-i="${i}" data-a="${q.a}"><p><b>${i + 1}.</b> ${escapeHtml(q.q)}</p>` +
+   460→      q.choices.map((c, j) => `<button class="choice rq" data-j="${j}">${escapeHtml(c)}</button>`).join(" ") + `</div>`;
+   461→  });
+   462→  html += `<button id="rd-cards" class="primary">Turn key language into cards</button><div id="rd-out"></div>`;
+   463→  $("reading-body").innerHTML = html;
+   464→  document.querySelectorAll("#reading-body .rq").forEach(b => b.onclick = () => {
+   465→    const blk = b.closest(".qblock");
+   466→    const okr = parseInt(blk.dataset.a) === parseInt(b.dataset.j);
+   467→    blk.querySelectorAll(".rq").forEach(x => x.disabled = true);
+   468→    b.classList.add(okr ? "right" : "wrong");
+   469→  });
+   470→  $("rd-cards").onclick = async () => {
+   471→    $("rd-out").textContent = "Extracting...";
+   472→    const res = await api("import/text", { text: rd.text });
+   473→    if (!res || !res.ok) { $("rd-out").textContent = "Import failed. Configure a provider first."; return; }
+   474→    pollGeneric(res.task, "import", $("rd-out"), (g) => `Added ${g.added} cards to the deck.`);
+   475→  };
+   476→}
+   477→$("reading-back").onclick = () => { $("reading-view").classList.add("hidden"); $("reading-list").classList.remove("hidden"); };
+   478→
+   479→// ---------- deck
+   480→async function renderDeck() {
+   481→  const q = $("deck-q").value;
+   482→  const unit = $("deck-unit").value;
+   483→  const r = await api("deck/list", { q, unit });
+   484→  if (!r || !r.ok) return;
+   485→  const units = r.units || {};
+   486→  const sel = $("deck-unit");
+   487→  const cur = sel.value;
+   488→  sel.innerHTML = `<option value="">all units</option>` + Object.keys(units).map(u2 =>
+   489→    `<option value="${escapeHtml(u2)}">${escapeHtml(u2)} (${units[u2]})</option>`).join("");
+   490→  sel.value = cur;
+   491→  document.querySelector("#deck-table tbody").innerHTML = (r.cards || []).slice(0, 400).map(c => `
+   492→    <tr><td>${escapeHtml(c.en || c.prompt || c.answer)}</td><td>${escapeHtml(unitLabel(c.unit))}</td>
+   493→    <td>${escapeHtml(c.level)}</td><td><span class="pill ${c.state}">${c.state}</span></td>
+   494→    <td>${c.due ? fmtIvl(c.due - todayIdx()) : "-"}</td></tr>`).join("");
+   495→}
+   496→function todayIdx() { return Math.floor(Date.now() / 86400000); }
+   497→
+   498→$("deck-q").addEventListener("input", () => renderDeck());
+   499→$("deck-unit").addEventListener("change", () => renderDeck());
+   500→$("deck-addtoggle").onclick = () => $("deck-addform").classList.toggle("hidden");
+   501→$("deck-importtoggle").onclick = () => $("deck-importform").classList.toggle("hidden");
+   502→
+   503→$("add-save").onclick = async () => {
+   504→  const r = await api("card/add", {
+   505→    en: $("add-en").value, fa: $("add-fa").value, prompt: $("add-prompt").value,
+   506→    answer: $("add-answer").value, kind: $("add-kind").value, unit: "mine"
+   507→  });
+   508→  if (r && r.ok) { toast("Card added"); renderDeck(); }
+   509→};
+   510→
+   511→$("import-run").onclick = async () => {
+   512→  const text = $("import-text").value;
+   513→  if (text.trim().split(/\s+/).length < 60) { toast("Paste at least 60 words", true); return; }
+   514→  $("import-out").textContent = "Extracting...";
+   515→  const r = await api("import/text", { text });
+   516→  if (!r || !r.ok) { $("import-out").textContent = "Import failed. Configure a provider in Settings."; return; }
+   517→  pollGeneric(r.task, "import", $("import-out"), (g) => `Added ${g.added} cards.`);
+   518→};
+   519→
+   520→// ---------- stats
+   521→async function renderStats() {
+   522→  const r = await api("stats");
+   523→  if (!r || !r.ok) return;
+   524→  $("stats-row").innerHTML = `
+   525→    <div class="levelcard statcard"><div class="nm">reviews total</div><b>${r.total_reviews}</b></div>
+   526→    <div class="levelcard statcard"><div class="nm">young cards</div><b>${r.young}</b></div>
+   527→    <div class="levelcard statcard"><div class="nm">mature (21d+)</div><b>${r.mature}</b></div>
+   528→    <div class="levelcard statcard"><div class="nm">due now</div><b>${r.due_now}</b></div>
+   529→    <div class="levelcard statcard"><div class="nm">streak</div><b>${r.streak}d</b></div>`;
+   530→  const max = Math.max(1, ...(r.days || []).map(d => d.reviews));
+   531→  $("stats-bars").innerHTML = (r.days || []).map(d => {
+   532→    const h = Math.max(2, Math.round(100 * d.reviews / max));
+   533→    const zero = d.reviews ? "" : " zero";
+   534→    return `<div class="bar${zero}" style="height:${h}%"><span class="val">${d.reviews}</span><span class="lbl">${dayLabel(d.day)}</span></div>`;
+   535→  }).join("");
+   536→  $("stats-traps").innerHTML = (r.traps || []).length
+   537→    ? r.traps.map(t => `<div class="traprow"><span>${t.trap}</span><b>${t.count} hits</b></div>`).join("")
+   538→    : `<p class="dim">No traps recorded yet. They appear when corrections are tagged in chat.</p>`;
+   539→}
+   540→
+   541→function dayLabel(dayIdx) {
+   542→  const d = new Date((dayIdx * 86400 + 43200) * 1000);
+   543→  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getUTCDay()] + " " + d.getUTCDate();
+   544→}
+   545→const UNIT_LABELS = {
+   546→  "colloc_core": "collocations", "colloc_c1": "collocations C1",
+   547→  "phrasal": "phrasal verbs", "phrasal_c1": "phrasal verbs C1",
+   548→  "awl": "academic words", "awl_c1": "academic words C1",
+   549→  "grm_articles": "grammar: articles", "grm_count": "grammar: plurals and count",
+   550→  "grm_copula": "grammar: copula", "grm_prep": "grammar: prepositions",
+   551→  "grm_tense": "grammar: tenses", "grm_struct": "grammar: structure",
+   552→  "register": "register", "wordbuild": "word building",
+   553→  "ef_core": "en to fa", "fae_core": "fa to en", "sent_core": "sentences", "mine": "my cards"
+   554→};
+   555→function unitLabel(u) { return UNIT_LABELS[u] || (u || "").replace(/_/g, " "); }
+   556→
+   557→// ---------- settings
+   558→async function renderSettings() {
+   559→  STATE = await api("state");
+   560→  if (!STATE || STATE.ok !== true) return;
+   561→  const s = STATE.settings || {};
+   562→  $("set-retention").value = s.retention || 0.9;
+   563→  $("set-new").value = s.new_limit || 12;
+   564→  $("set-maxreview").value = s.max_review || 120;
+   565→  $("set-reading").value = s.reading_target || 900;
+   566→  $("set-goal").value = s.daily_goal_reviews || 30;
+   567→  const provs = STATE.providers || [];
+   568→  $("provider-list").innerHTML = provs.map(p => `
+   569→    <div class="provcard">
+   570→      <div><span class="fid">${escapeHtml(p.label)}</span> <span class="dim">${escapeHtml(p.family)}</span>
+   571→      ${STATE.provider_id === p.id ? '<span class="pill review">default</span>' : ""}</div>
+   572→      <div class="dim">${escapeHtml(p.base)} ${p.keyset ? "| key " + escapeHtml(p.key_masked) : "| no key"}</div>
+   573→      <div class="dim">model: ${escapeHtml(p.model || "not set")}</div>
+   574→      <button onclick="listModels('${p.id}')">Fetch models</button>
+   575→      <button onclick="runBenchmark('${p.id}')">Auto benchmark</button>
+   576→    </div>`).join("") || "<p class='dim'>No provider yet. Add one below.</p>";
+   577→  const fm = STATE.feature_models || {};
+   578→  const feats = ["chat", "quiz", "grade", "placement"];
+   579→  $("feature-map").innerHTML = feats.map(f2 =>
+   580→    `<label>${f2}<input id="fm-${f2}" value="${escapeHtml(fm[f2] || "")}" placeholder="provider model"></label>`).join("");
+   581→}
+   582→window.listModels = async function(pid) {
+   583→  const r = await api("providers/models", { id: pid });
+   584→  if (!r || !r.ok) return;
+   585→  pollGeneric(r.task, "models", $("prov-out"), (g) => {
+   586→    return `<div class="glossary">${(g.ids || []).slice(0, 60).map(i2 =>
+   587→      `<div class="planitem"><span>${escapeHtml(i2)}</span><button onclick="useModel('${escapeHtml(i2)}')">use</button></div>`).join("")}</div>`;
+   588→  });
+   589→};
+   590→window.useModel = function(m) {
+   591→  $("prov-model").value = m;
+   592→  toast("Model set in the form. Save the provider to apply.");
+   593→};
+   594→window.runBenchmark = async function(pid) {
+   595→  const r = await api("providers/benchmark", { id: pid });
+   596→  if (!r || !r.ok) return;
+   597→  $("prov-out").innerHTML = "<p class='dim'>Probing candidate models with a tiny test prompt. This costs a few cents...</p>";
+   598→  pollGeneric(r.task, "benchmark", $("prov-out"), (g) => {
+   599→    return `<div class="glossary">` + (g.all || []).map(m2 =>
+   600→      `<div class="planitem"><span>${escapeHtml(m2.id)}</span><b>${m2.ok ? Math.round(m2.ms) + "ms" : "failed"} ${m2.correct ? "| follows instructions" : ""}</b></div>`).join("") + `</div>
+   601→      <p class="dim">Pick the top correct model for chat and jobs.</p>`;
+   602→  });
+   603→};
+   604→$("prov-family").onchange = () => {
+   605→  const b = $("prov-family").value;
+   606→  const presets = {
+   607→    openai: "https://api.openai.com/v1",
+   608→    anthropic: "https://api.anthropic.com",
+   609→    gemini: "https://generativelanguage.googleapis.com/v1beta",
+   610→    ollama: "http://localhost:11434",
+   611→    custom: ""
+   612→  };
+   613→  $("prov-base").value = presets[b] || "";
+   614→};
+   615→$("prov-save").onclick = async () => {
+   616→  const r = await api("providers/save", {
+   617→    id: "", family: $("prov-family").value, base: $("prov-base").value,
+   618→    key: $("prov-key").value, model: $("prov-model").value,
+   619→    label: $("prov-family").selectedOptions[0].text.split(" (")[0],
+   620→    make_default: $("prov-default").checked
+   621→  });
+   622→  if (r && r.ok) { toast("Provider saved"); renderSettings(); }
+   623→};
+   624→$("set-save").onclick = async () => {
+   625→  const r = await api("settings/set", {
+   626→    retention: parseFloat($("set-retention").value) || 0.9,
+   627→    new_limit: parseInt($("set-new").value) || 12,
+   628→    max_review: parseInt($("set-maxreview").value) || 120,
+   629→    reading_target: parseInt($("set-reading").value) || 900,
+   630→    daily_goal_reviews: parseInt($("set-goal").value) || 30,
+   631→    feature_models: {
+   632→      chat: $("fm-chat").value, quiz: $("fm-quiz").value,
+   633→      grade: $("fm-grade").value, placement: $("fm-placement").value
+   634→    }
+   635→  });
+   636→  if (r && r.ok) toast("Settings saved");
+   637→};
+   638→$("btn-export").onclick = async () => {
+   639→  const r = await api("export");
+   640→  if (!r || !r.ok) return;
+   641→  const blob = new Blob([JSON.stringify(r, null, 1)], { type: "application/json" });
+   642→  const a = document.createElement("a");
+   643→  a.href = URL.createObjectURL(blob);
+   644→  a.download = "rah_export.json";
+   645→  a.click();
+   646→};
+   647→
+   648→// ---------- boot
+   649→function escapeHtml(s) {
+   650→  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+   651→}
+   652→go("home");
+   653→
