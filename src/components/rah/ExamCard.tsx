@@ -127,7 +127,7 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
           <div>
             <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">{exam.title}</div>
             <div className="text-xs font-semibold text-[#8b96a9]">
-              {exam.count} questions · about {exam.spec.minutes} min · mixed: {exam.spec.targetSkills.join(", ")}
+              {exam.count} questions · about {exam.spec.minutes} min · {exam.spec.targetSkills.length === 1 ? `focus: ${exam.spec.targetSkills[0]}` : `mixed: ${exam.spec.targetSkills.join(", ")}`}
             </div>
           </div>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[var(--rah-primary)]/40 text-[11px] font-black text-[#9dc0ff]">
