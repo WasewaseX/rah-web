@@ -17,6 +17,7 @@ export async function GET() {
   const speaks = await db.speakSession.count();
   const seen = await db.cardState.count();
   const profile = await buildProfile();
+  const theme = l.theme ? JSON.parse(l.theme) : null;
   return NextResponse.json({
     learner: {
       level: l.level,
@@ -27,6 +28,7 @@ export async function GET() {
       focusSkill: l.focusSkill,
       placementPhase: l.placementPhase,
     },
+    theme,
     today: stat ?? { reviews: 0, correct: 0, xp: 0, spoken: 0, written: 0, listened: 0 },
     due,
     seen,

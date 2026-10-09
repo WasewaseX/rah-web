@@ -50,14 +50,23 @@
 */
 :root,
 .dark {
+  /* Rah theme plugin tokens. The coach repaints the app by writing these
+     five variables; every component reads them through Tailwind arbitrary
+     values. Defaults = Rah Midnight. */
+  --rah-primary: #4e8cff;
+  --rah-primary-deep: #2650a3;
+  --rah-accent: #4cc9f0;
+  --rah-bg: #10131a;
+  --rah-surface: #1a1f2b;
+
   --radius: 0.75rem;
-  --background: #10131a;
+  --background: var(--rah-bg);
   --foreground: #f2f5fa;
-  --card: #1a1f2b;
+  --card: var(--rah-surface);
   --card-foreground: #f2f5fa;
-  --popover: #1a1f2b;
+  --popover: var(--rah-surface);
   --popover-foreground: #f2f5fa;
-  --primary: #4e8cff;
+  --primary: var(--rah-primary);
   --primary-foreground: #0b1220;
   --secondary: #212836;
   --secondary-foreground: #f2f5fa;
@@ -68,20 +77,20 @@
   --destructive: #ff6b81;
   --border: rgba(255, 255, 255, 0.07);
   --input: #262d3b;
-  --ring: #4e8cff;
-  --chart-1: #4e8cff;
+  --ring: var(--rah-primary);
+  --chart-1: var(--rah-primary);
   --chart-2: #3ccb7f;
   --chart-3: #ffb02e;
-  --chart-4: #4cc9f0;
+  --chart-4: var(--rah-accent);
   --chart-5: #ff6b81;
   --sidebar: #0e1421;
   --sidebar-foreground: #f2f5fa;
-  --sidebar-primary: #4e8cff;
+  --sidebar-primary: var(--rah-primary);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1c2536;
   --sidebar-accent-foreground: #cfe0ff;
   --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-ring: #4e8cff;
+  --sidebar-ring: var(--rah-primary);
 }
 
 @layer base {
@@ -112,7 +121,7 @@
   ::-webkit-scrollbar-thumb {
     background: #2a3242;
     border-radius: 999px;
-    border: 2px solid #10131a;
+    border: 2px solid var(--rah-bg);
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #39445a;

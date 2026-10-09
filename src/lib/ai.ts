@@ -79,6 +79,7 @@ async function completeRaw(
   system: string,
   history: { role: "user" | "assistant"; content: string }[],
   escalate = 0,
+  deep = false,
 ): Promise<string> {
   const zai = await ZAI.create();
   const msgs: { role: "user" | "assistant"; content: string }[] = [
@@ -100,7 +101,7 @@ async function completeRaw(
   }
   const completion = await zai.chat.completions.create({
     messages: msgs,
-    thinking: { type: "disabled" },
+    thinking: { type: deep ? "enabled" : "disabled" },
   });
   const out = completion.choices[0]?.message?.content;
   if (!out || out.trim().length === 0) throw new Error("empty ai reply");
@@ -110,17 +111,19 @@ async function completeRaw(
 // One call = one complete, parseable envelope. Retries escalate: attempt 2 and
 // 3 re-assert the JSON contract next to the latest user turn. If every attempt
 // still yields no JSON, the last raw reply is wrapped into a minimal envelope
-// so the coach is never unreachable.
+// so the coach is never unreachable. `deep` enables extended reasoning for
+// jobs that earn it (exam building, level analysis) at the cost of seconds.
 export async function aiJson<T>(
   system: string,
   history: { role: "user" | "assistant"; content: string }[],
   fallback?: (raw: string) => T,
+  deep = false,
 ): Promise<T> {
   let lastRaw = "";
   let lastErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const raw = await completeRaw(system, history, attempt);
+      const raw = await completeRaw(system, history, attempt, deep);
       lastRaw = raw;
       return extractJson(raw) as T;
     } catch (e) {

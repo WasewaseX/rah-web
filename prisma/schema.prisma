@@ -19,6 +19,7 @@ model Learner {
   level          String  @default("?")
   placementPhase String  @default("none") // none | quiz | writing | done
   focusSkill     String  @default("vocabulary")
+  theme          String  @default("") // JSON theme tokens set by the theme plugin
   createdAt      DateTime @default(now())
 }
 
@@ -94,4 +95,25 @@ model QuizItem {
   src  String // text | reading:rd1 | chat
   quiz String // full JSON
   at   DateTime @default(now())
+}
+
+// Coach-built exam. Answers live server side; the client only sees items
+// without keys until the grade route scores a submission.
+model Exam {
+  id        String   @id
+  title     String
+  spec      String // JSON: level, targetSkills, plannedCount, minutes
+  items     String // JSON: full items WITH answers/accept/mustInclude
+  status    String   @default("pending") // pending | graded
+  result    String? // JSON: per-item verdicts + per-skill totals
+  createdAt DateTime @default(now())
+}
+
+// Measured CEFR band per skill, separate from the overall placement level.
+model SkillLevel {
+  skill     String   @id // grammar | vocabulary | writing | speaking | reading | listening
+  level     String   @default("?")
+  score     Float    @default(0) // 0..1 rolling mastery
+  samples   Int      @default(0)
+  updatedAt DateTime @updatedAt
 }

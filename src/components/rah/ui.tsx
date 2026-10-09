@@ -26,7 +26,7 @@ export function Btn({
   const styles = {
     // Dark blue key with a deeper blue edge underneath.
     primary:
-      "rah-3d bg-[#4e8cff] text-white hover:bg-[#66a0ff] [--rah-edge:#2650a3]",
+      "rah-3d bg-[var(--rah-primary)] text-white hover:bg-[#66a0ff] [--rah-edge:var(--rah-primary-deep)]",
     // Emerald key for "go" moments: start a round, confirm.
     go: "rah-3d bg-[#2fc273] text-[#062012] hover:bg-[#45d687] [--rah-edge:#1d8f52]",
     ghost: "text-[#a9b4c6] hover:bg-white/5 hover:text-[#e7ecf5] rounded-xl",
@@ -44,7 +44,7 @@ export function Btn({
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-3xl border border-white/[0.07] bg-[#1a1f2b] p-6 shadow-[0_1px_2px_rgba(0,0,0,.35),0_16px_40px_-24px_rgba(0,0,0,.6)] ${className}`}
+      className={`rounded-3xl border border-white/[0.07] bg-[var(--rah-surface)] p-6 shadow-[0_1px_2px_rgba(0,0,0,.35),0_16px_40px_-24px_rgba(0,0,0,.6)] ${className}`}
     >
       {children}
     </div>
@@ -72,11 +72,11 @@ export function Chip({
 }) {
   const tones = {
     slate: "bg-white/[0.06] text-[#b7c1d3] border-white/[0.08]",
-    blue: "bg-[#4e8cff]/12 text-[#9dc0ff] border-[#4e8cff]/25",
+    blue: "bg-[var(--rah-primary)]/12 text-[#9dc0ff] border-[var(--rah-primary)]/25",
     emerald: "bg-[#3ccb7f]/12 text-[#7fe0ac] border-[#3ccb7f]/25",
     amber: "bg-[#ffb02e]/12 text-[#ffd08a] border-[#ffb02e]/25",
     rose: "bg-[#ff6b81]/12 text-[#ffa3b1] border-[#ff6b81]/25",
-    cyan: "bg-[#4cc9f0]/12 text-[#9de6fb] border-[#4cc9f0]/25",
+    cyan: "bg-[var(--rah-accent)]/12 text-[#9de6fb] border-[var(--rah-accent)]/25",
   } as const;
   return (
     <span
@@ -121,8 +121,8 @@ export function Ring({
         />
         <defs>
           <linearGradient id="ringBlue" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#4e8cff" />
-            <stop offset="100%" stopColor="#4cc9f0" />
+            <stop offset="0%" stopColor="var(--rah-primary)" />
+            <stop offset="100%" stopColor="var(--rah-accent)" />
           </linearGradient>
         </defs>
       </svg>
@@ -145,11 +145,11 @@ export function Bar({
 }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const tones = {
-    blue: "bg-gradient-to-r from-[#4e8cff] to-[#6aa6ff]",
+    blue: "bg-gradient-to-r from-[var(--rah-primary)] to-[#6aa6ff]",
     amber: "bg-gradient-to-r from-[#ffb02e] to-[#ffcb6b]",
     rose: "bg-gradient-to-r from-[#ff6b81] to-[#ff8ba0]",
     emerald: "bg-gradient-to-r from-[#2fc273] to-[#55d98f]",
-    cyan: "bg-gradient-to-r from-[#4cc9f0] to-[#7fdcf7]",
+    cyan: "bg-gradient-to-r from-[var(--rah-accent)] to-[#7fdcf7]",
   } as const;
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-[#232b3a]">
@@ -175,7 +175,7 @@ export function FA({ children, className = "" }: { children: ReactNode; classNam
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-3 text-sm text-[#a9b4c6]">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2a3242] border-t-[#4e8cff]" />
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
       {label ?? "Working"}
     </div>
   );
@@ -189,7 +189,7 @@ export function Note({
   tone?: "blue" | "amber" | "rose" | "emerald";
 }) {
   const tones = {
-    blue: "border-[#4e8cff]/25 bg-[#4e8cff]/[0.08] text-[#cfe0ff]",
+    blue: "border-[var(--rah-primary)]/25 bg-[var(--rah-primary)]/[0.08] text-[#cfe0ff]",
     amber: "border-[#ffb02e]/25 bg-[#ffb02e]/[0.07] text-[#ffe3b3]",
     rose: "border-[#ff6b81]/25 bg-[#ff6b81]/[0.07] text-[#ffc9d2]",
     emerald: "border-[#3ccb7f]/25 bg-[#3ccb7f]/[0.07] text-[#c4f2d8]",

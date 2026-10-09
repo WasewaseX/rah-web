@@ -18,7 +18,7 @@ const TILES: {
     title: "Coach chat",
     desc: "Socratic turns, corrections with the Farsi why.",
     icon: MessagesSquare,
-    tint: "bg-[#4e8cff]/[0.14] text-[#9dc0ff]",
+    tint: "bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]",
     glow: "group-hover:shadow-[0_16px_40px_-20px_rgba(78,140,255,.5)]",
     stat: (s) => (s.chatCount > 0 ? `${s.chatCount} turns so far` : null),
   },
@@ -27,7 +27,7 @@ const TILES: {
     title: "Writing lab",
     desc: "CEFR grading on four dimensions, C1 upgrades.",
     icon: PenLine,
-    tint: "bg-[#4cc9f0]/[0.14] text-[#9de6fb]",
+    tint: "bg-[var(--rah-accent)]/[0.14] text-[#9de6fb]",
     glow: "group-hover:shadow-[0_16px_40px_-20px_rgba(76,201,240,.45)]",
     stat: (s) => (s.writes > 0 ? `${s.writes} graded` : null),
   },
@@ -69,8 +69,8 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
   return (
     <div className="flex flex-col gap-5">
       {/* Hero: today's road */}
-      <div className="rah-rise-1 relative overflow-hidden rounded-3xl border border-[#4e8cff]/20 bg-gradient-to-br from-[#16233e] via-[#141c30] to-[#121724] p-7 shadow-[0_1px_2px_rgba(0,0,0,.4),0_24px_60px_-30px_rgba(30,80,180,.45)]">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#4e8cff]/[0.09] blur-2xl" />
+      <div className="rah-rise-1 relative overflow-hidden rounded-3xl border border-[var(--rah-primary)]/20 bg-gradient-to-br from-[#16233e] via-[#141c30] to-[#121724] p-7 shadow-[0_1px_2px_rgba(0,0,0,.4),0_24px_60px_-30px_rgba(30,80,180,.45)]">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[var(--rah-primary)]/[0.09] blur-2xl" />
         <div className="relative flex flex-col items-center gap-7 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-6">
             <Ring value={done} max={goal} size={104} label={`${done}/${goal}`} sub="today" />
@@ -102,7 +102,7 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
       {/* Placement CTA */}
       {needPlacement && (
         <div className="rah-rise-2">
-          <Card className="border-[#ffb02e]/25 bg-gradient-to-br from-[#221c10] to-[#1a1f2b]">
+          <Card className="border-[#ffb02e]/25 bg-gradient-to-br from-[#221c10] to-[var(--rah-surface)]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#ffb02e]/[0.15] text-[#ffd08a]">
@@ -128,7 +128,7 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
         <div className="rah-rise-2">
           <Card>
             <div className="mb-4 flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4e8cff]/[0.14] text-[#9dc0ff]">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]">
                 <Stethoscope className="h-4 w-4" />
               </div>
               <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">What the coach notices</span>
@@ -171,7 +171,7 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 font-extrabold tracking-tight text-[#f2f5fa]">
                       {t.title}
-                      <ArrowRight className="h-4 w-4 text-[#3a4356] transition-all group-hover:translate-x-0.5 group-hover:text-[#4e8cff]" />
+                      <ArrowRight className="h-4 w-4 text-[#3a4356] transition-all group-hover:translate-x-0.5 group-hover:text-[var(--rah-primary)]" />
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-[#a9b4c6]">{t.desc}</p>
                     {stat && <div className="mt-2 text-xs font-bold text-[#7fa8f5]">{stat}</div>}

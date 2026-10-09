@@ -246,7 +246,7 @@ export default function SpeakView({ state, onChange }: { state: AppState; onChan
           )}
 
           <div className="rah-rise">
-            <Card className="border-[#ffb02e]/25 bg-gradient-to-br from-[#221c10] to-[#1a1f2b]">
+            <Card className="border-[#ffb02e]/25 bg-gradient-to-br from-[#221c10] to-[var(--rah-surface)]">
               <div className="text-sm font-extrabold tracking-tight text-[#ffd08a]">Round 2 constraint</div>
               <p className="mt-2 text-sm leading-relaxed text-[#dbe3f0]">{result.round2.constraint}</p>
               <Btn

@@ -106,7 +106,7 @@ export default function ListenView({ state }: { state: AppState }) {
               key={t}
               onClick={() => generate(t)}
               disabled={busy}
-              className="rounded-full border border-[#2a3242] bg-white/[0.03] px-4 py-2 text-xs font-bold text-[#b7c1d3] transition-all hover:border-[#4e8cff]/60 hover:bg-[#4e8cff]/[0.1] hover:text-[#cfe0ff] disabled:opacity-40"
+              className="rounded-full border border-[#2a3242] bg-white/[0.03] px-4 py-2 text-xs font-bold text-[#b7c1d3] transition-all hover:border-[var(--rah-primary)]/60 hover:bg-[var(--rah-primary)]/[0.1] hover:text-[#cfe0ff] disabled:opacity-40"
             >
               {t}
             </button>
@@ -144,7 +144,7 @@ export default function ListenView({ state }: { state: AppState }) {
                     }}
                     className={`rounded-xl px-1 py-2.5 text-center text-[11px] font-black uppercase tracking-wide transition-all ${
                       pass === p.n
-                        ? "bg-gradient-to-br from-[#4e8cff] to-[#3a6fd6] text-white shadow-[0_8px_18px_-8px_rgba(78,140,255,.6)]"
+                        ? "bg-gradient-to-br from-[var(--rah-primary)] to-[#3a6fd6] text-white shadow-[0_8px_18px_-8px_rgba(78,140,255,.6)]"
                         : "bg-white/[0.05] text-[#7d889c] hover:bg-white/[0.09] hover:text-[#b7c1d3]"
                     }`}
                   >
@@ -160,7 +160,7 @@ export default function ListenView({ state }: { state: AppState }) {
               <div className="mt-6 flex flex-wrap items-center gap-3.5">
                 <button
                   onClick={play}
-                  className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-white shadow-[0_12px_28px_-10px_rgba(78,140,255,.65)] transition-transform hover:scale-105 active:scale-95"
+                  className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white shadow-[0_12px_28px_-10px_rgba(78,140,255,.65)] transition-transform hover:scale-105 active:scale-95"
                   aria-label={playing ? "Pause" : "Play"}
                 >
                   {playing ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
@@ -172,7 +172,7 @@ export default function ListenView({ state }: { state: AppState }) {
                       onClick={() => setRate(r)}
                       className={`rounded-xl px-3 py-2 text-xs font-black transition-all ${
                         rate === r
-                          ? "bg-[#4e8cff] text-white shadow-[0_6px_14px_-6px_rgba(78,140,255,.6)]"
+                          ? "bg-[var(--rah-primary)] text-white shadow-[0_6px_14px_-6px_rgba(78,140,255,.6)]"
                           : "bg-white/[0.05] text-[#8b96a9] hover:bg-white/[0.1] hover:text-[#dbe3f0]"
                       }`}
                     >
@@ -221,7 +221,7 @@ export default function ListenView({ state }: { state: AppState }) {
                                 : wrong
                                   ? "border-[#ff6b81] bg-[#ff6b81]/[0.1] text-[#ffc9d2]"
                                   : picked
-                                    ? "border-[#4e8cff] bg-[#4e8cff]/[0.1] font-bold text-[#e7ecf5]"
+                                    ? "border-[var(--rah-primary)] bg-[var(--rah-primary)]/[0.1] font-bold text-[#e7ecf5]"
                                     : "border-[#2a3242] text-[#b7c1d3] hover:border-[#3f4c63] hover:bg-white/[0.03]"
                             }`}
                           >

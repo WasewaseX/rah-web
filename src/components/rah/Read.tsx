@@ -96,7 +96,7 @@ export default function ReadView({ state }: { state: AppState }) {
 
       <Card>
         <h2 className="text-2xl font-black tracking-tight text-[#f2f5fa]">{reading.title}</h2>
-        <div className="mt-5 flex flex-col gap-4 border-l-2 border-[#4e8cff]/25 pl-5 text-[15px] leading-loose text-[#c3cddd]">
+        <div className="mt-5 flex flex-col gap-4 border-l-2 border-[var(--rah-primary)]/25 pl-5 text-[15px] leading-loose text-[#c3cddd]">
           {reading.text.split("\n").filter(Boolean).map((p, i) => (
             <p key={i}>{p}</p>
           ))}
@@ -105,7 +105,7 @@ export default function ReadView({ state }: { state: AppState }) {
 
       {!q && (
         <Card className="flex flex-col items-center gap-4 py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4e8cff]/[0.12]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--rah-primary)]/[0.12]">
             <Sparkles className="h-6 w-6 text-[#9dc0ff]" />
           </div>
           <p className="max-w-sm text-sm leading-relaxed text-[#a9b4c6]">
@@ -153,7 +153,7 @@ export default function ReadView({ state }: { state: AppState }) {
                                 : wrong
                                   ? "border-[#ff6b81] bg-[#ff6b81]/[0.1] text-[#ffc9d2]"
                                   : picked
-                                    ? "border-[#4e8cff] bg-[#4e8cff]/[0.1] font-bold text-[#e7ecf5]"
+                                    ? "border-[var(--rah-primary)] bg-[var(--rah-primary)]/[0.1] font-bold text-[#e7ecf5]"
                                     : "border-[#2a3242] text-[#b7c1d3] hover:border-[#3f4c63] hover:bg-white/[0.03]"
                             }`}
                           >
@@ -168,7 +168,7 @@ export default function ReadView({ state }: { state: AppState }) {
                       onChange={(e) => !checked[reading.id] && setAnswers((a) => ({ ...a, [key]: e.target.value }))}
                       disabled={checked[reading.id]}
                       placeholder="Type the missing words"
-                      className="mt-2.5 min-h-12 w-full rounded-2xl border-2 border-[#2a3242] bg-[#141924] px-3.5 text-sm text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[#4e8cff] disabled:opacity-60"
+                      className="mt-2.5 min-h-12 w-full rounded-2xl border-2 border-[#2a3242] bg-[#141924] px-3.5 text-sm text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[var(--rah-primary)] disabled:opacity-60"
                     />
                   )}
                   {checked[reading.id] && (
