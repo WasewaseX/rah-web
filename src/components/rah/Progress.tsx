@@ -45,7 +45,7 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
   if (!data) {
     return (
       <Card>
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2a3242] border-t-[#4e8cff]" />
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
       </Card>
     );
   }
@@ -60,7 +60,7 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {/* Totals: big number tiles */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="py-5 text-center">
-          <div className="text-[28px] font-black leading-none tracking-tight text-[#4e8cff]">{data.totals.started}</div>
+          <div className="text-[28px] font-black leading-none tracking-tight text-[var(--rah-primary)]">{data.totals.started}</div>
           <div className="mt-2 text-xs font-semibold text-[#7d889c]">of {data.totals.cards} cards started</div>
         </Card>
         <Card className="py-5 text-center">
@@ -96,7 +96,7 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
               style={{
                 height: `${Math.max(4, (d.reviews / maxDay) * 100)}%`,
                 backgroundColor:
-                  d.reviews === 0 ? "#232b3a" : d.reviews < state.learner.dailyGoal ? "rgba(78,140,255,.4)" : "#4e8cff",
+                  d.reviews === 0 ? "#232b3a" : d.reviews < state.learner.dailyGoal ? "rgba(78,140,255,.4)" : "var(--rah-primary)",
               }}
             />
           ))}
@@ -131,13 +131,13 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {/* Skills measured by AI */}
       <Card>
         <div className="mb-5 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4cc9f0]/[0.14] text-[#9de6fb]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-accent)]/[0.14] text-[#9de6fb]">
             <TrendingUp className="h-4 w-4" />
           </div>
           <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">AI graded skills</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-[#4cc9f0]/20 bg-[#4cc9f0]/[0.05] p-5 text-center">
+          <div className="rounded-2xl border border-[var(--rah-accent)]/20 bg-[var(--rah-accent)]/[0.05] p-5 text-center">
             <div className="text-3xl font-black leading-none tracking-tight text-[#9de6fb]">{writeAvg ?? "-"}</div>
             <div className="mt-2 text-xs font-semibold text-[#8b96a9]">writing, avg of 4 scores / 10</div>
             <div className="mt-1.5 text-[11px] font-medium text-[#5c6678]">{state.writes} essays graded</div>
@@ -190,7 +190,7 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {state.learner.placementPhase !== "done" && (
         <Card className="flex flex-col items-center gap-4 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#4e8cff]/[0.14] text-[#9dc0ff]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]">
               <Target className="h-5 w-5" />
             </div>
             <p className="text-sm leading-relaxed text-[#a9b4c6]">No measured level on record. Placement tunes every number on this page.</p>

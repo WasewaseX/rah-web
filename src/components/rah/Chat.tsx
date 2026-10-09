@@ -1,45 +1,99 @@
 "use client";
 
-// Coach chat: Socratic turns with elaborated Farsi corrections.
-// Powered by the built-in AI, no configuration anywhere.
+// Coach chat: an agent with 22 skills, not a chatbot. Steps show the work,
+// exams render inline, bands render inline, plugins act on the app itself.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Trash2, Sparkles, ArrowRight } from "lucide-react";
+import { Send, Trash2, Sparkles, ArrowRight, Wrench } from "lucide-react";
 import { Btn, Card, FA, Note, Spinner } from "./ui";
+import { ExamCard } from "./ExamCard";
+import { AssessCard } from "./AssessCard";
+import { applyTheme } from "@/lib/theme-bus";
 import type { AppState } from "./App";
+import type { CoachEnvelope, Correction } from "@/lib/agent/types";
 
-interface Correction {
-  wrong: string;
-  right: string;
-  fa: string;
-  trap: string;
-}
-interface CoachMsg {
-  reply: string;
-  corrections: Correction[];
-  fa_note: string;
-}
 interface Msg {
   id: number;
   role: string;
   text?: string;
-  parsed?: CoachMsg | null;
+  parsed?: CoachEnvelope | null;
 }
 
 const OPENERS = [
-  "Correct this: I have seen him yesterday at the office.",
-  "I want to sound more professional in meetings. Where do I start?",
-  "Drill me on articles. Quiz me and fix me.",
-  "Here is a sentence I need for work: 'لطفاً فردا گزارش را برایم ایمیل کنید'. How do I say it naturally?",
+  "Generate an exam",
+  "/deep",
+  "Assess my level",
+  "Theme ocean",
+  "Drill me on collocations with take and get",
 ];
+
+function Steps({ steps }: { steps: NonNullable<CoachEnvelope["steps"]> }) {
+  const [open, setOpen] = useState(false);
+  if (steps.length === 0) return null;
+  return (
+    <div className="flex flex-col">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="self-start rounded-full border border-white/[0.07] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-[#8b96a9] transition-colors hover:text-[#dbe3f0]"
+      >
+        <Wrench className="mr-1 inline h-3 w-3" />
+        {steps.length} step{steps.length > 1 ? "s" : ""}
+      </button>
+      {open && (
+        <div className="mt-1.5 flex flex-col gap-1 self-start rounded-2xl border border-white/[0.05] bg-[#141924] px-3 py-2">
+          {steps.map((s, i) => (
+            <div key={i} className="text-[11px] leading-snug text-[#8b96a9]">
+              <span className="font-bold text-[#a9b4c6]">{s.label}</span>
+              {s.detail ? ` — ${s.detail}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Corrections({ corrections }: { corrections: Correction[] }) {
+  if (corrections.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {corrections.map((c, i) => (
+        <div key={i} className="rounded-2xl border border-[#ffb02e]/25 bg-[#ffb02e]/[0.06] p-3.5 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[#ff8ba0] line-through">{c.wrong}</span>
+            <ArrowRight className="h-3.5 w-3.5 text-[#5c6678]" />
+            <span className="font-black text-[#7fe0ac]">{c.right}</span>
+          </div>
+          {c.fa && (
+            <FA className="mt-1.5 block text-xs leading-loose">{c.fa}</FA>
+          )}
+          {c.trap && c.trap !== "none" && (
+            <span className="mt-1.5 inline-block rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-0.5 text-[10px] font-bold text-[#8b96a9]">
+              {c.trap.replace(/_/g, " ")}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ChatView({ state, onChange }: { state: AppState; onChange: () => void }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const DEEP_PHASES = [
+    "Routing your request",
+    "Gathering evidence",
+    "Mining patterns",
+    "Synthesizing",
+    "Almost there",
+  ];
 
   const load = useCallback(async () => {
     const r = await fetch("/api/chat", { cache: "no-store" });
@@ -54,7 +108,28 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs, busy]);
+  }, [msgs, busy, phase]);
+
+  // Progressive phase labels while a long turn runs: the agent shows its work.
+  useEffect(() => {
+    if (!busy) {
+      setPhase(0);
+      return;
+    }
+    const t = setInterval(() => setPhase((p) => Math.min(p + 1, DEEP_PHASES.length - 1)), 7000);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  const runActions = (env: CoachEnvelope) => {
+    for (const a of env.actions ?? []) {
+      if (a.type === "theme" && a.tokens) applyTheme(a.tokens);
+      if (a.type === "navigate" && a.view) {
+        window.history.pushState(null, "", `#${a.view}`);
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      }
+      if (a.type === "focus") onChange();
+    }
+  };
 
   const send = async (text?: string) => {
     const m = (text ?? input).trim();
@@ -71,7 +146,9 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "The coach did not answer.");
-      setMsgs((prev) => [...prev, { id: Date.now() + 1, role: "coach", parsed: j }]);
+      const env = j as CoachEnvelope;
+      setMsgs((prev) => [...prev, { id: Date.now() + 1, role: "coach", parsed: env }]);
+      runActions(env);
       onChange();
     } catch (e) {
       setError((e as Error).message);
@@ -90,14 +167,14 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
     <div className="flex flex-col gap-4">
       <Card className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3.5">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-white shadow-[0_8px_20px_-6px_rgba(78,140,255,.55)]">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white shadow-[0_8px_20px_-6px_rgba(78,140,255,.55)]">
             <Sparkles className="h-5 w-5" />
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#1a1f2b] bg-[#2fc273]" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--rah-surface)] bg-[#2fc273]" />
           </div>
           <div>
-            <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Your coach is already here</div>
+            <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">The coach runs skills</div>
             <div className="text-xs text-[#8b96a9]">
-              Built in, running now. Knows your level ({state.learner.level === "?" ? "unmeasured" : state.learner.level}) and your recent leaks.
+              Exams, level bands, deep analysis, themes, drills. Try /skills for the directory.
             </div>
           </div>
         </div>
@@ -108,20 +185,20 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
         )}
       </Card>
 
-      <Card className="flex max-h-[55vh] min-h-80 flex-col gap-4 overflow-y-auto">
+      <Card className="flex max-h-[58vh] min-h-80 flex-col gap-4 overflow-y-auto">
         {loading && <Spinner />}
         {!loading && msgs.length === 0 && (
           <div className="py-6 text-center">
-            <p className="text-base font-extrabold tracking-tight text-[#f2f5fa]">The coach makes you produce before it explains.</p>
+            <p className="text-base font-extrabold tracking-tight text-[#f2f5fa]">Twenty-two skills. One coach. No scripts.</p>
             <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">
-              Expect short turns, one correction at a time, and every fix explained in Farsi. Try one of these:
+              Ask for an exam, a level probe, a 30-second deep analysis, a theme change, or just talk. Start with:
             </p>
             <div className="mt-5 flex flex-col items-center gap-2">
               {OPENERS.map((o) => (
                 <button
                   key={o}
                   onClick={() => send(o)}
-                  className="w-full max-w-md rounded-2xl border-2 border-[#2a3242] px-4 py-3 text-left text-sm leading-relaxed text-[#b7c1d3] transition-all hover:border-[#4e8cff]/60 hover:bg-[#4e8cff]/[0.07] hover:text-[#dbe3f0]"
+                  className="w-full max-w-md rounded-2xl border-2 border-[#2a3242] px-4 py-3 text-left text-sm leading-relaxed text-[#b7c1d3] transition-all hover:border-[var(--rah-primary)]/60 hover:bg-[var(--rah-primary)]/[0.07] hover:text-[#dbe3f0]"
                 >
                   {o}
                 </button>
@@ -133,43 +210,29 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
           m.role === "user" ? (
             <div
               key={m.id}
-              className="rah-pop self-end rounded-3xl rounded-br-lg bg-gradient-to-br from-[#4e8cff] to-[#3a6fd6] px-[18px] py-3 text-sm leading-relaxed text-white shadow-[0_10px_28px_-14px_rgba(78,140,255,.65)] sm:max-w-[80%]"
+              className="rah-pop self-end rounded-3xl rounded-br-lg bg-gradient-to-br from-[var(--rah-primary)] to-[#3a6fd6] px-[18px] py-3 text-sm leading-relaxed text-white shadow-[0_10px_28px_-14px_rgba(78,140,255,.65)] sm:max-w-[80%]"
             >
               {m.text}
             </div>
           ) : (
             <div key={m.id} className="rah-pop flex max-w-[92%] flex-col gap-2 self-start">
-              <div className="rounded-3xl rounded-bl-lg border border-white/[0.06] bg-[#212836] px-[18px] py-3 text-sm leading-relaxed text-[#e7ecf5]">
+              <div className="whitespace-pre-wrap rounded-3xl rounded-bl-lg border border-white/[0.06] bg-[#212836] px-[18px] py-3 text-sm leading-relaxed text-[#e7ecf5]">
                 {m.parsed?.reply ?? "..."}
               </div>
-              {(m.parsed?.corrections?.length ?? 0) > 0 && (
-                <div className="flex flex-col gap-2">
-                  {m.parsed!.corrections.map((c, i) => (
-                    <div key={i} className="rounded-2xl border border-[#ffb02e]/25 bg-[#ffb02e]/[0.06] p-3.5 text-sm">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[#ff8ba0] line-through">{c.wrong}</span>
-                        <ArrowRight className="h-3.5 w-3.5 text-[#5c6678]" />
-                        <span className="font-black text-[#7fe0ac]">{c.right}</span>
-                      </div>
-                      <FA className="mt-1.5 block text-xs leading-loose">{c.fa}</FA>
-                      {c.trap && c.trap !== "none" && (
-                        <span className="mt-1.5 inline-block rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-0.5 text-[10px] font-bold text-[#8b96a9]">
-                          {c.trap.replace(/_/g, " ")}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {m.parsed?.steps && m.parsed.steps.length > 0 && <Steps steps={m.parsed.steps} />}
+              <Corrections corrections={m.parsed?.corrections ?? []} />
               {m.parsed?.fa_note && (
                 <FA className="self-start rounded-2xl border border-white/[0.05] bg-[#141924] px-3.5 py-2 text-xs">{m.parsed.fa_note}</FA>
               )}
+              {m.parsed?.exam && <ExamCard exam={m.parsed.exam} onDone={onChange} />}
+              {m.parsed?.result && !m.parsed?.exam && <ExamResultInline result={m.parsed.result} title="Graded" />}
+              {m.parsed?.assessment && <AssessCard data={m.parsed.assessment} />}
             </div>
           ),
         )}
         {busy && (
           <div className="self-start">
-            <Spinner label="Coach is thinking" />
+            <Spinner label={`${DEEP_PHASES[phase]}...`} />
           </div>
         )}
         <div ref={bottomRef} />
@@ -187,13 +250,25 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Write in English. Mistakes are the point."
-          className="min-h-12 flex-1 rounded-2xl border-2 border-[#2a3242] bg-[#141924] px-4 text-sm text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[#4e8cff]"
+          placeholder="Ask, drill, or /slash. The coach picks the right skill."
+          className="min-h-12 flex-1 rounded-2xl border-2 border-[#2a3242] bg-[var(--rah-bg)] px-4 text-sm text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[var(--rah-primary)]"
         />
         <Btn type="submit" variant="go" disabled={!input.trim() || busy} className="px-4">
           <Send className="h-4 w-4" />
         </Btn>
       </form>
+    </div>
+  );
+}
+
+function ExamResultInline({ result, title }: { result: NonNullable<CoachEnvelope["result"]>; title: string }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-[#141924] p-4 text-sm">
+      <div className="text-xs font-bold uppercase tracking-wider text-[#8b96a9]">{title}</div>
+      <div className="mt-1 font-black text-[#f2f5fa]">
+        {result.correct}/{result.total} ({result.pct}%)
+      </div>
+      <p className="mt-1.5 leading-relaxed text-[#c4cddc]">{result.headline}</p>
     </div>
   );
 }

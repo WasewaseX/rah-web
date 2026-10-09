@@ -27,6 +27,7 @@ import ListenView from "./Listen";
 import SpeakView from "./Speak";
 import ReadView from "./Read";
 import ProgressView from "./Progress";
+import { applyTheme } from "@/lib/theme-bus";
 
 export interface AppState {
   learner: {
@@ -38,6 +39,7 @@ export interface AppState {
     focusSkill: string;
     placementPhase: string;
   };
+  theme: { primary?: string; primaryDeep?: string; bg?: string; surface?: string; accent?: string } | null;
   today: { reviews: number; correct: number; xp: number; spoken: number; written: number; listened: number };
   due: number;
   seen: number;
@@ -70,7 +72,12 @@ export default function RahApp() {
   const refresh = useCallback(async () => {
     try {
       const r = await fetch("/api/state", { cache: "no-store" });
-      if (r.ok) setState(await r.json());
+      if (r.ok) {
+        const s: AppState = await r.json();
+        setState(s);
+        // The theme plugin's choices survive reloads: paint on every state load.
+        applyTheme(s.theme ?? null);
+      }
     } catch {
       // offline blip; keep last state
     }
@@ -101,11 +108,11 @@ export default function RahApp() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#10131a] md:flex-row">
+    <div className="flex min-h-screen flex-col bg-[var(--rah-bg)] md:flex-row">
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0e1421] via-[#101725] to-[#0d1119] px-4 py-6 md:flex">
         <div className="mb-9 flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-lg font-black text-white shadow-[0_8px_20px_-6px_rgba(78,140,255,.55)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-lg font-black text-white shadow-[0_8px_20px_-6px_rgba(78,140,255,.55)]">
             R
           </div>
           <div>
@@ -123,17 +130,17 @@ export default function RahApp() {
                 onClick={() => go(v.id)}
                 className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-all ${
                   active
-                    ? "bg-[#4e8cff]/[0.12] text-[#9dc0ff]"
+                    ? "bg-[var(--rah-primary)]/[0.12] text-[#9dc0ff]"
                     : "text-[#8b96a9] hover:bg-white/[0.04] hover:text-[#dbe3f0]"
                 }`}
               >
                 {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[#4e8cff]" />
+                  <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[var(--rah-primary)]" />
                 )}
                 <Icon className="h-[18px] w-[18px]" />
                 {v.label}
                 {v.id === "review" && state && state.due > 0 && (
-                  <span className="ml-auto rounded-full bg-[#4e8cff] px-2 py-0.5 text-[11px] font-bold text-white shadow-[0_4px_10px_-2px_rgba(78,140,255,.6)]">
+                  <span className="ml-auto rounded-full bg-[var(--rah-primary)] px-2 py-0.5 text-[11px] font-bold text-white shadow-[0_4px_10px_-2px_rgba(78,140,255,.6)]">
                     {state.due}
                   </span>
                 )}
@@ -141,7 +148,7 @@ export default function RahApp() {
             );
           })}
         </nav>
-        <div className="mt-auto rounded-2xl border border-[#4e8cff]/20 bg-gradient-to-br from-[#16233e] to-[#131b2c] p-4">
+        <div className="mt-auto rounded-2xl border border-[var(--rah-primary)]/20 bg-gradient-to-br from-[#16233e] to-[#131b2c] p-4">
           <div className="flex items-center gap-2 text-xs font-bold text-[#9dc0ff]">
             <Sparkles className="h-3.5 w-3.5" />
             Built-in AI coach
@@ -153,9 +160,9 @@ export default function RahApp() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#10131a]/85 px-4 py-3 backdrop-blur-xl md:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[var(--rah-bg)]/85 px-4 py-3 backdrop-blur-xl md:hidden">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-base font-black text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-base font-black text-white">
             R
           </div>
           <span className="text-lg font-black tracking-tight">Rah</span>
@@ -191,7 +198,7 @@ export default function RahApp() {
 
         {!state ? (
           <div className="flex h-64 items-center justify-center">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#2a3242] border-t-[#4e8cff]" />
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
           </div>
         ) : (
           <div key={view} className="rah-rise">
@@ -222,7 +229,7 @@ export default function RahApp() {
                 key={v.id}
                 onClick={() => go(v.id)}
                 className={`flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[10px] font-bold transition-colors ${
-                  active ? "bg-[#4e8cff]/[0.14] text-[#9dc0ff]" : "text-[#6e7a8e]"
+                  active ? "bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]" : "text-[#6e7a8e]"
                 }`}
               >
                 <Icon className="h-5 w-5" />

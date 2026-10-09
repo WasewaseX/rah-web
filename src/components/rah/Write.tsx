@@ -59,7 +59,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
     <div className="flex flex-col gap-4">
       <Card>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4cc9f0]/[0.14] text-[#9de6fb]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-accent)]/[0.14] text-[#9de6fb]">
             <PenLine className="h-4 w-4" />
           </div>
           <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Pick a prompt</span>
@@ -75,7 +75,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
               }}
               className={`rounded-2xl border-2 px-4 py-3.5 text-left text-sm leading-relaxed transition-all active:scale-[.995] ${
                 prompt === i
-                  ? "border-[#4cc9f0] bg-[#4cc9f0]/[0.08] font-semibold text-[#f2f5fa]"
+                  ? "border-[var(--rah-accent)] bg-[var(--rah-accent)]/[0.08] font-semibold text-[#f2f5fa]"
                   : "border-[#2a3242] text-[#a9b4c6] hover:border-[#3f4c63] hover:bg-white/[0.03]"
               }`}
             >
@@ -91,7 +91,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
           onChange={(e) => setText(e.target.value)}
           rows={9}
           placeholder="Write 120 to 200 words. Push for range: collocations, hedging, discourse markers. The examiner rewards risk taken with control."
-          className="w-full resize-none rounded-2xl border-2 border-[#2a3242] bg-[#141924] p-4 text-sm leading-relaxed text-[#e7ecf5] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[#4cc9f0]"
+          className="w-full resize-none rounded-2xl border-2 border-[#2a3242] bg-[#141924] p-4 text-sm leading-relaxed text-[#e7ecf5] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[var(--rah-accent)]"
         />
         <div className="mt-4 flex items-center justify-between">
           <span className="text-xs font-semibold text-[#7d889c]">{words} words</span>
@@ -157,7 +157,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
                 <div className="mb-4 text-sm font-extrabold tracking-tight text-[#f2f5fa]">B2 to C1 upgrades</div>
                 <div className="flex flex-col gap-3">
                   {result.upgrades.map((u, i) => (
-                    <div key={i} className="rounded-2xl border border-[#4cc9f0]/25 bg-[#4cc9f0]/[0.06] p-3.5 text-sm">
+                    <div key={i} className="rounded-2xl border border-[var(--rah-accent)]/25 bg-[var(--rah-accent)]/[0.06] p-3.5 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[#8b96a9]">{u.plain}</span>
                         <ArrowRight className="h-3.5 w-3.5 text-[#5c6678]" />

@@ -102,7 +102,7 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
       <div className="text-center">
         <button
           onClick={() => speak(card.kind === "cloze" ? card.en : card.en)}
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-white shadow-[0_10px_24px_-8px_rgba(78,140,255,.6)] transition-transform hover:scale-105 active:scale-95"
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white shadow-[0_10px_24px_-8px_rgba(78,140,255,.6)] transition-transform hover:scale-105 active:scale-95"
           aria-label="Play audio"
         >
           <Volume2 className="h-7 w-7" />
@@ -257,7 +257,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-[#232b3a]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#4e8cff] to-[#4cc9f0] transition-all duration-500"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--rah-primary)] to-[var(--rah-accent)] transition-all duration-500"
           style={{ width: `${(idx / queue.length) * 100}%` }}
         />
       </div>
@@ -274,7 +274,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
                 onClick={() => setChoice(c)}
                 className={`rounded-2xl border-2 px-4 py-3.5 text-sm font-semibold transition-all active:scale-[.99] ${
                   choice === c
-                    ? "border-[#4e8cff] bg-[#4e8cff]/[0.12] text-[#cfe0ff]"
+                    ? "border-[var(--rah-primary)] bg-[var(--rah-primary)]/[0.12] text-[#cfe0ff]"
                     : "border-[#2a3242] text-[#b7c1d3] hover:border-[#3f4c63] hover:bg-white/[0.03]"
                 }`}
               >
@@ -316,7 +316,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type your answer"
-              className="min-h-12 flex-1 rounded-2xl border-2 border-[#2a3242] bg-[#141924] px-4 text-base text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[#4e8cff]"
+              className="min-h-12 flex-1 rounded-2xl border-2 border-[#2a3242] bg-[#141924] px-4 text-base text-[#f2f5fa] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[var(--rah-primary)]"
               dir="ltr"
               autoComplete="off"
             />
@@ -357,7 +357,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
                   ["Again", 1, "bg-[#ff6b81] hover:bg-[#ff8194] text-white [--rah-edge:#c2475c]", previews[0]],
                   ["Hard", 2, "bg-[#ffb02e] hover:bg-[#ffc055] text-[#221400] [--rah-edge:#b87715]", previews[1]],
                   ["Good", 3, "bg-[#2fc273] hover:bg-[#45d687] text-[#062012] [--rah-edge:#1d8f52]", previews[2]],
-                  ["Easy", 4, "bg-[#4e8cff] hover:bg-[#66a0ff] text-white [--rah-edge:#2650a3]", previews[3]],
+                  ["Easy", 4, "bg-[var(--rah-primary)] hover:bg-[#66a0ff] text-white [--rah-edge:var(--rah-primary-deep)]", previews[3]],
                 ] as const
               ).map(([label, g, cls, ivl]) => (
                 <button
@@ -390,7 +390,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           <span>{counts.newLeft} new left today</span>
           <span className="text-[#3a4356]">·</span>
           <span className="flex items-center gap-1">
-            <Sparkles className="h-3 w-3 text-[#4cc9f0]" /> intervals target {(state.learner.retention ?? 0.9) * 100}% retention
+            <Sparkles className="h-3 w-3 text-[var(--rah-accent)]" /> intervals target {(state.learner.retention ?? 0.9) * 100}% retention
           </span>
         </div>
       )}

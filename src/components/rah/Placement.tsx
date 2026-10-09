@@ -149,7 +149,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
   if (phase === "intro") {
     return (
       <Card className="rah-pop py-12 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[#4e8cff] to-[#2f62c4] text-white shadow-[0_16px_36px_-12px_rgba(78,140,255,.6)]">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white shadow-[0_16px_36px_-12px_rgba(78,140,255,.6)]">
           <Target className="h-8 w-8" />
         </div>
         <h2 className="mt-6 text-2xl font-black tracking-tight text-[#f2f5fa]">Find your level</h2>
@@ -193,7 +193,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
                         ? "border-[#ff6b81] bg-[#ff6b81]/[0.1] text-[#ffc9d2]"
                         : chosen
                           ? "border-[#232b3a] text-[#5c6678]"
-                          : "border-[#2a3242] text-[#b7c1d3] hover:border-[#4e8cff]/60 hover:bg-[#4e8cff]/[0.07]"
+                          : "border-[#2a3242] text-[#b7c1d3] hover:border-[var(--rah-primary)]/60 hover:bg-[var(--rah-primary)]/[0.07]"
                   }`}
                 >
                   {c}
@@ -223,7 +223,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
             onChange={(e) => setWriting(e.target.value)}
             rows={8}
             placeholder="Write here. Natural mistakes are useful; perfect sentences copied from elsewhere are not."
-            className="mt-5 w-full resize-none rounded-2xl border-2 border-[#2a3242] bg-[#141924] p-4 text-sm leading-relaxed text-[#e7ecf5] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[#4e8cff]"
+            className="mt-5 w-full resize-none rounded-2xl border-2 border-[#2a3242] bg-[#141924] p-4 text-sm leading-relaxed text-[#e7ecf5] outline-none transition-colors placeholder:text-[#5c6678] focus:border-[var(--rah-primary)]"
           />
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs font-semibold text-[#7d889c]">{writing.trim().split(/\s+/).filter(Boolean).length} words</span>
@@ -249,7 +249,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
           <CheckCircle2 className="h-9 w-9 text-[#2fc273]" />
         </div>
         <div className="mt-5 text-xs font-black uppercase tracking-[0.14em] text-[#5f8fe8]">Your measured level</div>
-        <div className="mt-2 text-5xl font-black tracking-tight text-[#4e8cff]">{done.level}</div>
+        <div className="mt-2 text-5xl font-black tracking-tight text-[var(--rah-primary)]">{done.level}</div>
         <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[#a9b4c6]">{done.reasons}</p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {done.writingLevel && done.writingLevel !== done.level && <Chip tone="amber">Writing sample: {done.writingLevel}</Chip>}
