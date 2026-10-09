@@ -157,3 +157,20 @@ Stage Summary:
 - "vocab only exam" and every other "<skill> only" request now produces a strictly focused exam with matching label; announced count always equals graded count.
 - Repo public at https://github.com/WasewaseX/rah-web (CI green), no secrets in history, runtime DB no longer published with future pushes.
 - Preview serves the exact pushed commit: verifiable via /api/version on both origins.
+
+---
+Task ID: 9
+Agent: Super Z (main)
+Task: Fix the three AI failures from the user's transcript (reading question with no text, recycled exams, "4 questions vocab only no grammar" returning grammar items); respond to the external capability audit.
+
+Work Log:
+- Bug 1 (phantom text): the probe asked "According to the text, what was the main reason...?" with no passage. Fixed with a READING RULE in the examiner prompt (text-based items must embed their 2-4 sentence mini-text inside q) plus a broken-item guard: DANGLING_TEXT_REF regex drops any item that references a text/passage/author while being too short to carry one.
+- Bug 2 (recycled exams): built a freshness moderator in exam.ts: 16 topic domains, 4 drawn at random per generation and required for at least half the items; an OVERUSED blacklist naming the exact cliches the user hit ("The new policy had a significant ___ on", "make something less severe", "By the time we arrived at the party", ...); loadFreshness() reads the last 4 exams from the DB and turns their sentences AND answer keys into an explicit ban list (no reused teaching points, no reused keys as answers or distractors); generation temperature raised to 0.9 via a new { deep, temperature } options param on aiJson/completeRaw (all call sites migrated off the positional deep flag).
+- Bug 3 (negation ignored): "make an exam with only 4 questions and only vocab no grammar" parsed [vocabulary, grammar] because the word "grammar" matched inside the negation. skills-power.ts now strips negated mentions (no/not/without/except/other than/aside from/anything but, with optional filler words, typo-proof via gram\w* matching "grammer") into an exclusion set, matches skills only from the remaining text, applies exclusions to the default mix too, and relabels collocation items to vocabulary when vocabulary is the requested focus (the level engine already folds collocation into vocabulary), so the count promise survives. Top-up loop extended to two rounds.
+- Count honored: the user's exact request now returns exactly 4 vocabulary items (was 4 items with 1 grammar, or 3 items the attempt before).
+- scripts/test-exam-quality.ts: 9-assertion eval replaying the user's real failures - exact count (4/4, 12/12), focus exclusivity, zero recycled questions between two consecutive mixed exams, no dangling text references across all exams, no overused templates. ALL PASS, verified against genuinely fresh DB rows.
+- Pushed 10ee30a to WasewaseX/rah-web (public); /api/version identical on localhost and preview (dirty 0).
+
+Stage Summary:
+- Exams are now moderated for freshness, focus, count, and self-contained reading items; the eval suite makes regressions visible instead of anecdotal.
+- Audit response: adopted its P0 "automated evaluations" in the exam domain; learner memory of recurring mistakes and multi-skill orchestration are the next slices, graded quality gates before new skills.
