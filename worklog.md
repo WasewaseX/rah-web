@@ -111,3 +111,29 @@ Work Log:
 Stage Summary:
 - The GUI is no longer sloppy: cohesive midnight design system with Duolingo-grade button physics and brilliant-grade card hierarchy, in the requested dark blue + dark gray palette.
 - Preview link: https://preview-16721396.space-z.ai/
+
+---
+Task ID: 7
+Agent: Super Z (main)
+Task: Make the stale-preview problem never happen again; store the user's GitHub PAT securely; rebuild the coach as a multi-step agent with a revived skill registry, per-skill assessment, fuzzy exam grading, deep analysis, and plugin-based theme control; release to GitHub.
+
+Work Log:
+- Diagnosed the stale preview: the space-z preview URL is a LIVE PROXY to the dev server; the previous session's work never landed on disk (sandbox restore), so the user kept seeing the Oct 7 snapshot. There is no separate deploy step; freshness = code on disk + dev server up.
+- Guarantee #1: added /api/version beacon (git SHA + dirty count); comparing localhost vs preview now proves freshness in one curl. Verified: both serve c5816c373571.
+- Guarantee #2: pushed the full state to private repo WasewaseX/rah-web after every meaningful change (sandbox restores are now recoverable from GitHub).
+- Stored the user's GitHub PAT in .env (gitignored; .env was historically tracked - untracked it, verified git check-ignore). Token read only via env vars, never hardcoded.
+- Schema: + Exam (server-side keys, status pending/graded, result JSON), + SkillLevel (per-skill band, rolling mastery 0..1, samples), Learner.theme.
+- Agent core in src/lib/agent/: types.ts, run.ts (route -> skill -> verify loop, never-unreachable envelopes), planner.ts (slash commands -> trigger table -> LLM planner fallback), verify.ts (English-only reply, banned AI-sign phrases stripped, Farsi only in fa fields, fa_note suppressed when no corrections, exam count consistency), registry.ts.
+- Revived 22 skills: chat, correct, translate, collocation-drill, vocab-drill, phrasal-verbs, idioms, grammar-drill, pronunciation, word-of-the-day, paraphrase, writing-prompt, generate-exam, assess-level, deep-analysis, skill-report, study-plan, exam-history, theme-control, navigate, focus-skill, settings. Slash routing live (/exam, /assess, /deep, /theme ocean, /skills...). Unknown slash returns the directory.
+- Exam engine v2 (exam.ts + fuzzy.ts): keys never sent to client; grading = normalize (case/punct/articles) + accept-variant lists from generation + token-set similarity with light stemming + mustInclude patterns for rewrites. 15/15 self-tests pass incl. the user's exact failures ("take the advantage of" accepted, "pouring rain" accepted for "heavy rain", "rains" for "rain", "raise" correctly rejected for "address"). Announced count == graded count enforced. Grading updates SkillLevels.
+- Per-skill bands (levels.ts): grammar, vocabulary, writing, speaking, reading, listening each with own CEFR band + one overall; rolling updates so early evidence moves fast, later evidence moves slow.
+- Deep analysis: 5 AI passes with extended reasoning (production errors, composed texts, synthesis, verification, coaching note) + 25s minimum working window; zero-score bands for unevidenced skills filtered out.
+- Theme plugin (theme.ts + theme-bus.ts + /api/theme): 6 presets + custom hex tokens; validation server side; paints CSS vars --rah-*; persists in Learner.theme; App applies on load so it survives reloads. Replaced all 5 identity hexes with var() across components (Tailwind v4 color-mix handles opacity modifiers).
+- Chat UI: step trace chips (expandable), inline interactive ExamCard (answers, submit, per-skill result bars, item-by-item review), AssessCard (band bars + overall), actions applied client side (theme paint, hash navigation), progressive phase labels while busy.
+- Browser-verified end to end at the PREVIEW URL: /skills directory, theme ocean applied + persisted + violet repaint visible, generate exam -> answered -> graded (count consistent, per-skill bars, item review), /deep full run (48s, 11 steps, bands updated), navigate + focus plugins, correction with Farsi trap tag. Zero console/page errors. Lint + tsc clean.
+- Pushed c5816c3; GitHub Actions CI GREEN.
+
+Stage Summary:
+- The coach is an agent now: 22 skills, slash routing, step traces, exam engine with synonym-mercy grading, per-skill bands, 5-pass deep analysis, theme plugin. No scripted strings left (grepped: old fingerprints gone).
+- Preview freshness is guaranteed and verifiable: /api/version matches on localhost and preview-chat-d027ce73-...space-z.ai, and every push to WasewaseX/rah-web (private, CI green) doubles as disaster recovery.
+- Screenshots: download/screenshots/agent-01..08 (chat, exam card, graded, violet repaint, midnight reset, preview live).
