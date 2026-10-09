@@ -7,6 +7,7 @@ import { parseSlash, routeByCommand, routeByTrigger, routeByPlanner } from "./pl
 import { getSkill, REGISTRY } from "./registry";
 import { verifyEnvelope } from "./verify";
 import { buildProfile } from "@/lib/server";
+import { runModeFlow } from "./mode-flow";
 import type { ProfileJson } from "@/lib/ai";
 
 export { REGISTRY, getSkill } from "./registry";
@@ -66,6 +67,12 @@ export async function runCoach(
   }
 
   // Deterministic triggers first: zero latency, zero misroutes.
+  // But an active conversation mode (roleplay, debate, socratic, daily)
+  // IS the turn: it intercepts before skill routing and exits cleanly on
+  // "end". Slash commands still win, so /skills works mid-scene.
+  const modeTurn = await runModeFlow(text, history, p, emit).catch(() => null);
+  if (modeTurn) return verifyEnvelope(modeTurn);
+
   const triggered = routeByTrigger(text);
   const decision = triggered ?? (await routeByPlanner(text, history));
   if (decision.via === "planner") emit("Planner", `picked ${decision.def.name}`);

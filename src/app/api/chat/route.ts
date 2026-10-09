@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { runCoach } from "@/lib/agent/run";
+import { recordMistakes } from "@/lib/mistakes";
 import type { ProfileJson } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,22 @@ export async function POST(req: Request) {
 
   await db.chatMsg.create({ data: { role: "user", content: text } });
   await db.chatMsg.create({ data: { role: "coach", content: JSON.stringify(out) } });
+
+  // One memory hook at the agent boundary: ANY skill that returns tagged
+  // corrections (chat, correct, roleplay, debate, socratic, summarize, ...)
+  // feeds the persistent mistake families here. Fire and forget: memory must
+  // never delay or break the turn that produced the mistakes.
+  if (out.corrections && out.corrections.length > 0) {
+    void recordMistakes(
+      out.corrections.map((c) => ({
+        kind: "chat" as const,
+        tag: String((c as { trap?: string }).trap ?? "none"),
+        wrong: String(c.wrong ?? ""),
+        right: String(c.right ?? ""),
+      })),
+    ).catch(() => undefined);
+  }
+
   await bumpDaily("reviews");
   await bumpDaily("xp", 8);
   await touchStreak();

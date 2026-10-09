@@ -20,6 +20,8 @@ model Learner {
   placementPhase String  @default("none") // none | quiz | writing | done
   focusSkill     String  @default("vocabulary")
   theme          String  @default("") // JSON theme tokens set by the theme plugin
+  mode           String  @default("coach") // coach | roleplay | debate | socratic | daily
+  modeData       String  @default("") // JSON state for the active conversation mode
   createdAt      DateTime @default(now())
 }
 
