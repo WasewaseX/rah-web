@@ -8,6 +8,7 @@ import type { SkillDef, SkillContext, StepTrace } from "./types";
 import { generateExam } from "./exam";
 import { updateSkillLevels, getSkillLevels, buildAssessment, spreadLine } from "./levels";
 import { parseThemeRequest, presetById, PRESETS } from "./theme";
+import { topMistakes } from "@/lib/mistakes";
 import { basePersona } from "./skills-util";
 
 const VIEW_WORDS: Record<string, RegExp> = {
@@ -86,6 +87,36 @@ export const POWER_SKILLS: SkillDef[] = [
         fa_note: "",
         steps,
         exam: client,
+      };
+    },
+  },
+  {
+    id: "mistakes",
+    name: "Mistake memory",
+    oneLiner: "Your recurring mistakes, counted, with live evidence",
+    commands: ["mistakes"],
+    triggers: [/\b(recurring )?mistakes?\b/i, /what do i keep (getting )?wrong/i, /\bmy (weak|leak\w*) (points|spots|families)\b/i, /\berror (families|patterns)\b/i],
+    run: async (ctx) => {
+      const steps: StepTrace[] = [];
+      steps.push({ label: "Mining corrections", detail: "chat turns, essays, speaking rounds" });
+      const families = await topMistakes(6);
+      if (families.length === 0) {
+        return {
+          skill: "mistakes",
+          reply: "No recurring mistakes on file yet. The memory builds itself as I correct your chat messages, essays and speaking rounds, so keep producing: within a few sessions the persistent patterns surface here with counts and evidence.",
+          corrections: [],
+          fa_note: "",
+          steps,
+        };
+      }
+      const lines = families.map((f, i) => `${i + 1}. ${f.label} - seen ${f.count}x in your ${f.kind}. Latest: "${f.evidence}"`);
+      const top = families[0];
+      return {
+        skill: "mistakes",
+        reply: `Your leaks, most persistent first:\n${lines.join("\n")}\n\nThis is the memory the tutor and the examiner both aim with. Say "focus on ${top.tag}" to drill the worst one, or "generate a 6 question grammar only exam" to test it under pressure.`,
+        corrections: [],
+        fa_note: "",
+        steps,
       };
     },
   },

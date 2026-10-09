@@ -117,3 +117,19 @@ model SkillLevel {
   samples   Int      @default(0)
   updatedAt DateTime @updatedAt
 }
+
+// Recurring production-mistake families, mined from corrections across chat,
+// essays and speaking. Keyed by kind:tag where tag is the Farsi-interference
+// trap taxonomy the tutor already emits, so the same weakness aggregates over
+// time instead of fragmenting per sentence. Count separates a one-off slip
+// from a persistent leak; exams, drills and the tutor prompt prioritize these.
+model MistakeFamily {
+  id        String   @id // "chat:statives", "writing:articles", ...
+  kind      String   // chat | writing | speak
+  tag       String   // normalized trap tag: statives, articles, prepositions, ...
+  label     String   // human-readable family name
+  count     Int      @default(1)
+  evidence  String   // latest wrong -> right example
+  lastSeen  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

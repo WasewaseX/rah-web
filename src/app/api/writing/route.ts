@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiJson, writingSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
+import { recordMistakes } from "@/lib/mistakes";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,12 @@ export async function POST(req: Request) {
   await bumpDaily("written");
   await bumpDaily("xp", 15);
   await touchStreak();
+  // Mistake memory: essay errors feed persistent families by their trap type.
+  if (Array.isArray(result.errors) && result.errors.length > 0) {
+    await recordMistakes(
+      result.errors.map((e) => ({ kind: "writing" as const, tag: String(e.type ?? "none"), wrong: String(e.bad ?? ""), right: String(e.good ?? "") })),
+    );
+  }
   return NextResponse.json(result);
 }
 

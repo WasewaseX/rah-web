@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiJson, speakSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
+import { recordMistakes } from "@/lib/mistakes";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,12 @@ export async function POST(req: Request) {
   await bumpDaily("spoken");
   await bumpDaily("xp", 20);
   await touchStreak();
+  // Mistake memory: spoken errors feed persistent families by their trap tag.
+  if (Array.isArray(result.errors) && result.errors.length > 0) {
+    await recordMistakes(
+      result.errors.map((e) => ({ kind: "speak" as const, tag: String(e.trap ?? "none"), wrong: String(e.bad ?? ""), right: String(e.good ?? "") })),
+    );
+  }
   return NextResponse.json(result);
 }
 
