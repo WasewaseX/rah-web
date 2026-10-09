@@ -104,7 +104,7 @@ export async function coachTurn(
     `${system}\n\n## Learner profile (live)\n${profileBlock(ctx.profile)}`,
     [...history, { role: "user", content: ctx.text }],
     rawFallback,
-    deep,
+    { deep },
   );
   return {
     reply: cleanEmDash(String(out.reply ?? "")).trim(),

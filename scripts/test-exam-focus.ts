@@ -42,3 +42,5 @@ const results = await run("vocab-only 12q (the user's exact request)", "generate
 await run("grammar-only 6q", "generate a 6 question grammar only exam", ["grammar"]);
 console.log(results ? "\nALL EXAM FOCUS TESTS PASS" : "\nSOME TESTS FAILED");
 process.exit(results ? 0 : 1);
+
+export {}

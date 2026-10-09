@@ -31,14 +31,80 @@ interface RawExam {
   items?: RawItem[];
 }
 
-function examSystem(p: ProfileJson, spec: ExamSpec): string {
+// Randomized topic domains: exams rotate through these so two exams never
+// mine the same "office policy + party + heavy rain" cliché territory.
+const DOMAINS = [
+  "technology and apps", "health and fitness", "travel and airports", "food and cooking",
+  "environment and climate", "work and careers", "education and studying", "sports and competition",
+  "music and film", "science and space", "money and shopping", "city life and transport",
+  "family and friendships", "news and media", "nature and animals", "art and design",
+];
+
+// Templates the model gravitates to when lazy. Named explicitly so the first
+// sentence of every exam is not "The new policy had a significant ___ on".
+const OVERUSED = [
+  "The new policy had a significant ___ on",
+  "Which word means to make something less severe or intense",
+  "By the time we arrived at the party",
+  "What verb collocates with 'heavy'",
+  "If I ___ more time, I would have",
+  "The company needs to ___ its operations",
+];
+
+interface Freshness {
+  domains: string[];
+  bannedQ: string[];
+  bannedA: string[];
+}
+
+// Recent-exam ledger: the last few exams' sentences and answer keys become a
+// ban list, so "the same exam again" is structurally impossible, not hoped
+// against. Banned answers rotate the teaching points too (no more alleviate /
+// mitigate asked twice in a row).
+async function loadFreshness(): Promise<Freshness> {
+  const domains = [...DOMAINS].sort(() => Math.random() - 0.5).slice(0, 4);
+  try {
+    const recent = await db.exam.findMany({ orderBy: { createdAt: "desc" }, take: 4, select: { items: true } });
+    const past = recent.flatMap((r) => {
+      try { return JSON.parse(r.items) as ExamItem[]; } catch { return []; }
+    });
+    return {
+      domains,
+      bannedQ: [...new Set(past.map((i) => i.q.replace(/\s+/g, " ").slice(0, 90)))].slice(0, 24),
+      bannedA: [...new Set(past.map((i) => i.a.toLowerCase().replace(/\s+/g, " ").slice(0, 40)))].slice(0, 24),
+    };
+  } catch {
+    return { domains, bannedQ: [], bannedA: [] };
+  }
+}
+
+// A question that says "according to the text" without carrying the text is a
+// broken item: the learner has nothing to read. Reading items must embed their
+// own mini-passage, so anything referencing a text while staying short is dead
+// on arrival.
+const DANGLING_TEXT_REF = /\b(according to|based on)\b[^.]{0,40}\b(text|passage|article|author|writer)\b|\bthe (text|passage|article) (says|states|mentions|suggests)\b|\bthe (author|writer) (says|states|mentions|argues)\b/i;
+
+function examSystem(p: ProfileJson, spec: ExamSpec, fresh: Freshness): string {
+  const bans = [
+    fresh.bannedQ.length ? `BANNED questions (served recently; never reuse the sentence, a close paraphrase, or the same teaching point): ${fresh.bannedQ.map((q) => JSON.stringify(q)).join("; ")}` : "",
+    fresh.bannedA.length ? `BANNED answers (do not make any of these the correct answer or a distractor again): ${fresh.bannedA.join("; ")}` : "",
+    `AVOID these worn-out templates entirely: ${OVERUSED.map((t) => JSON.stringify(t)).join("; ")}`,
+  ].filter(Boolean).join("\n\n");
   return `You are the examiner inside Rah, an English app for Farsi speakers. Build ONE exam targeted at ${spec.level} level, focused on: ${spec.targetSkills.join(", ")}.
 
-The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ") || "general B2 range"}. Push at the edge of ${p.level} toward C1: collocations, register, precise verbs, Farsi interference traps (articles, countability, prepositions, present perfect, question order).
+The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ") || "general B2 range"}. Push at the edge of ${spec.level} toward C1: collocations, register, precise verbs, Farsi interference traps (articles, countability, prepositions, present perfect, question order).
 
 Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 
+FRESHNESS RULES (a moderator rejects recycled exams):
+- Draw situations from these domains: ${fresh.domains.join(", ")}. At least half the items must come from this list.
+- Every sentence pattern in the exam must be structurally different from every other. Ten cloze items are ten different shapes, not one shape repeated.
+- Never test the same word or teaching point twice in one exam, even in different sentence frames.
+${bans}
+
 HARD FOCUS RULE: every item's "skill" field MUST be one of: ${spec.targetSkills.join(", ")}. Zero items outside this list, even if the item type would fit another skill. A rewrite item in a vocabulary exam is still a vocabulary item (word choice, register, word formation), never a writing item.
+
+READING RULE: an item about a text MUST embed the full mini-text (2 to 4 short sentences) inside its "q" before the question. Never write "according to the text" without the text being right there in "q". Standalone reading items (word meaning in context) are fine without a passage.
 
 CRITICAL answer-key rules, the grader is mechanical:
 - "a" is the single best answer, lowercase unless a proper noun.
@@ -68,7 +134,10 @@ export async function generateExam(
   };
 
   emit("Calibrating difficulty", `level ${spec.level}, edge of ${spec.level} toward C1`);
-  const raw = await aiJson<RawExam>(examSystem(p, spec), [{ role: "user", content: `Generate the ${spec.plannedCount}-item exam now. Cover: ${spec.targetSkills.join(", ")}.` }], () => ({}), true);
+  const fresh = await loadFreshness();
+  emit("Rotating topics", fresh.domains.join(", "));
+  const genOpts = { deep: true, temperature: 0.9 };
+  const raw = await aiJson<RawExam>(examSystem(p, spec, fresh), [{ role: "user", content: `Generate the ${spec.plannedCount}-item exam now. Cover: ${spec.targetSkills.join(", ")}. Respect every BAN list and freshness rule.` }], () => ({}), genOpts);
   emit("Validating answer keys", "every item needs a key and a why");
 
   const seen = new Set<string>();
@@ -82,10 +151,17 @@ export async function generateExam(
       if (!q || !a || seen.has(q)) continue;
       const type = (["mcq", "cloze", "short", "rewrite"] as const).includes(r.type as never) ? (r.type as ExamItem["type"]) : "cloze";
       if (type === "mcq" && (!Array.isArray(r.choices) || r.choices.length < 2)) continue;
-      const skill = /^(grammar|vocabulary|collocation|writing|reading|listening)$/.test(String(r.skill)) ? String(r.skill) : "vocabulary";
+      const skillRaw = /^(grammar|vocabulary|collocation|writing|reading|listening)$/.test(String(r.skill)) ? String(r.skill) : "vocabulary";
+      // Collocation is vocabulary in narrower clothes: when the learner asked
+      // for vocabulary only, a collocation item honors the promise (the level
+      // engine already folds collocation into the vocabulary band), so relabel
+      // instead of dropping it. That is how "4 vocab questions" stays 4.
+      const skill = skillRaw === "collocation" && spec.targetSkills.includes("vocabulary") ? "vocabulary" : skillRaw;
       // Focus guard: an item tagged outside the requested focus would break the
       // promise the exam card makes ("mixed: ..." / "focus: ..."), so drop it.
       if (!spec.targetSkills.includes(skill)) continue;
+      // Broken-item guard: no question may reference a text it fails to carry.
+      if (DANGLING_TEXT_REF.test(q) && q.length < 220) continue;
       batchCount += 1;
       items.push({
         id: `i${batchStart + batchCount}`,
@@ -106,18 +182,18 @@ export async function generateExam(
 
   harvest(raw.items, 0);
 
-  // If focus filtering left the exam short, top up with one more generation
-  // round locked to the requested skills, instead of shipping off-focus items
-  // or shrinking the announced count.
-  if (items.length < spec.plannedCount) {
+  // If focus filtering left the exam short, top up with up to two more
+  // generation rounds locked to the requested skills, instead of shipping
+  // off-focus items or shrinking the announced count.
+  for (let round = 0; round < 2 && items.length < spec.plannedCount; round++) {
     emit("Topping up", "keeping every item inside your requested focus");
-    const avoid = items.map((i) => i.q.slice(0, 60));
+    const avoid = [...items.map((i) => i.q.slice(0, 60)), ...fresh.bannedQ.slice(0, 10)];
     const need = spec.plannedCount - items.length;
     const raw2 = await aiJson<RawExam>(
-      examSystem(p, spec),
+      examSystem(p, spec, fresh),
       [{ role: "user", content: `Generate exactly ${need} more items now. The "skill" field of every item MUST be one of: ${spec.targetSkills.join(", ")}. Do not repeat or paraphrase any of these questions: ${JSON.stringify(avoid)}. Output the same JSON object shape with only the new items.` }],
       () => ({}),
-      true,
+      genOpts,
     );
     harvest(raw2.items, items.length);
   }
