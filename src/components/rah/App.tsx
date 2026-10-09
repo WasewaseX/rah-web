@@ -48,7 +48,7 @@ export interface AppState {
   speaks: number;
   deck: { total: number; byLevel: Record<string, number>; byUnit: Record<string, number> };
   diagnosis: { bySkill: { skill: string; lapseRate: number; due: number; reps: number }[]; advice: string[] };
-  profile: { level: string; streak: number; focus: string; due: number; recentTraps: string[]; weakSkills: string[]; mistakes?: { tag: string; count: number; label: string }[] };
+  profile: { level: string; streak: number; focus: string; due: number; recentTraps: string[]; weakSkills: string[]; mistakes?: { tag: string; count: number; label: string }[]; mistakesHealed?: number };
 }
 
 export const VIEWS = [

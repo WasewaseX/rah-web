@@ -37,12 +37,14 @@ check((statives[0]?.count ?? 0) >= 2, "family count is at least 2", `got ${stati
 
 // The /mistakes skill must surface it.
 const r3 = await chat("what are my recurring mistakes?");
-check(r3.reply?.toLowerCase().includes("stative") || r3.reply?.toLowerCase().includes("statives"), "/mistakes reply names the family", r3.reply?.slice(0, 140));
+check(r3.reply?.toLowerCase().includes("stative") === true || r3.reply?.toLowerCase().includes("statives") === true, "/mistakes reply names the family", r3.reply?.slice(0, 140));
 
 // The live profile carries the memory (this is what tutor/exam prompts consume).
 const sres = await fetch(`${BASE}/api/state`);
 const sdata = (await sres.json()) as { profile?: { mistakes?: { tag: string; count: number }[] } };
-check((sdata.profile?.mistakes?.some((m) => m.tag === "statives" && m.count >= 2)) === true, "profile carries the family into prompts", JSON.stringify(sdata.profile?.mistakes ?? []));
+check(sdata.profile?.mistakes?.some((m) => m.tag === "statives" && m.count >= 2) === true, "profile carries the family into prompts", JSON.stringify(sdata.profile?.mistakes ?? []));
 
 console.log(failures === 0 ? "\nMISTAKE MEMORY: ALL CHECKS PASS" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
+
+export {}

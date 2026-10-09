@@ -38,7 +38,7 @@ async function main() {
     focus: "vocabulary",
     due: 10,
     recentTraps: ["preposition"],
-    mistakes: [],
+    mistakes: [], mistakesHealed: 0,
     weakSkills: ["vocabulary"],
   };
 
