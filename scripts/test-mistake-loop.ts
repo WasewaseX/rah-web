@@ -64,16 +64,27 @@ check(d1.spec.weakTags?.includes("articles") === true, "exam spec hunts articles
 const tagged1 = d1.items.filter((i) => i.tag === "articles");
 check(tagged1.length >= 1, "weakness quota: at least 1 item tagged articles", `${tagged1.length} of ${d1.items.length}`);
 
-// --- Clean hit #1 ---
+// --- Clean hit(s) #1: resolve whenever 2 tagged items have been answered
+// correctly in total. The examiner may legitimately hunt the same family with
+// more than one tagged item per exam, so resolution can land in exam 1.
 const answers1: Record<string, string> = {};
 for (const it of d1.items) answers1[it.id] = it.tag === "articles" ? it.a : "";
 const r1 = await grade(e1.exam!.id, answers1);
 check(r1.total === d1.items.length, "grading returns full count", `${r1.correct}/${r1.total}`);
 await sleep(400);
 fam = await prisma.mistakeFamily.findUnique({ where: { id: "chat:articles" } });
-check((fam?.streakClean ?? 0) >= 1 && !fam?.resolvedAt, "clean hit 1: streak advanced, not resolved", `streak=${fam?.streakClean} resolved=${!!fam?.resolvedAt}`);
+const cleanHits1 = fam?.streakClean ?? 0;
+check(cleanHits1 >= 1, "clean hit 1: streak advanced", `streak=${cleanHits1}`);
+const resolvedInExam1 = !!fam?.resolvedAt;
+if (resolvedInExam1) {
+  check(cleanHits1 >= 2, "family resolved early only after 2 clean hits", `streak=${cleanHits1}`);
+  console.log("  (examiner hunted articles twice in exam 1 - family retired in one exam)");
+} else {
+  check(true, "family not yet resolved after partial streak", `streak=${cleanHits1}`);
+}
 
-// --- Clean hit #2 retires the family ---
+// --- Clean hit #2 retires the family (skipped if already retired) ---
+if (!resolvedInExam1) {
 const e2 = await examViaChat("generate a 6 question mixed exam");
 check(!!e2.exam, "exam 2 generated");
 const d2 = await latestExam(e2.exam!.id);
@@ -83,6 +94,7 @@ await grade(e2.exam!.id, answers2);
 await sleep(400);
 fam = await prisma.mistakeFamily.findUnique({ where: { id: "chat:articles" } });
 check(!!fam?.resolvedAt, "clean hit 2: family RESOLVED (retired)", `resolved=${fam?.resolvedAt}`);
+}
 
 prof = await profileMistakes();
 check(prof.mistakes?.some((m) => m.tag === "articles") !== true, "healed family stops steering the profile", JSON.stringify(prof.mistakes));
