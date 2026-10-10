@@ -31,6 +31,8 @@ const TAG_LABELS: Record<string, string> = {
   spelling: "Spelling",
   word_choice: "Word choice",
   register: "Register (formal vs casual)",
+  conditional: "Conditionals (would have + participle)",
+  fluency_illusion: "Trusting fluency: mistaking ease for learning",
 };
 
 function normalizeTag(raw: string): string {
@@ -41,6 +43,14 @@ function normalizeTag(raw: string): string {
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .slice(0, 40);
+}
+
+/** Human-readable label for a trap tag, shared by placement feedback and the
+ *  mistake UI. Falls back to a prettified tag for codes not in the map. */
+export function tagLabel(raw: string): string {
+  const tag = normalizeTag(raw);
+  if (!tag || tag === "none") return "";
+  return labelFor(tag, "recent answers");
 }
 
 function labelFor(tag: string, kind: string): string {
