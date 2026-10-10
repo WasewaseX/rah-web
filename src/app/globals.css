@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Build-guard: never let Tailwind's project scan touch non-app dirs.
+   Root-owned external dirs (research/) crashed Turbopack with
+   "Permission denied" during glob tracking and took the whole /page
+   endpoint down. These exclusions keep the scan inside the app only. */
+@source not "../../research";
+@source not "../../shots";
+@source not "../../download";
+@source not "../../rah";
+@source not "../../rah-run";
+@source not "../../tool-results";
+@source not "../../scripts";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

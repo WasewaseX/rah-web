@@ -61,3 +61,14 @@ server.log
 db/custom.db
 /rah-web-export/
 /rah-repo/
+
+# external research artifacts (root-owned, unreadable at build time - Turbopack dies on these)
+/research/
+/shots/
+# local deliverables & screenshots - not repo content
+/download/
+/agent-ctx/
+/rah/
+/rah-run/
+/tool-results/
+scripts/*.json
