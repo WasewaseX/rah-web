@@ -248,3 +248,19 @@ Work Log:
 Stage Summary:
 - The site survived two silent infra failures (unreadable scan dir + rolled-back schema) and both failure classes are now structurally guarded: @source-not build-guard in CSS and a canary-probe schema guard at boot.
 - The public repo now contains the complete live app (frontend + backend + tests), type-checks clean from a fresh clone, and the beacon serves dirty:0 at b2bc6f8 on localhost and the preview URL.
+
+---
+Task ID: 14
+Agent: Super Z (main)
+Task: Fix the placement-test bugs the user reported ("whatt passage??" - reading items referencing passages that do not exist; options that give away the answer with 3 negative distractors + 1 positive) and sweep the whole bank for more of the same.
+
+Work Log:
+- Audited all 25 placement items; bugs found: all 4 reading items referenced an unseen passage (r1/r3/r4 said "the passage", r2 quoted an unseen phrase); the reading distractors were classic give-aways (3 negative strawmen + 1 hedged/positive key, longest-is-correct on r1); 18 of 25 items had empty trap fields; v3 ('bear' vs 'hold up to' scrutiny) and c3 ('laid' vs 'put' emphasis) had TWO idiomatic keys; v7 used a misspelling distractor ('divice'); keys sat on A/B in 96% of items (A=11 B=13 C=1 D=0); the route collected trap codes but never showed any feedback, and start did pickItem(s)! with no guard.
+- Rebuilt the bank (scripts/build-placement.py writes src/content/placement.json and self-validates before writing): every reading item now embeds its full 2-3 sentence mini-passage before the question; distractors are plausible misconceptions with mixed polarity and similar lengths; v3 and c3 rebuilt as single-key items; all traps filled with learner-true misconceptions (incl. new codes conditional, fluency_illusion added to TAG_LABELS).
+- Route (/api/placement): choices are now Fisher-Yates shuffled per delivery (grading compares text, so this is safe) which makes static position bias irrelevant; answer responses now return key + human trap label (via new exported tagLabel() in mistakes.ts) on every miss; start guards against an empty bank.
+- UI (Placement.tsx): question renders whitespace-pre-line so embedded passages read as a passage block; a miss now shows "Correct answer: X" plus "The trap: ..." for 4.2s instead of a bare "Missed." flash of 0.9s.
+- New deterministic gate scripts/test-placement.ts (25-item structural checks, phantom-passage regex, 3-negative/unique-hedge/longest-key tells, trap presence, per-section key-position balance) plus scripts/test-placement-live.ts which walks the whole placement flow against the running server (verifies shuffling in delivery, passages in reading items, key+trap on a deliberate miss) and restores the learner's placement state afterwards so the user's real result is untouched.
+- Verification: test-placement ALL PASS, test-placement-live ALL PASS (12 live checks), test-fuzzy 15/15, test-grading ALL PASS, tsc + eslint clean, / and /api/placement return 200.
+
+Stage Summary:
+- The placement test can no longer ask about a passage it never showed, its options no longer self-signal the answer, every miss teaches (key + trap), and a build-time gate plus a live drive keep this class of bug from ever shipping again.

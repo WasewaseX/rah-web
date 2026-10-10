@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { PLACEMENT_ITEMS, type PlacementItem } from "@/lib/content";
 import { aiJson, placementWritingSystem } from "@/lib/ai";
 import { getLearner, bumpDaily } from "@/lib/server";
+import { tagLabel } from "@/lib/mistakes";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,18 @@ function freshSession(): Session {
 function sectionItems(sec: string): PlacementItem[] {
   const order = (r: string) => Math.max(0, RUNGS.indexOf(r));
   return PLACEMENT_ITEMS.filter((it) => it.sec === sec).sort((a, b) => order(a.rung) - order(b.rung));
+}
+
+// Shuffle choices per delivery. Grading compares the chosen TEXT, not an
+// index, so this is safe everywhere and kills static answer-position tells
+// (the old bank was A=11 B=13 C=1 D=0 - test-savvy learners learn to avoid D).
+function shuffled(item: PlacementItem) {
+  const choices = [...item.choices];
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+  return { id: item.id, q: item.q, choices };
 }
 
 function pickItem(s: Session): PlacementItem | undefined {
@@ -109,7 +122,7 @@ export async function GET() {
     sections: SECTIONS.length,
     idx: s.idx,
     rung: RUNGS[Math.max(0, Math.min(3, s.rung))],
-    item: { id: item.id, q: item.q, choices: item.choices },
+    item: shuffled(item),
   });
 }
 
@@ -121,7 +134,11 @@ export async function POST(req: Request) {
     const s = freshSession();
     await saveSession(s, "quiz");
     await db.learner.update({ where: { id: "me" }, data: { placementPhase: "quiz" } });
-    const item = pickItem(s)!;
+    const first = pickItem(s);
+    if (!first) {
+      await saveSession(s, "writing");
+      return NextResponse.json({ phase: "writing" });
+    }
     return NextResponse.json({
       phase: "quiz",
       sec: s.sec,
@@ -129,7 +146,7 @@ export async function POST(req: Request) {
       sections: SECTIONS.length,
       idx: 0,
       rung: RUNGS[s.rung],
-      item: { id: item.id, q: item.q, choices: item.choices },
+      item: shuffled(first),
     });
   }
 
@@ -160,7 +177,7 @@ export async function POST(req: Request) {
       if (!nextSec) {
         await saveSession(s, "writing");
         await db.learner.update({ where: { id: "me" }, data: { placementPhase: "writing" } });
-        return NextResponse.json({ correct, phase: "writing" });
+        return NextResponse.json({ correct, key: item.a, trapLabel: correct ? "" : tagLabel(item.trap), phase: "writing" });
       }
       s.sec = nextSec;
       s.idx = 0;
@@ -169,18 +186,20 @@ export async function POST(req: Request) {
       if (!item2) {
         await saveSession(s, "writing");
         await db.learner.update({ where: { id: "me" }, data: { placementPhase: "writing" } });
-        return NextResponse.json({ correct, phase: "writing" });
+        return NextResponse.json({ correct, key: item.a, trapLabel: correct ? "" : tagLabel(item.trap), phase: "writing" });
       }
       await saveSession(s, "quiz");
       await bumpDaily("reviews");
       return NextResponse.json({
         correct,
+        key: item.a,
+        trapLabel: correct ? "" : tagLabel(item.trap),
         phase: "quiz",
         sec: s.sec,
         secIndex: SECTIONS.indexOf(s.sec),
         idx: s.idx,
         rung: RUNGS[Math.max(0, Math.min(3, s.rung))],
-        item: { id: item2.id, q: item2.q, choices: item2.choices },
+        item: shuffled(item2),
       });
     }
 
@@ -189,12 +208,14 @@ export async function POST(req: Request) {
     await bumpDaily("reviews");
     return NextResponse.json({
       correct,
+      key: item.a,
+      trapLabel: correct ? "" : tagLabel(item.trap),
       phase: "quiz",
       sec: s.sec,
       secIndex: SECTIONS.indexOf(s.sec),
       idx: s.idx,
       rung: RUNGS[Math.max(0, Math.min(3, s.rung))],
-      item: nextItem ? { id: nextItem.id, q: nextItem.q, choices: nextItem.choices } : null,
+      item: nextItem ? shuffled(nextItem) : null,
     });
   }
 

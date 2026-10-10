@@ -25,6 +25,8 @@ interface QuizQ {
 type GetRes = QuizQ | { phase: "writing" } | { phase: "done"; level: string; writingLevel: string };
 interface AnswerRes {
   correct: boolean;
+  key?: string;
+  trapLabel?: string;
   phase: string;
   sec?: string;
   secIndex?: number;
@@ -55,6 +57,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
   const [phase, setPhase] = useState<"intro" | "quiz" | "writing" | "done">("intro");
   const [chosen, setChosen] = useState<string | null>(null);
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [feedback, setFeedback] = useState<{ key: string; trap: string } | null>(null);
   const [writing, setWriting] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<DoneRes | null>(null);
@@ -113,16 +116,20 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
     });
     const j: AnswerRes = await r.json();
     setCorrect(j.correct);
+    setFeedback(j.correct ? null : { key: j.key ?? "", trap: j.trapLabel ?? "" });
     setBusy(false);
+    // A miss is a teaching moment: hold the explanation on screen long enough
+    // to actually read it, then move on.
     setTimeout(async () => {
       setChosen(null);
       setCorrect(null);
+      setFeedback(null);
       if (j.phase === "writing") {
         setPhase("writing");
         return;
       }
       if (j.item) setQ({ ...q, item: j.item, idx: j.idx ?? q.idx, rung: j.rung ?? q.rung, sec: j.sec ?? q.sec, secIndex: j.secIndex ?? q.secIndex });
-    }, 900);
+    }, j.correct ? 900 : 4200);
   };
 
   const submitWriting = async () => {
@@ -176,7 +183,7 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
           </Chip>
         </div>
         <Card key={q.item.id} className="rah-pop">
-          <p className="text-lg font-bold leading-relaxed tracking-tight text-[#e7ecf5]">{q.item.q}</p>
+          <p className="whitespace-pre-line text-lg font-bold leading-relaxed tracking-tight text-[#e7ecf5]">{q.item.q}</p>
           <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {q.item.choices.map((c) => {
               const isChosen = chosen === c;
@@ -202,9 +209,19 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
             })}
           </div>
           {chosen && correct !== null && (
-            <div className={`rah-pop mt-5 flex items-center justify-center gap-2 text-sm font-black ${correct ? "text-[#2fc273]" : "text-[#ff8ba0]"}`}>
-              {correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-              {correct ? "Right." : "Missed."}
+            <div className="rah-pop mt-5">
+              <div className={`flex items-center justify-center gap-2 text-sm font-black ${correct ? "text-[#2fc273]" : "text-[#ff8ba0]"}`}>
+                {correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                {correct ? "Right." : "Missed."}
+              </div>
+              {!correct && feedback && (
+                <div className="mt-3 rounded-2xl border border-[#3a3242] bg-[#1a1620] px-4 py-3 text-center">
+                  <p className="text-sm font-bold text-[#e7ecf5]">
+                    Correct answer: <span className="text-[#2fc273]">{feedback.key}</span>
+                  </p>
+                  {feedback.trap && <p className="mt-1 text-xs font-semibold text-[#b8a8d8]">The trap: {feedback.trap}</p>}
+                </div>
+              )}
             </div>
           )}
         </Card>
