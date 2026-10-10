@@ -230,3 +230,21 @@ Work Log:
 Stage Summary:
 - Grading now has two brains: a deterministic regex layer that is fast and strict about patterns, and an arbiter that is generous about meaning and coaches every miss in Farsi. "All wrong" nukings of natural answers are structurally over.
 - The agent grew from 22 to 33 skills with persistent conversation modes and a closed remediation loop; every new capability has a replayable assertion.
+
+---
+Task ID: 13
+Agent: Super Z (main)
+Task: Fix the Turbopack runtime error the user hit, restore full service after a platform volume restore, restore repo integrity, and keep the roadmap rolling ("countinue never stop").
+
+Work Log:
+- Diagnosed the Turbopack panic: an external root-owned dir (research/operon-lang, created 19:28 by the platform boot) was unreadable by user z; Tailwind v4's project-wide scan tracked the glob and "Permission denied" killed the whole /page endpoint. Fix: @source not exclusions for research/shots/download/rah/rah-run/tool-results/scripts in globals.css + .gitignore entries. Verified / compiles and serves 200 with no new panic logs.
+- Second outage found while verifying: a platform volume restore had rolled db/custom.db back to a pre-healing-loop schema (no MistakeFamily table, no Learner.mode column) - /api/state and /api/chat were 500ing silently. The boot's `db:push || true` had failed without a trace. Fix: manual db:push + server restart, then hardened .zscripts/dev.sh with a canary probe (MistakeFamily.count) that retries db:push loudly 3x at boot so a restored schema self-heals from now on.
+- Repo completeness: 70+ live files were untracked (the public repo would have been broken if cloned): all API routes, lib/agent-exam-tutor-skills libs, content, test suites. Security-scanned for tokens (none; release scripts use env-only), checked case-collisions (Tutor/tutor, Progress/progress) before adding. Committed and pushed 54ce20b.
+- Dead legacy v1 layer (21 files: api/ai|bootstrap|checkpoint|coach|grammar|settings|track|tutor|tts|asr, lib/agent.ts|skills*|tutor*|builtin-ai|prompts|exam.ts, content/listening|practice) referenced the old Prisma schema and no live code reaches it - archived locally under download/_legacy-v1 and removed from src (b2bc6f8). tsc + eslint now fully clean.
+- Git mode-churn silenced permanently with core.fileMode false (65 files of exec-bit flips were polluting every status).
+- Tests: test-mistake-loop had a flaky assumption (examiner may hunt one family with 2+ tagged items in one exam -> resolves after a single exam); made the test count total clean hits instead. All suites green: fuzzy 15/15, grading ALL, mistake-loop 14/14 (incl. early resolution), skills+modes smoke ALL, mistake-memory ALL (the previously 429-blocked regression cleared).
+- Live-AI suites needed provider-quota spacing (429s during back-to-back runs); staggered reruns passed. Test-seeded mistake families cleaned from the real db so they never steer the learner's prompts.
+
+Stage Summary:
+- The site survived two silent infra failures (unreadable scan dir + rolled-back schema) and both failure classes are now structurally guarded: @source-not build-guard in CSS and a canary-probe schema guard at boot.
+- The public repo now contains the complete live app (frontend + backend + tests), type-checks clean from a fresh clone, and the beacon serves dirty:0 at b2bc6f8 on localhost and the preview URL.
