@@ -16,6 +16,25 @@ bun install >> dev.log 2>&1
 echo "[rah-dev] boot: syncing database schema"
 bun run db:push >> dev.log 2>&1 || true
 
+# Schema-restore guard (2026-10-10 incident): a platform volume restore rolled
+# custom.db back to an old schema, db:push failed silently (`|| true`), and the
+# site served 500s for hours because the MistakeFamily table was missing. The
+# boot now PROBES a canary table that exists in the current schema and, if the
+# probe fails, retries db:push loudly (3 attempts) instead of trusting it.
+CANARY="MistakeFamily"
+probe_db() {
+  bun -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.$CANARY.count().then(c=>{console.log('canary-ok:'+c);process.exit(0)}).catch(e=>{console.log('canary-fail:'+e.code);process.exit(1)})" >/dev/null 2>&1
+}
+for attempt in 1 2 3; do
+  if probe_db; then
+    echo "[rah-dev] boot: schema probe OK ($CANARY reachable)" >> dev.log
+    break
+  fi
+  echo "[rah-dev] boot: schema probe FAILED (attempt $attempt) - re-running db:push" >> dev.log
+  bun run db:push >> dev.log 2>&1
+  sleep 2
+done
+
 FAILS=0
 while true; do
   # Clear anything squatting on the port from a previous generation.
