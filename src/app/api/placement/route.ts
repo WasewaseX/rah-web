@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { PLACEMENT_ITEMS, type PlacementItem } from "@/lib/content";
 import { aiJson, placementWritingSystem } from "@/lib/ai";
 import { getLearner, bumpDaily } from "@/lib/server";
-import { tagLabel } from "@/lib/mistakes";
+import { tagLabel, foldPlacementMisses } from "@/lib/mistakes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ interface Session {
   idx: number;
   rung: number;
   streak: number;
-  answers: { id: string; rung: string; correct: boolean; trap: string }[];
+  answers: { id: string; rung: string; correct: boolean; trap: string; pick: string }[];
   asked: Record<string, boolean>;
   sectionScores: Record<string, number>;
 }
@@ -155,7 +155,9 @@ export async function POST(req: Request) {
     const item = PLACEMENT_ITEMS.find((i) => i.id === body.itemId);
     if (!item) return NextResponse.json({ error: "bad item" }, { status: 400 });
     const correct = item.a === body.choice;
-    s.answers.push({ id: item.id, rung: item.rung, correct, trap: item.trap });
+    // Keep the exact text the learner picked: it becomes the miss evidence
+    // folded into the mistake families when the placement completes.
+    s.answers.push({ id: item.id, rung: item.rung, correct, trap: item.trap, pick: String(body.choice ?? "") });
     s.asked[item.id] = true;
     if (correct) {
       s.streak += 1;
@@ -240,8 +242,19 @@ export async function POST(req: Request) {
       where: { id: "me" },
       data: { placementPhase: "done", level: finalLevel },
     });
+    // The diagnostic's whole point: every tagged miss seeds the healing loop,
+    // so the first exam after placement already hunts these traps.
+    const traps = await foldPlacementMisses(
+      s.answers
+        .filter((a) => !a.correct)
+        .map((a) => {
+          const it = PLACEMENT_ITEMS.find((i) => i.id === a.id);
+          return { tag: a.trap || it?.trap || "", wrong: a.pick || "(blank)", right: it?.a ?? "" };
+        })
+        .filter((m) => m.right),
+    );
     await bumpDaily("written");
-    return NextResponse.json({ phase: "done", level: finalLevel, writingLevel: res.level, mcq, reasons: res.reasons, signals: (res as { signals?: unknown }).signals ?? [] });
+    return NextResponse.json({ phase: "done", level: finalLevel, writingLevel: res.level, mcq, reasons: res.reasons, traps, signals: (res as { signals?: unknown }).signals ?? [] });
   }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });
