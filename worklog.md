@@ -283,3 +283,24 @@ Work Log:
 Stage Summary:
 - Placement is no longer a dead-end diagnostic: every tagged miss now seeds a family, reopens healed ones, shows on the result screen, and steers the very next exam - the loop the user demanded ("wont ever let it happen") now starts at the measurement itself.
 - The orchestration bus (pendingCommand) gives every surface a one-line way to hand the coach its next move; the placement result uses it first.
+
+---
+Task ID: 16
+Agent: Super Z (main)
+Task: Root out the ARCHITECTURE flaw behind the recurring broken-exam bug class ("you say a random statement and want me to answer a vocab??") - bare statements shipped as rewrite tasks, trivia shipped as English items, ambiguous keys, MCQ keys not among choices, fake weakness tags.
+
+Work Log:
+- Root cause identified: exam generation was validated for SHAPE only (fields exist, choices present, skill in focus). Nothing between the model and the learner ever asked "can this item be answered?" - so every failure mode of the generator reached the user. The same shape-only philosophy had caused phantom passages and recycled exams before; each got a point fix while the class stayed open.
+- Architectural fix - a two-layer ANSWERABILITY GATE, same pattern as the two-brain grading:
+  * Layer 1 (deterministic, src/lib/agent/exam-gate.ts): TRIVIA_REF bans encyclopedic term-hunting ("what term describes...", "which document..."); bare-statement ban (no blank + no question + no instruction verb = dead regardless of claimed type); rewrite must carry its instruction inside q; cloze must contain a forced blank; short needs a blank or an explicit form task; MCQ key must be among the delivered choices; cloze key must not leak into the sentence. itemFairlyAsked exported for keyless client payloads.
+  * Layer 2 (AI, exam-ai.ts vetItems): one deep-mode batched pass over the whole pool judging ambiguity (several natural answers not covered by accept), unfair MCQs, broken keys - and a tag-integrity audit that STRIPS a weakness tag from any item that does not genuinely force that trap (a fake tag poisons the healing loop). Failure never stalls generation (falls back to layer 1).
+  * Generator prompt now carries per-type CONTRACTS (mcq single-defensible-key rules, forced cloze, forced short, instruction-inside-q rewrite, trivia ban) so the model wastes fewer items; harvest drops gate failures and keeps a report; a converging top-up loop (up to 3 gated+vetted rounds) preserves the count promise the coach announces; spec.weakTags is pruned to families that actually survived the tag audit, so "hunting: articles" is only ever announced truthfully.
+- The user's verbatim broken items are now permanent negative fixtures in scripts/test-exam-gate.ts (15 checks: bare statements from two exams, cooking/sport/document trivia, open collocation quiz, key-off-choices mcq, blankless cloze, key leak; plus 5 fair items that must keep passing). Live eval (test-exam-quality.ts) gained 3 assertions: every delivered item passes the gate, zero trivia phrasing, every rewrite carries its instruction.
+- Orchestration (bus.ts completed): handCoach() = sessionStorage command + BUS_EVENT + navigation to #chat (both halves: event wakes a mounted chat, navigation reaches an unmounted one); Chat consumes exactly-once with a busy-safe retry (command stays queued while a turn runs). ExamCard result view gained "Drill these misses with fresh sentences" (remediate handoff); Placement result's "Hunt these traps now" migrated to the bus.
+- Verification: ANSWERABILITY GATE ALL PASS (15), EXAM QUALITY live ALL PASS (13, incl. 4/4 and 12/12 counts through the gated pipeline), HEALING LOOP ALL PASS (14) on the new pipeline, PLACEMENT BANK ALL PASS, fuzzy 15/15, tsc + eslint clean. Provider 429s during back-to-back suites confirmed the graceful degradation path ("The exam builder stalled... one more try usually lands it").
+- Visual proof from a fresh mixed exam: every rewrite carries an instruction ("Rewrite using more formal vocabulary: '...'"), the articles-tagged item genuinely drills articles ("Correct the sentence by adding appropriate articles: 'I need to buy ___ new luggage before my trip to ___ Japan...'").
+- Pushed cf62fc1 to WasewaseX/rah-web; /api/version = cf62fc18c1c5 dirty:0 on localhost and preview; home + chat API 200.
+
+Stage Summary:
+- The bug class is structurally closed: an item cannot reach a learner without passing a deterministic fairness gate and an AI answerability arbiter, and the eval suite replays the user's exact broken items as permanent fixtures. Quality failures now fail loudly in CI-style checks instead of shipping to the user.
+- The count promise survives the gate (converging top-up), and the weakness banner can no longer lie (tag integrity audit + weakTags pruning).
