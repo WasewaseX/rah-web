@@ -1,6 +1,6 @@
 "use client";
 
-// Coach chat: an agent with 22 skills, not a chatbot. Steps show the work,
+// Coach chat: an agent with 36 skills, not a chatbot. Steps show the work,
 // exams render inline, bands render inline, plugins act on the app itself.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -157,6 +157,16 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
     }
   };
 
+  // Orchestration bus: other views (placement result, future surfaces) can
+  // hand the coach the next move. Consumed exactly once, after history loads.
+  useEffect(() => {
+    if (loading) return;
+    const cmd = sessionStorage.getItem("rah.pendingCommand");
+    if (!cmd) return;
+    sessionStorage.removeItem("rah.pendingCommand");
+    void send(cmd);
+  }, [loading]);
+
   const reset = async () => {
     await fetch("/api/chat", { method: "DELETE" });
     setMsgs([]);
@@ -189,7 +199,7 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
         {loading && <Spinner />}
         {!loading && msgs.length === 0 && (
           <div className="py-6 text-center">
-            <p className="text-base font-extrabold tracking-tight text-[#f2f5fa]">Twenty-two skills. One coach. No scripts.</p>
+            <p className="text-base font-extrabold tracking-tight text-[#f2f5fa]">Thirty-six skills. One coach. No scripts.</p>
             <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">
               Ask for an exam, a level probe, a 30-second deep analysis, a theme change, or just talk. Start with:
             </p>

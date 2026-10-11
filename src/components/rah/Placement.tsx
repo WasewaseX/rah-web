@@ -40,6 +40,7 @@ interface DoneRes {
   writingLevel: string;
   mcq: string;
   reasons: string;
+  traps?: { tag: string; label: string; count: number }[];
 }
 
 const SEC_LABEL: Record<string, string> = {
@@ -260,6 +261,15 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
   }
 
   if (phase === "done" && done) {
+    const traps = done.traps ?? [];
+    const huntTraps = () => {
+      // Orchestration: hand the coach the next move. The pending command is
+      // picked up by the chat view on arrival; the examiner's weakness quota
+      // already knows these families from the fold.
+      sessionStorage.setItem("rah.pendingCommand", "Make me an exam that hunts my weak spots and recurring mistakes");
+      window.history.pushState(null, "", "#chat");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    };
     return (
       <Card className="rah-pop py-12 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#2fc273]/[0.14]">
@@ -271,6 +281,27 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {done.writingLevel && done.writingLevel !== done.level && <Chip tone="amber">Writing sample: {done.writingLevel}</Chip>}
         </div>
+        {traps.length > 0 && (
+          <div className="mx-auto mt-6 max-w-md rounded-3xl border border-[#ffb02e]/25 bg-[#ffb02e]/[0.05] px-5 py-4">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-[#ffb02e]">Traps to watch</div>
+            <p className="mt-1.5 text-xs leading-relaxed text-[#a9b4c6]">
+              These leaked in your placement. The coach already remembers them - every exam will hunt them until two clean hits retire each one.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {traps.map((t) => (
+                <span key={t.tag} className="rounded-full border border-[#ffb02e]/30 bg-[#ffb02e]/10 px-3 py-1 text-xs font-bold text-[#ffd88f]">
+                  {t.label}
+                  {t.count > 1 && <span className="ml-1 text-[#b8a8d8]">×{t.count}</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {traps.length > 0 ? (
+          <Btn onClick={huntTraps} className="mt-6">
+            Hunt these traps now <ArrowRight className="h-4 w-4" />
+          </Btn>
+        ) : null}
         <p className="mx-auto mt-5 max-w-sm text-xs leading-relaxed text-[#7d889c]">
           Schedules, card order, and coach prompts now target this level. Retake every few weeks as a real measurement.
         </p>

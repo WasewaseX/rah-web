@@ -7,7 +7,7 @@
 import { db } from "@/lib/db";
 
 export interface MistakeInput {
-  kind: "chat" | "writing" | "speak" | "exam";
+  kind: "chat" | "writing" | "speak" | "exam" | "placement";
   tag: string; // raw trap tag from the model, e.g. "statives", "none"
   wrong: string;
   right: string;
@@ -169,4 +169,61 @@ export async function noteExamAnswer(tag: string, wrong: string, right: string, 
   } catch {
     // Memory must never break the grading turn that fed it.
   }
+}
+
+export interface PlacementMiss {
+  tag: string;
+  wrong: string;
+  right: string;
+}
+
+export interface TrapSummary {
+  tag: string;
+  label: string;
+  count: number;
+}
+
+// The diagnostic side of the healing loop. Placement misses are the single
+// richest signal the app ever gets: a measured, deliberate miss on a tagged
+// trap. Fold them into families so the very first exam after placement already
+// hunts them - and reopen any healed family the diagnostic proved is still
+// leaking. Returns the top traps for the result screen.
+export async function foldPlacementMisses(misses: PlacementMiss[]): Promise<TrapSummary[]> {
+  const valid = misses
+    .map((m) => ({ ...m, tag: normalizeTag(m.tag) }))
+    .filter((m) => m.tag && m.tag !== "none" && m.wrong.trim() && m.right.trim());
+  if (valid.length === 0) return [];
+
+  const counts = new Map<string, number>();
+  const evidence = new Map<string, PlacementMiss>();
+  for (const m of valid) {
+    counts.set(m.tag, (counts.get(m.tag) ?? 0) + 1);
+    if (!evidence.has(m.tag)) evidence.set(m.tag, m);
+  }
+
+  await recordMistakes(
+    [...evidence.values()].map((m) => ({
+      kind: "placement" as const,
+      tag: m.tag,
+      wrong: m.wrong,
+      right: m.right,
+    })),
+  );
+
+  // A placement miss is relapse evidence for every family sharing the tag,
+  // whatever kind originally owned it - same rule an exam miss follows.
+  for (const tag of counts.keys()) {
+    try {
+      await db.mistakeFamily.updateMany({
+        where: { tag, id: { not: `placement:${tag}` } },
+        data: { streakClean: 0, resolvedAt: null },
+      });
+    } catch {
+      // Memory must never break the result the learner is waiting for.
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, label: labelFor(tag, "placement"), count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
