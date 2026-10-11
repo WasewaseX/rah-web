@@ -10,7 +10,8 @@ import { gradeAnswer } from "./fuzzy";
 import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace } from "./types";
 import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
-import { arbitrateMisses } from "./exam-ai";
+import { arbitrateMisses, vetItems } from "./exam-ai";
+import { itemAnswerable } from "./exam-gate";
 
 function newId(): string {
   return `ex${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -101,6 +102,13 @@ ${spec.weakTags.length ? `WEAKNESS QUOTA: this learner has these recurring mista
 
 Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 
+ITEM TYPE CONTRACTS (an answerability gate rejects any item that breaks them; a rejected item is wasted):
+- TRIVIA BAN: never ask for terms, definitions, or world knowledge ("what term describes...", "what do you call...", "which document/instrument..."). Every item must test ENGLISH itself: a grammatical form, a collocation, register, a connector, or meaning in context. To teach a word, put it in a sentence blank.
+- mcq: exactly ONE choice is defensibly correct. The others must be wrong for a reason you could state (wrong form, wrong meaning, unidiomatic pairing). Never make the key the only positive/hedged/longest option. The key MUST be copied exactly from the choices array.
+- cloze: q contains exactly one ___ and the blank is FORCED: grammar or a fixed collocation decides the word, so a competent learner can produce the key (or an accept variant) with confidence. Never an open style/word-choice blank with several equally good answers - if you cannot name why the alternatives fail, the item is unfair.
+- short: the answer must be FORCED too: either a blank decided by grammar/collocation, or an explicit form task (comparative, plural, passive form, reported form, negative). Never a "what is X called" question and never an open definition.
+- rewrite: q MUST begin with the full instruction, stated in the question text itself: what to do, and to which sentence (quoted). "Rewrite using more formal vocabulary: 'The new law really stops people from polluting rivers.'" is correct. A bare statement with no instruction is a wasted item - the learner cannot know the task.
+
 FRESHNESS RULES (a moderator rejects recycled exams):
 - Draw situations from these domains: ${fresh.domains.join(", ")}. At least half the items must come from this list.
 - Every sentence pattern in the exam must be structurally different from every other. Ten cloze items are ten different shapes, not one shape repeated.
@@ -120,8 +128,8 @@ ${spec.weakTags.length ? `- "tag" (optional) is exactly one of: ${spec.weakTags.
 - "why" is one short English sentence teaching the point (max 18 words). No Farsi anywhere in the exam.
 
 Output ONE JSON object, nothing else:
-{"title": "short exam title in English", "items": [{"type": "mcq", "skill": "collocation", "q": "sentence with ___ or a question", "choices": ["", "", "", ""], "a": "exact correct choice", "accept": [], "why": ""}]}
-For cloze: q contains ___ and a is the missing string. For short: a one-phrase answer. For rewrite: a full-sentence task, mustInclude patterns, model a.
+{"title": "short exam title in English", "items": [{"type": "mcq", "skill": "collocation", "q": "sentence with ___ or an instruction plus a quoted sentence", "choices": ["", "", "", ""], "a": "exact correct choice", "accept": [], "why": ""}]}
+For cloze: q contains ___ and a is the missing string. For short: a forced form answer. For rewrite: instruction inside q, mustInclude patterns, model a.
 Never use the em dash character anywhere.`;
 }
 
@@ -149,6 +157,7 @@ export async function generateExam(
 
   const seen = new Set<string>();
   const items: ExamItem[] = [];
+  const dropped: string[] = [];
 
   const harvest = (rawItems: RawItem[] | undefined, batchStart: number) => {
     let batchCount = 0;
@@ -169,6 +178,15 @@ export async function generateExam(
       if (!spec.targetSkills.includes(skill)) continue;
       // Broken-item guard: no question may reference a text it fails to carry.
       if (DANGLING_TEXT_REF.test(q) && q.length < 220) continue;
+      // ANSWERABILITY GATE (layer 1, deterministic): bare statements, trivia,
+      // cloze without a forced blank, rewrite without an instruction, MCQ keys
+      // not among the choices, leaked keys - all dead before the learner sees
+      // them. This is the structural fix for the "random statement" bug class.
+      const gate = itemAnswerable({ type, q, a, choices: type === "mcq" ? r.choices : undefined });
+      if (!gate.ok) {
+        dropped.push(`[${gate.reason}] ${q.slice(0, 70)}`);
+        continue;
+      }
       // Weakness tags are validated against the exam's family list so the
       // model can never invent a tag and poison the healing loop.
       const weakTag = spec.weakTags.includes(String(r.tag ?? "").trim().toLowerCase()) ? String(r.tag).trim().toLowerCase() : undefined;
@@ -193,9 +211,9 @@ export async function generateExam(
 
   harvest(raw.items, 0);
 
-  // If focus filtering left the exam short, top up with up to two more
-  // generation rounds locked to the requested skills, instead of shipping
-  // off-focus items or shrinking the announced count.
+  // If focus filtering or the gate left the exam short, top up with up to two
+  // more generation rounds locked to the requested skills, instead of shipping
+  // off-focus or unanswerable items or shrinking the announced count.
   for (let round = 0; round < 2 && items.length < spec.plannedCount; round++) {
     emit("Topping up", "keeping every item inside your requested focus");
     const avoid = [...items.map((i) => i.q.slice(0, 60)), ...fresh.bannedQ.slice(0, 10)];
@@ -207,6 +225,58 @@ export async function generateExam(
       genOpts,
     );
     harvest(raw2.items, items.length);
+  }
+
+  // ANSWERABILITY GATE (layer 2, AI): the arbiter judges what regex cannot -
+  // ambiguous keys, unfair MCQs, items whose key does not fit - and audits
+  // weakness tags for integrity (a tag on an item that does not force that
+  // trap poisons the healing loop, so the tag is stripped, not the item).
+  const vetInPlace = (pool: ExamItem[], label: string) =>
+    vetItems(pool.map((it) => ({ id: it.id, type: it.type, skill: it.skill, q: it.q, choices: it.choices, a: it.a, accept: it.accept ?? [], tag: it.tag }))).then((vet) => {
+      for (const it of [...pool]) {
+        const v = vet.get(it.id);
+        if (v && !v.ok) {
+          dropped.push(`[${label}: ${v.reason}] ${it.q.slice(0, 70)}`);
+          items.splice(items.indexOf(it), 1);
+        } else if (v && !v.keepTag) {
+          it.tag = undefined;
+        }
+      }
+    });
+
+  if (items.length > 0) {
+    emit("Answerability gate", "every item must be fairly answerable");
+    await vetInPlace(items, "ai");
+  }
+
+  // If the gate dropped items, keep topping up (each round gated AND vetted)
+  // until the count promise is met or the retry budget is spent. The count
+  // the coach announces is the count the learner can actually sit.
+  let gateRounds = 0;
+  while (items.length < spec.plannedCount && gateRounds < 3) {
+    gateRounds++;
+    emit("Topping up", `replacing what the gate rejected (round ${gateRounds})`);
+    const avoid = [...items.map((i) => i.q.slice(0, 60)), ...fresh.bannedQ.slice(0, 10)];
+    const need = spec.plannedCount - items.length;
+    const raw3 = await aiJson<RawExam>(
+      examSystem(p, spec, fresh),
+      [{ role: "user", content: `Generate exactly ${need} more items now. The "skill" field of every item MUST be one of: ${spec.targetSkills.join(", ")}. Do not repeat or paraphrase any of these questions: ${JSON.stringify(avoid)}. Output the same JSON object shape with only the new items.` }],
+      () => ({}),
+      genOpts,
+    );
+    const before = items.length;
+    harvest(raw3.items, items.length);
+    const freshItems = items.slice(before);
+    if (freshItems.length > 0) await vetInPlace(freshItems, `ai-r${gateRounds}`);
+  }
+
+  // Tag honesty: the exam card announces "hunting: ..." from spec.weakTags.
+  // A family whose items all failed the tag audit must not be announced.
+  const survivingTags = new Set(items.map((it) => it.tag).filter(Boolean));
+  spec.weakTags = spec.weakTags.filter((t) => survivingTags.has(t));
+
+  if (dropped.length > 0) {
+    emit("Gate report", `${dropped.length} item(s) rejected before delivery`);
   }
 
   // Guarantee the announced count: top up from the pool by trimming or

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, XCircle, ArrowRight, Target } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "./ui";
+import { handCoach } from "@/lib/bus";
 import type { AppState } from "./App";
 
 interface Item {

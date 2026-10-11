@@ -5,8 +5,9 @@
 // grading.
 
 import { useState } from "react";
-import { Check, X, Loader2, ChevronDown, ChevronUp, Target } from "lucide-react";
+import { Check, X, Loader2, ChevronDown, ChevronUp, Target, Dumbbell } from "lucide-react";
 import type { ExamClient, ExamResult } from "@/lib/agent/types";
+import { handCoach } from "@/lib/bus";
 import { Btn, Card } from "./ui";
 
 const SKILL_TONE: Record<string, string> = {
@@ -127,6 +128,15 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
                 );
               })}
             </div>
+          )}
+          {result.correct < result.total && (
+            <Btn
+              onClick={() => handCoach("practice my misses")}
+              variant="ghost"
+              className="mt-4 text-xs"
+            >
+              <Dumbbell className="h-4 w-4" /> Drill these misses with fresh sentences
+            </Btn>
           )}
         </Card>
       </div>

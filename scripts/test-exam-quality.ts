@@ -1,6 +1,8 @@
 // Exam quality evaluation: replays the user's real failures as assertions.
 // Covers: exact count honored, skill focus respected, no dangling text
 // references, no recycled questions across consecutive exams.
+import { itemFairlyAsked } from "../src/lib/agent/exam-gate";
+
 const BASE = "http://localhost:3000";
 
 interface ExamItemClient { id: string; type: string; skill: string; q: string }
@@ -64,6 +66,22 @@ check(danglingAll.length === 0, "all exams: no dangling text references", dangli
 const banned = ["new policy has had a significant", "make something less severe", "by the time we arrived at the party"];
 const recycled = allItems.filter((i) => banned.some((b) => i.q.toLowerCase().includes(b)));
 check(recycled.length === 0, "no overused templates in today's exams", recycled.map((i) => i.q.slice(0, 60)).join(" | "));
+
+// 7. Answerability gate on every delivered item (the "random statement" bug
+// class): no bare statements, no trivia, rewrite instructions inside q,
+// cloze blanks present, short items forced. itemFairlyAsked is the exact
+// gate the generator now enforces before delivery.
+const unfair = allItems.filter((i) => !itemFairlyAsked({ type: i.type, q: i.q }).ok);
+check(
+  unfair.length === 0,
+  "every delivered item passes the answerability gate",
+  unfair.map((i) => `[${i.type}] ${i.q.slice(0, 70)}`).join(" | "),
+);
+const triviaLive = allItems.filter((i) => /\bwhat (is the |was the )?(correct |proper )?term\b|\bwhat term\b|\bwhat do you call\b|\bwhich (document|instrument|device)\b/i.test(i.q));
+check(triviaLive.length === 0, "no trivia phrasing in delivered exams", triviaLive.map((i) => i.q.slice(0, 60)).join(" | "));
+const rewrites = allItems.filter((i) => i.type === "rewrite");
+const instructionless = rewrites.filter((i) => !/\b(rewrite|rephrase|reword|combine|join|transform|make (it|this|that|the|them)|put (it|this|that) into|passive|reported|conditional|start(ing)? with|begin(ning)? with|using|so that)\b/i.test(i.q));
+check(rewrites.length === 0 || instructionless.length === 0, "every rewrite carries its instruction in the question", instructionless.map((i) => i.q.slice(0, 70)).join(" | "));
 
 console.log(failures === 0 ? "\nALL EXAM QUALITY CHECKS PASS" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
