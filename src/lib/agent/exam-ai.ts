@@ -97,3 +97,86 @@ export async function arbitrateMisses(misses: MissForArbitration[]): Promise<Map
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Layer 2 of the answerability gate: AI vetting BEFORE delivery. The
+// deterministic gate (exam-gate.ts) kills bare statements, trivia and
+// structurally broken items; this pass judges what regex cannot see:
+// ambiguous keys (several natural answers), MCQ choices that are as
+// defensible as the key, and weakness tags slapped onto items that do not
+// actually force that trap. Nothing reaches a learner unvetted.
+// ---------------------------------------------------------------------------
+
+export interface ItemForVetting {
+  id: string;
+  type: string;
+  skill: string;
+  q: string;
+  choices?: string[];
+  a: string;
+  accept: string[];
+  tag?: string;
+}
+
+export interface VetVerdict {
+  ok: boolean;
+  keepTag: boolean;
+  reason: string;
+}
+
+function vetSystem(items: ItemForVetting[]): string {
+  return `You are the answerability gate inside Rah, an English exam app. The items below were generated for a learner; they passed structural checks. Your job: make sure each one is FAIRLY ANSWERABLE - a competent learner given only the question text could produce the key (or something on its accept list) with confidence.
+
+An item is NOT answerable (ok=false) when ANY holds:
+(a) NO REAL TASK: a bare statement with nothing asked, or a "rewrite" whose instruction lives only in your imagination - the question text alone does not say what to do;
+(b) AMBIGUOUS KEY: several natural, equally correct answers exist and the accept list does not cover them (open vocabulary blanks like "a distinct ___" where flavor/aroma/taste all fit; "which verb collocates" with multiple candidates; definition questions with several possible terms);
+(c) TRIVIA / WORLD KNOWLEDGE: the item tests facts, terms, or general education instead of English structure, collocation, register, or meaning in context;
+(d) UNFAIR MCQ: another choice is as defensible as the key, or the key cannot be chosen without guessing;
+(e) BROKEN KEY: the key is grammatically wrong in its sentence, or does not fit the blank.
+
+keepTag: items may carry a "tag" naming the mistake family they hunt (e.g. articles). keepTag=false when the item does not GENUINELY force that exact weakness - a tag slapped on an unrelated item poisons the healing loop. The item itself can still be fine (ok=true).
+
+Output ONE JSON object, nothing else:
+{"vetted": [{"id": "...", "ok": true, "keepTag": true, "reason": "max 10 words; empty when ok"}]}
+One entry per item, same order, same ids. Never use the em dash character.
+
+The items:
+${items
+  .map(
+    (it) =>
+      `id=${it.id} [${it.type}/${it.skill}] q: ${JSON.stringify(it.q)}${it.choices ? ` choices: ${JSON.stringify(it.choices)}` : ""} key: ${JSON.stringify(it.a)} accept: ${JSON.stringify(it.accept)}${it.tag ? ` tag: ${it.tag}` : ""}`,
+  )
+  .join("\n")}`;
+}
+
+export async function vetItems(items: ItemForVetting[]): Promise<Map<string, VetVerdict>> {
+  const out = new Map<string, VetVerdict>();
+  if (items.length === 0) return out;
+  try {
+    const raw = await aiJson<{ vetted?: { id?: string; ok?: boolean; keepTag?: boolean; reason?: string }[] }>(
+      vetSystem(items),
+      [{ role: "user", content: `Vet all ${items.length} items now. Judge answerability strictly; an unfair item teaches nothing.` }],
+      () => ({}),
+      // Deep mode: the vet runs once per exam and is the last line before the
+      // learner; a missed ambiguous key costs a whole item. Spend the tokens.
+      { deep: true, temperature: 0.1 },
+    );
+    for (const it of items) {
+      const v = (raw.vetted ?? []).find((x) => String(x.id ?? "") === it.id);
+      if (!v) {
+        out.set(it.id, { ok: true, keepTag: true, reason: "" });
+        continue;
+      }
+      out.set(it.id, {
+        ok: v.ok !== false,
+        keepTag: v.keepTag !== false,
+        reason: String(v.reason ?? "").trim(),
+      });
+    }
+  } catch {
+    // The gate must never stall generation: on failure, trust the
+    // deterministic layer and deliver.
+    for (const it of items) out.set(it.id, { ok: true, keepTag: true, reason: "" });
+  }
+  return out;
+}
