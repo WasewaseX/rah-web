@@ -263,12 +263,9 @@ export default function PlacementView({ state, onChange }: { state: AppState; on
   if (phase === "done" && done) {
     const traps = done.traps ?? [];
     const huntTraps = () => {
-      // Orchestration: hand the coach the next move. The pending command is
-      // picked up by the chat view on arrival; the examiner's weakness quota
-      // already knows these families from the fold.
-      sessionStorage.setItem("rah.pendingCommand", "Make me an exam that hunts my weak spots and recurring mistakes");
-      window.history.pushState(null, "", "#chat");
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      // Orchestration: hand the coach the next move. The examiner's weakness
+      // quota already knows these families from the fold.
+      handCoach("Make me an exam that hunts my weak spots and recurring mistakes");
     };
     return (
       <Card className="rah-pop py-12 text-center">

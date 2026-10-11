@@ -9,6 +9,7 @@ import { Btn, Card, FA, Note, Spinner } from "./ui";
 import { ExamCard } from "./ExamCard";
 import { AssessCard } from "./AssessCard";
 import { applyTheme } from "@/lib/theme-bus";
+import { takeCoachCommand, BUS_EVENT } from "@/lib/bus";
 import type { AppState } from "./App";
 import type { CoachEnvelope, Correction } from "@/lib/agent/types";
 
@@ -157,15 +158,24 @@ export default function ChatView({ state, onChange }: { state: AppState; onChang
     }
   };
 
-  // Orchestration bus: other views (placement result, future surfaces) can
-  // hand the coach the next move. Consumed exactly once, after history loads.
+  // Orchestration bus: other surfaces (placement result, exam cards, progress
+  // cards) hand the coach the next move. Consumed exactly once - on mount and
+  // whenever a handoff event fires; the busy-flip effect retries if a turn was
+  // already running when the command arrived.
+  const consumePending = useCallback(() => {
+    // Busy: leave the command queued. The busy flip recreates this callback,
+    // the effect re-runs, and the command is consumed then - never lost.
+    if (busy) return;
+    const cmd = takeCoachCommand();
+    if (cmd) void send(cmd);
+  }, [busy]);
+
   useEffect(() => {
     if (loading) return;
-    const cmd = sessionStorage.getItem("rah.pendingCommand");
-    if (!cmd) return;
-    sessionStorage.removeItem("rah.pendingCommand");
-    void send(cmd);
-  }, [loading]);
+    consumePending();
+    window.addEventListener(BUS_EVENT, consumePending);
+    return () => window.removeEventListener(BUS_EVENT, consumePending);
+  }, [loading, consumePending]);
 
   const reset = async () => {
     await fetch("/api/chat", { method: "DELETE" });
