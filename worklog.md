@@ -264,3 +264,22 @@ Work Log:
 
 Stage Summary:
 - The placement test can no longer ask about a passage it never showed, its options no longer self-signal the answer, every miss teaches (key + trap), and a build-time gate plus a live drive keep this class of bug from ever shipping again.
+
+---
+Task ID: 15
+Agent: Super Z (main)
+Task: Close the diagnostic gap the placement bug-sweep left behind - placement misses were stored but never fed the mistake-memory healing loop - and add the first orchestration hook (result screen hands the coach its next move).
+
+Work Log:
+- Found the gap: /api/placement stored every answer's trap code but nothing ever called recordMistakes/noteExamAnswer, so the richest signal the app gets (a measured, deliberate miss on a tagged trap) was thrown away. Added kind "placement" to MistakeInput (schema comment updated; kind is a plain String, no migration).
+- mistakes.ts: foldPlacementMisses() - groups misses by normalized tag, records placement:* families with evidence "pick -> key", and reopens every family sharing the tag regardless of kind (same relapse rule an exam miss follows); returns a TrapSummary[] (label + count) for the result screen.
+- /api/placement: Session answers now keep the exact picked text (pick); the terminal "writing" action folds all misses into the loop after the level is written and returns `traps` in the done response.
+- Placement.tsx done screen: "Traps to watch" amber panel (labeled chips with miss counts) + a "Hunt these traps now" button that seeds rah.pendingCommand and routes to #chat - the examiner's weakness quota picks the new families up automatically.
+- Chat.tsx: consumes rah.pendingCommand exactly once after history loads (orchestration bus any view can use); fixed stale copy "Twenty-two skills" -> "Thirty-six skills" (and header comment).
+- test-placement-live.ts upgraded from a quiz-walk to a full-flow drive with total state restoration: submits the writing sample (live AI), asserts the trap summary, the placement:* families, evidence text, the reopen of pre-seeded healed chat:word_choice / chat:fluency_illusion families, and that /api/state profile now steers with those tags; restores placement row, learner fields, ALL MistakeFamily rows and today's DailyStat afterwards. Also fixed a pre-existing tsc error (line 76 boolean coercion) surfaced by --incremental false.
+- Verification: PLACEMENT LIVE ALL PASS (22 checks incl. reopen + steering), PLACEMENT BANK ALL PASS, fuzzy 15/15, HYBRID GRADING ALL PASS, HEALING LOOP ALL PASS, tsc + eslint clean, / and /api/placement 200.
+- Pushed b9b0fec to WasewaseX/rah-web; /api/version = b9b0fec390c5 dirty:0 on localhost and the preview URL.
+
+Stage Summary:
+- Placement is no longer a dead-end diagnostic: every tagged miss now seeds a family, reopens healed ones, shows on the result screen, and steers the very next exam - the loop the user demanded ("wont ever let it happen") now starts at the measurement itself.
+- The orchestration bus (pendingCommand) gives every surface a one-line way to hand the coach its next move; the placement result uses it first.
