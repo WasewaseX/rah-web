@@ -42,7 +42,13 @@ function publicItem(state: GauntletState) {
 }
 
 export async function GET() {
-  const { state } = await loadRun();
+  let { state } = await loadRun();
+  // A finished run is a story the UI already told (the death screen reads
+  // the POST response); any fresh GET rolls a new gauntlet so the mode is
+  // always replayable.
+  if (state.done) {
+    ({ state } = await resetRun());
+  }
   const best = (await db.gameStat.findUnique({ where: { key: "gauntlet:best" } }))?.best ?? 0;
   return NextResponse.json({
     ...publicItem(state),

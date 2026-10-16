@@ -39,13 +39,18 @@ function normalize(s: string): string {
 // Cards whose traps overlap the learner's active families come first; the
 // rest of the pool is padded with random cards.
 async function prioritizedCards(count: number, favoredTags: string[]): Promise<Card[]> {
+  // Data guard: a cloze card with a blank but no key can never be answered,
+  // and any card with neither answer nor English cannot become an item at
+  // all - drop both wherever they would land.
+  const usable = (c: Card) =>
+    Boolean(c.answer || c.en) && !(c.kind === "cloze" && c.prompt.includes("___") && !c.answer.trim());
   let cards: Card[] = [];
   if (favoredTags.length > 0) {
-    const hot = DECK.filter((c) => c.traps.some((t) => favoredTags.includes(t)));
+    const hot = DECK.filter((c) => usable(c) && c.traps.some((t) => favoredTags.includes(t)));
     cards = shuffle(hot);
   }
   if (cards.length < count) {
-    const rest = shuffle(DECK.filter((c) => !cards.includes(c)));
+    const rest = shuffle(DECK.filter((c) => usable(c) && !cards.includes(c)));
     cards = [...cards, ...rest];
   }
   return cards.slice(0, count);
@@ -68,7 +73,10 @@ function toMcq(c: Card): ArcadeItem {
     hint: c.fa,
     choices,
     key: c.fa,
-    accepts: [c.fa],
+    // Normalized to match how graders compare: normalizeAnswer(pick) must be
+    // an exact member of accepts, so punctuation-heavy Persian keys
+    // ("کتاب (بعد از عدد جمع می‌آید)") grade correctly.
+    accepts: [c.fa].map(normalize).filter(Boolean),
     note: c.note || undefined,
     tag: c.traps[0] ?? undefined,
   };
