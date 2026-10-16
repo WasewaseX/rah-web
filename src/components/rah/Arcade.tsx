@@ -5,15 +5,17 @@
 // live on Home; this floor is pure play.
 
 import { useState } from "react";
-import { Swords, Zap, Trophy, Medal } from "lucide-react";
+import { Swords, Zap, Trophy, Medal, Mic } from "lucide-react";
 import { Card, Chip } from "./ui";
 import SpeedRound from "./games/SpeedRound";
 import BossBattle from "./games/BossBattle";
+import VoiceArena from "./games/VoiceArena";
 import type { AppState } from "./App";
 
 const TABS = [
   { id: "speed", label: "Speed Round", icon: Zap },
   { id: "boss", label: "Boss Battle", icon: Swords },
+  { id: "voice", label: "Voice Arena", icon: Mic },
   { id: "trophies", label: "Trophies", icon: Trophy },
 ] as const;
 
@@ -53,6 +55,7 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
       <div key={tab} className="rah-rise">
         {tab === "speed" && <SpeedRound onChange={onChange} />}
         {tab === "boss" && <BossBattle onChange={onChange} />}
+        {tab === "voice" && <VoiceArena onChange={onChange} />}
         {tab === "trophies" && (
           <Card>
             <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
