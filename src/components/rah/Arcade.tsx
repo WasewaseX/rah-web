@@ -5,18 +5,30 @@
 // live on Home; this floor is pure play.
 
 import { useState } from "react";
-import { Swords, Zap, Trophy, Medal, Mic, Flame } from "lucide-react";
+import { Swords, Zap, Trophy, Medal, Mic, Flame, Castle, Skull, Timer, Sparkles } from "lucide-react";
 import { Card, Chip } from "./ui";
 import SpeedRound from "./games/SpeedRound";
 import BossBattle from "./games/BossBattle";
 import VoiceArena from "./games/VoiceArena";
+import Dungeon from "./games/Dungeon";
+import Duel from "./games/Duel";
+import Gauntlet from "./games/Gauntlet";
+import League from "./games/League";
+import Talents from "./games/Talents";
+import Flow from "./games/Flow";
 import BattleCardButton from "./BattleCardButton";
 import type { AppState } from "./App";
 
 const TABS = [
-  { id: "speed", label: "Speed Round", icon: Zap },
-  { id: "boss", label: "Boss Battle", icon: Swords },
-  { id: "voice", label: "Voice Arena", icon: Mic },
+  { id: "speed", label: "Speed", icon: Zap },
+  { id: "boss", label: "Boss", icon: Swords },
+  { id: "voice", label: "Voice", icon: Mic },
+  { id: "dungeon", label: "Dungeon", icon: Castle },
+  { id: "duel", label: "Duel", icon: Swords },
+  { id: "gauntlet", label: "Gauntlet", icon: Skull },
+  { id: "league", label: "League", icon: Medal },
+  { id: "flow", label: "Flow", icon: Timer },
+  { id: "talents", label: "Talents", icon: Sparkles },
   { id: "trophies", label: "Trophies", icon: Trophy },
 ] as const;
 
@@ -28,7 +40,7 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -49,6 +61,11 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
           <div className="ml-auto hidden items-center gap-2 sm:flex">
             <Chip tone="violet">Lv {state.game.level.level} · {state.game.level.name}</Chip>
             <Chip tone="cyan">{state.game.level.xp} XP</Chip>
+            {state.chain && state.chain.chain > 0 && (
+              <Chip tone="amber">
+                <Flame className="h-3 w-3" /> ×{state.chain.chain} · {state.chain.mult}x
+              </Chip>
+            )}
           </div>
         )}
       </div>
@@ -57,6 +74,12 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
         {tab === "speed" && <SpeedRound onChange={onChange} />}
         {tab === "boss" && <BossBattle onChange={onChange} />}
         {tab === "voice" && <VoiceArena onChange={onChange} />}
+        {tab === "dungeon" && <Dungeon onChange={onChange} />}
+        {tab === "duel" && <Duel onChange={onChange} />}
+        {tab === "gauntlet" && <Gauntlet onChange={onChange} />}
+        {tab === "league" && <League />}
+        {tab === "flow" && <Flow onChange={onChange} />}
+        {tab === "talents" && <Talents onChange={onChange} />}
         {tab === "trophies" && (
           <Card>
             <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">

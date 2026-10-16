@@ -3,6 +3,7 @@
 import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake, Zap } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, Ring } from "./ui";
 import { handCoach } from "@/lib/bus";
+import Briefing from "./Briefing";
 import type { AppState, ViewId } from "./App";
 
 const TILES: {
@@ -92,6 +93,11 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                 <Chip tone="cyan">
                   <Sparkles className="h-3 w-3" /> {state.today.xp} XP
                 </Chip>
+                {state.chain && state.chain.chain > 0 && (
+                  <Chip tone="amber">
+                    <Flame className="h-3 w-3" /> {state.chain.chain}-chain · {state.chain.mult}x heat
+                  </Chip>
+                )}
                 {state.today.reviews > 0 && (
                   <Chip tone={accuracy >= 80 ? "emerald" : "rose"}>{accuracy}% recall</Chip>
                 )}
@@ -162,6 +168,11 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
           </Card>
         </div>
       )}
+
+      {/* AI Director's daily briefing */}
+      <div className="rah-rise-2">
+        <Briefing />
+      </div>
 
       {/* Rival race */}
       {state.rival && (
