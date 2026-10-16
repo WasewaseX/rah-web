@@ -5,11 +5,12 @@
 // schedules what comes back and when.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles } from "lucide-react";
+import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles, Zap, RotateCcw as RotateCcwIcon } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "./ui";
 import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
+import BlitzDeck from "./games/BlitzDeck";
 
 interface QueueCard {
   card: {
@@ -142,6 +143,7 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
 }
 
 export default function ReviewView({ state, onChange }: { state: AppState; onChange: () => void }) {
+  const [mode, setMode] = useState<"classic" | "blitz">("classic");
   const [queue, setQueue] = useState<QueueCard[]>([]);
   const [counts, setCounts] = useState<{ due: number; newLeft: number; reviewedToday: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -210,6 +212,10 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     onChange();
   };
 
+  if (mode === "blitz") {
+    return <BlitzDeck state={state} onChange={onChange} onExit={() => setMode("classic")} />;
+  }
+
   if (loading) {
     return (
       <Card>
@@ -244,6 +250,26 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Mode toggle: classic FSRS flow vs the swipe blitz */}
+      <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/[0.06] bg-[#141924] p-1.5">
+        {(
+          [
+            ["classic", "Classic", RotateCcwIcon],
+            ["blitz", "Blitz", Zap],
+          ] as const
+        ).map(([id, label, Icon]) => (
+          <button
+            key={id}
+            onClick={() => setMode(id)}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              mode === id ? "bg-[var(--rah-primary)]/[0.16] text-[#9dc0ff]" : "text-[#8b96a9] hover:text-[#dbe3f0]"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
       {/* Progress strip */}
       <div className="flex items-center justify-between text-xs font-semibold text-[#7d889c]">
         <span>
