@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiJson, quizSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily } from "@/lib/server";
+import { awardXp } from "@/lib/arcade";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,6 @@ export async function POST(req: Request) {
   }
 
   await db.quizItem.create({ data: { src: String(source ?? "text"), quiz: JSON.stringify(quiz) } });
-  await bumpDaily("xp", 10);
+  await awardXp(10);
   return NextResponse.json(quiz);
 }

@@ -68,7 +68,7 @@ export function Chip({
   tone = "slate",
 }: {
   children: ReactNode;
-  tone?: "slate" | "emerald" | "amber" | "rose" | "blue" | "cyan";
+  tone?: "slate" | "emerald" | "amber" | "rose" | "blue" | "cyan" | "violet";
 }) {
   const tones = {
     slate: "bg-white/[0.06] text-[#b7c1d3] border-white/[0.08]",
@@ -77,6 +77,7 @@ export function Chip({
     amber: "bg-[#ffb02e]/12 text-[#ffd08a] border-[#ffb02e]/25",
     rose: "bg-[#ff6b81]/12 text-[#ffa3b1] border-[#ff6b81]/25",
     cyan: "bg-[var(--rah-accent)]/12 text-[#9de6fb] border-[var(--rah-accent)]/25",
+    violet: "bg-[#a78bfa]/12 text-[#cfc3fc] border-[#a78bfa]/25",
   } as const;
   return (
     <span

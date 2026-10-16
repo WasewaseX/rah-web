@@ -29,6 +29,20 @@ import ReadView from "./Read";
 import ProgressView from "./Progress";
 import { applyTheme } from "@/lib/theme-bus";
 
+import type { GameView, RivalView } from "@/lib/arcade";
+
+export interface QuestView {
+  id: string;
+  day: number;
+  key: string;
+  title: string;
+  fa: string;
+  target: number;
+  progress: number;
+  done: boolean;
+  xp: number;
+}
+
 export interface AppState {
   learner: {
     level: string;
@@ -38,6 +52,7 @@ export interface AppState {
     newPerDay: number;
     focusSkill: string;
     placementPhase: string;
+    freezes: number;
   };
   theme: { primary?: string; primaryDeep?: string; bg?: string; surface?: string; accent?: string } | null;
   today: { reviews: number; correct: number; xp: number; spoken: number; written: number; listened: number };
@@ -49,6 +64,9 @@ export interface AppState {
   deck: { total: number; byLevel: Record<string, number>; byUnit: Record<string, number> };
   diagnosis: { bySkill: { skill: string; lapseRate: number; due: number; reps: number }[]; advice: string[] };
   profile: { level: string; streak: number; focus: string; due: number; recentTraps: string[]; weakSkills: string[]; mistakes?: { tag: string; count: number; label: string }[]; mistakesHealed?: number };
+  game: GameView;
+  rival: RivalView;
+  quests: QuestView[];
 }
 
 export const VIEWS = [
@@ -68,6 +86,25 @@ export type ViewId = (typeof VIEWS)[number]["id"];
 export default function RahApp() {
   const [view, setView] = useState<ViewId>("home");
   const [state, setState] = useState<AppState | null>(null);
+  const [toasts, setToasts] = useState<{ key: string; title: string; desc: string; icon: string }[]>([]);
+
+  // Trophy fanfare: recent unlocks surface once per session, then never again.
+  const announceUnlocks = (recent: { key: string; title: string; desc: string; icon: string }[]) => {
+    if (recent.length === 0) return;
+    let seen: string[] = [];
+    try {
+      seen = JSON.parse(sessionStorage.getItem("rah.seenAch") ?? "[]");
+    } catch {
+      seen = [];
+    }
+    const fresh = recent.filter((a) => !seen.includes(a.key));
+    if (fresh.length === 0) return;
+    sessionStorage.setItem("rah.seenAch", JSON.stringify([...seen, ...fresh.map((a) => a.key)]));
+    setToasts((t) => [...t, ...fresh].slice(-3));
+    for (const a of fresh) {
+      setTimeout(() => setToasts((t) => t.filter((x) => x.key !== a.key)), 6500);
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -77,6 +114,7 @@ export default function RahApp() {
         setState(s);
         // The theme plugin's choices survive reloads: paint on every state load.
         applyTheme(s.theme ?? null);
+        announceUnlocks(s.game?.recent ?? []);
       }
     } catch {
       // offline blip; keep last state
@@ -192,6 +230,7 @@ export default function RahApp() {
               <Chip tone="cyan">
                 <Sparkles className="h-3 w-3" /> {state.today.xp} XP today
               </Chip>
+              {state.game && <Chip tone="violet">Lv {state.game.level.level} · {state.game.level.name}</Chip>}
             </div>
           </div>
         )}
@@ -239,6 +278,24 @@ export default function RahApp() {
           })}
         </div>
       </nav>
+      {/* Trophy fanfare toasts */}
+      <div className="pointer-events-none fixed bottom-24 right-4 z-50 flex flex-col gap-2 md:bottom-6">
+        {toasts.map((t) => (
+          <div
+            key={t.key}
+            className="rah-pop flex items-center gap-3 rounded-2xl border border-[#ffb02e]/30 bg-gradient-to-br from-[#2a2312] to-[#1a1710] px-4 py-3 shadow-[0_16px_40px_-16px_rgba(255,176,46,.35)]"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ffb02e]/[0.18] text-[#ffd08a]">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#ffd08a]">Achievement unlocked</div>
+              <div className="text-sm font-extrabold text-[#f2f5fa]">{t.title}</div>
+              <div className="text-[11px] text-[#a9b4c6]">{t.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

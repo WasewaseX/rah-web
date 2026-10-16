@@ -83,6 +83,9 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                 <Chip tone="amber">
                   <Flame className="h-3 w-3" /> {state.learner.streak} day streak
                 </Chip>
+                {state.learner.freezes > 0 && (
+                  <Chip tone="cyan">❄ {state.learner.freezes} freeze{state.learner.freezes > 1 ? "s" : ""} banked</Chip>
+                )}
                 <Chip tone="cyan">
                   <Sparkles className="h-3 w-3" /> {state.today.xp} XP
                 </Chip>
@@ -90,6 +93,22 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                   <Chip tone={accuracy >= 80 ? "emerald" : "rose"}>{accuracy}% recall</Chip>
                 )}
               </div>
+              {state.game && (
+                <div className="mt-3 w-full max-w-xs">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-[#cfc3fc]">Lv {state.game.level.level} · {state.game.level.name}</span>
+                    <span className="text-[#7d889c]">
+                      {state.game.level.nextAt ? `${state.game.level.intoLevel}/${state.game.level.levelSpan} XP` : "MAX"}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#232b3a]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#7fdcf7] transition-all duration-700"
+                      style={{ width: `${state.game.level.pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <Btn variant="go" onClick={() => go("review")} className="w-full shrink-0 sm:w-auto">

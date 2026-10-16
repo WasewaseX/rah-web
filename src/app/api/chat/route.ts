@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
+import { awardXp, progressQuest } from "@/lib/arcade";
 import { runCoach } from "@/lib/agent/run";
 import { recordMistakes } from "@/lib/mistakes";
 import type { ProfileJson } from "@/lib/ai";
@@ -60,7 +61,8 @@ export async function POST(req: Request) {
   }
 
   await bumpDaily("reviews");
-  await bumpDaily("xp", 8);
+  await awardXp(8);
+  await progressQuest("chat_10", 1);
   await touchStreak();
 
   return NextResponse.json(out);

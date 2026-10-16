@@ -3,6 +3,7 @@ import { getLearner, dueCount, diagnose, buildProfile } from "@/lib/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { deckStats } from "@/lib/content";
+import { ensureQuests, getGameView, getRivalView } from "@/lib/arcade";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function GET() {
   const seen = await db.cardState.count();
   const profile = await buildProfile();
   const theme = l.theme ? JSON.parse(l.theme) : null;
+  await ensureQuests();
+  const [game, rival, quests] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } })]);
   return NextResponse.json({
     learner: {
       level: l.level,
@@ -27,6 +30,7 @@ export async function GET() {
       newPerDay: l.newPerDay,
       focusSkill: l.focusSkill,
       placementPhase: l.placementPhase,
+      freezes: l.freezes,
     },
     theme,
     today: stat ?? { reviews: 0, correct: 0, xp: 0, spoken: 0, written: 0, listened: 0 },
@@ -38,5 +42,8 @@ export async function GET() {
     deck: deckStats(),
     diagnosis: diag,
     profile,
+    game,
+    rival,
+    quests,
   });
 }

@@ -22,6 +22,8 @@ model Learner {
   theme          String  @default("") // JSON theme tokens set by the theme plugin
   mode           String  @default("coach") // coach | roleplay | debate | socratic | daily
   modeData       String  @default("") // JSON state for the active conversation mode
+  xp             Int     @default(0) // lifetime XP; levels are derived from it in arcade.ts
+  freezes        Int     @default(0) // streak freezes: auto-consumed when one missed day would break a chain (cap 2)
   createdAt      DateTime @default(now())
 }
 
@@ -118,6 +120,50 @@ model SkillLevel {
   score     Float    @default(0) // 0..1 rolling mastery
   samples   Int      @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// Unlocked trophies. Keyed by stable achievement key from arcade.ts.
+model Achievement {
+  key  String   @id
+  at   DateTime @default(now())
+  meta String   @default("")
+}
+
+// Per-game records: speed best score / best combo, boss wins, flawless runs.
+model GameStat {
+  key       String   @id // "speed:best", "speed:combo", "boss:wins", ...
+  best      Int      @default(0)
+  plays     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+// Three daily quests, regenerated deterministically from the learner's weak
+// spots. Progress is bumped from the same hooks that award XP; finishing a
+// quest pays its XP automatically.
+model Quest {
+  id       String  @id // "<day>:<key>"
+  day      Int
+  key      String  // template key: reviews_20, speed_play, boss_win, ...
+  title    String
+  fa       String  @default("")
+  target   Int
+  progress Int     @default(0)
+  done     Boolean @default(false)
+  xp       Int     @default(0)
+}
+
+// The rubber-band rival. Its weekly XP is derived deterministically from the
+// learner's own 7-day average plus a seeded per-day jitter, so the race always
+// feels alive and winnable without any background jobs.
+model Rival {
+  id          String @id // "me"
+  name        String
+  weekXp      Int    @default(0)
+  lastWeekXp  Int    @default(0)
+  weekKey     Int    @default(-1)
+  wins        Int    @default(0) // weeks the learner out-gained the rival
+  losses      Int    @default(0)
+  taunt       String @default("")
 }
 
 // Recurring production-mistake families, mined from corrections across chat,

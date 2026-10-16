@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiJson, writingSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
+import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
 
   await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify(result) } });
   await bumpDaily("written");
-  await bumpDaily("xp", 15);
+  await awardXp(15);
+  await progressQuest("write_1", 1);
   await touchStreak();
   // Mistake memory: essay errors feed persistent families by their trap type.
   if (Array.isArray(result.errors) && result.errors.length > 0) {
