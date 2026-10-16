@@ -2463,17 +2463,17 @@
    "skill": "grammar",
    "level": "B2",
    "kind": "cloze",
-   "prompt": "___ honesty is the best policy.",
-   "answer": "",
+   "prompt": "They praised ___ honesty of the report.",
+   "answer": "the",
    "alt": [],
-   "en": "Honesty",
-   "fa": "صداقت (بی‌حرف تعریف)",
-   "note": "Abstract nouns take no article.",
+   "en": "the honesty of the report",
+   "fa": "صداقتِ گزارش (با حرف تعریف)",
+   "note": "A specific abstract noun takes the definite article.",
    "traps": [
     "articles"
    ],
    "distractors": [
-    "The",
+    "A",
     "An"
    ]
   },
@@ -2483,18 +2483,18 @@
    "skill": "grammar",
    "level": "B2",
    "kind": "cloze",
-   "prompt": "He was sent to ___ prison for fraud.",
-   "answer": "",
+   "prompt": "She visited ___ prison where her brother worked.",
+   "answer": "the",
    "alt": [],
-   "en": "to prison",
-   "fa": "به زندان رفتن (به‌عنوان نهاد)",
-   "note": "go to prison = as a prisoner; the prison = the building.",
+   "en": "the prison where her brother worked",
+   "fa": "آن زندانِ مشخص (با حرف تعریف)",
+   "note": "the prison = the specific building; to prison = as a prisoner.",
    "traps": [
     "articles"
    ],
    "distractors": [
-    "the",
-    "a"
+    "a",
+    "an"
    ]
   },
   {

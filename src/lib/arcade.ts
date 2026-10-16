@@ -91,8 +91,6 @@ export const PERKS: PerkDef[] = [
   { key: "quest_boost", branch: "grammar", tier: 2, title: "Overachiever", desc: "Quest payouts pay +15% XP." },
 ] as const;
 
-const PERK_ORDER = ["xp_review", "chain_shield", "duel_time", "dungeon_heart", "freeze_cap", "quest_boost"];
-
 export function hasPerk(perksJson: string, key: string): boolean {
   if (!perksJson) return false;
   try {
@@ -159,10 +157,9 @@ export async function buyPerk(key: string): Promise<{ ok: boolean; error?: strin
   const l = await getLearner();
   const owned = learnerPerksFrom(l.perks);
   if (owned.includes(key)) return { ok: false, error: "Already unlocked", sp: l.sp, owned };
-  const earlier = PERKS.filter((p) => p.key !== key && p.tier < def.tier && PERK_ORDER.indexOf(p.key) < PERK_ORDER.indexOf(key));
-  const branchesBought = owned.filter((k) => PERKS.find((p) => p.key === k)?.branch === def.branch).length;
-  if (branchesBought < def.tier - 1) return { ok: false, error: `Unlock ${def.tier - 1} earlier ${def.branch} talents first`, sp: l.sp, owned };
-  void earlier;
+  // Tier N needs N-1 perks owned anywhere: every branch holds a single perk,
+  // so the gate counts global progress, not same-branch purchases.
+  if (owned.length < def.tier - 1) return { ok: false, error: `Unlock ${def.tier - 1} perk${def.tier - 1 === 1 ? "" : "s"} first`, sp: l.sp, owned };
   if (l.sp < def.tier) return { ok: false, error: `Needs ${def.tier} SP (you have ${l.sp})`, sp: l.sp, owned };
   const sp = l.sp - def.tier;
   const perks = JSON.stringify([...owned, key]);
@@ -273,13 +270,14 @@ interface AchCtx {
   chainBest: number;
   leaguePromotions: number;
   dungeonBest: number;
+  dungeonPerfect: number;
   duelWins: number;
   gauntletBest: number;
   flowStreak: number;
 }
 
 async function achCtx(): Promise<AchCtx> {
-  const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival, chainBest, leagueProm, dungeonBest, duelWins, gauntletBest, flowStreak] = await Promise.all([
+  const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival, chainBest, leagueProm, dungeonBest, dungeonPerfect, duelWins, gauntletBest, flowStreak] = await Promise.all([
     db.reviewLog.count(),
     db.writingSub.count(),
     db.speakSession.count(),
@@ -293,6 +291,7 @@ async function achCtx(): Promise<AchCtx> {
     db.gameStat.findUnique({ where: { key: "chain:best" } }),
     db.gameStat.findUnique({ where: { key: "league:promotions" } }),
     db.gameStat.findUnique({ where: { key: "dungeon:best" } }),
+    db.gameStat.findUnique({ where: { key: "dungeon:perfect" } }),
     db.gameStat.findUnique({ where: { key: "duel:wins" } }),
     db.gameStat.findUnique({ where: { key: "gauntlet:best" } }),
     db.gameStat.findUnique({ where: { key: "flow:streak" } }),
@@ -314,6 +313,7 @@ async function achCtx(): Promise<AchCtx> {
     chainBest: chainBest?.best ?? 0,
     leaguePromotions: leagueProm?.best ?? 0,
     dungeonBest: dungeonBest?.best ?? 0,
+    dungeonPerfect: dungeonPerfect?.best ?? 0,
     duelWins: duelWins?.best ?? 0,
     gauntletBest: gauntletBest?.best ?? 0,
     flowStreak: flowStreak?.best ?? 0,
@@ -341,7 +341,7 @@ function ctxUnlocks(c: AchCtx): string[] {
   if (c.level >= 20) out.push("level_20");
   if (c.chainBest >= 25) out.push("chain_25");
   if (c.leaguePromotions >= 1) out.push("league_gold");
-  if (c.dungeonBest >= 3) out.push("dungeon_perfect");
+  if (c.dungeonPerfect >= 1) out.push("dungeon_perfect");
   if (c.duelWins >= 1) out.push("duel_win");
   if (c.gauntletBest >= 25) out.push("gauntlet_25");
   if (c.flowStreak >= 5) out.push("flow_5");

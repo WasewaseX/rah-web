@@ -29,7 +29,10 @@ async function main() {
   const logs0 = await db.reviewLog.count();
   const ach0 = await db.achievement.findMany();
 
-  // Grade one review (Good = 3)
+  // Grade one review (Good = 3). Momentum is neutralized first so the XP
+  // check stays deterministic: no chain means the 1.0x heat multiplier.
+  const chainSnap = await db.learner.findUnique({ where: { id: "me" } });
+  await db.learner.update({ where: { id: "me" }, data: { chain: 0, chainDay: -1 } });
   const r = await fetch(`${BASE}/api/review/grade`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -60,7 +63,7 @@ async function main() {
   check("levelView monotonic", lv.nextAt === null || lv.pct >= 0 && lv.pct <= 100);
 
   // Restore everything
-  await db.learner.update({ where: { id: "me" }, data: { xp: xp0, freezes: freezes0 } });
+  await db.learner.update({ where: { id: "me" }, data: { xp: xp0, freezes: freezes0, chain: chainSnap?.chain ?? 0, chainDay: chainSnap?.chainDay ?? -1 } });
   if (stat0) await db.dailyStat.update({ where: { day }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
   else await db.dailyStat.deleteMany({ where: { day } });
   if (card0) {
