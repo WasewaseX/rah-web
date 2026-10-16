@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2 } from "lucide-react";
+import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, Ring } from "./ui";
 import type { AppState, ViewId } from "./App";
 
@@ -84,7 +84,9 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                   <Flame className="h-3 w-3" /> {state.learner.streak} day streak
                 </Chip>
                 {state.learner.freezes > 0 && (
-                  <Chip tone="cyan">❄ {state.learner.freezes} freeze{state.learner.freezes > 1 ? "s" : ""} banked</Chip>
+                  <Chip tone="cyan">
+                    <Snowflake className="h-3 w-3" /> {state.learner.freezes} freeze{state.learner.freezes > 1 ? "s" : ""} banked
+                  </Chip>
                 )}
                 <Chip tone="cyan">
                   <Sparkles className="h-3 w-3" /> {state.today.xp} XP
@@ -117,6 +119,92 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
           </Btn>
         </div>
       </div>
+
+      {/* Daily quests */}
+      {state.quests && state.quests.length > 0 && (
+        <div className="rah-rise-2">
+          <Card>
+            <div className="mb-1 flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#3ccb7f]/[0.12] text-[#7fe0ac]">
+                <ScrollText className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Today's missions</span>
+              {state.quests.every((q) => q.done) && <Chip tone="emerald">all cleared</Chip>}
+            </div>
+            <div className="mb-4 text-xs font-medium text-[#7d889c]">
+              Three missions, rerolled at midnight, aimed at your leaks. Finishing one pays its XP instantly.
+            </div>
+            <div className="flex flex-col gap-3">
+              {state.quests.map((q) => {
+                const pct = Math.min(100, Math.round((q.progress / q.target) * 100));
+                return (
+                  <div key={q.id} className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${q.done ? "bg-[#3ccb7f]/[0.07]" : "bg-[#171c28]"}`}>
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${q.done ? "bg-[#3ccb7f]/[0.14] text-[#7fe0ac]" : "bg-white/[0.05] text-[#6e7a8e]"}`}>
+                      <CheckCircle2 className={`h-4 w-4 ${q.done ? "text-[#7fe0ac]" : "opacity-40"}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className={`truncate text-sm font-bold ${q.done ? "text-[#c3f0d8]" : "text-[#dbe3f0]"}`}>{q.title}</span>
+                        <span className="shrink-0 text-[11px] font-bold text-[#7d889c]">
+                          {Math.min(q.progress, q.target)}/{q.target}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#232b3a]">
+                        <div className={`h-full rounded-full transition-all duration-700 ${q.done ? "bg-[#3ccb7f]" : "bg-gradient-to-r from-[var(--rah-primary)] to-[#6aa6ff]"}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <Chip tone={q.done ? "emerald" : "slate"}>{q.done ? "paid" : `+${q.xp} XP`}</Chip>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Rival race */}
+      {state.rival && (
+        <div className="rah-rise-2">
+          <Card className="border-[#a78bfa]/20">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#a78bfa]/[0.14] text-[#cfc3fc]">
+                  <Swords className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Weekly race</span>
+              </div>
+              <span className="text-[11px] font-bold text-[#7d889c]">
+                record {state.rival.wins}W · {state.rival.losses}L
+              </span>
+            </div>
+            {(() => {
+              const total = Math.max(1, state.rival.you + state.rival.weekXp);
+              const youPct = Math.round((state.rival.you / total) * 100);
+              const winning = state.rival.you >= state.rival.weekXp;
+              return (
+                <>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black">
+                    <span className={winning ? "text-[#7fe0ac]" : "text-[#b7c1d3]"}>YOU · {state.rival.you} XP</span>
+                    <span className={!winning ? "text-[#ffa3b1]" : "text-[#b7c1d3]"}>
+                      {state.rival.name} · {state.rival.weekXp} XP
+                    </span>
+                  </div>
+                  <div className="flex h-3 overflow-hidden rounded-full bg-[#232b3a]">
+                    <div className="h-full bg-gradient-to-r from-[#2fc273] to-[#55d98f] transition-all duration-700" style={{ width: `${youPct}%` }} />
+                    <div className="h-full flex-1 bg-gradient-to-r from-[#ff6b81] to-[#ff8ba0]" />
+                  </div>
+                  <p className="mt-3 text-xs italic leading-relaxed text-[#8b96a9]">
+                    "{state.rival.taunt}"
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-[#5c6678]">
+                    Out-gain the rival by Sunday night to take the week. The rival trains at ~80% of your pace - fall behind and it pulls away.
+                  </p>
+                </>
+              );
+            })()}
+          </Card>
+        </div>
+      )}
 
       {/* Placement CTA */}
       {needPlacement && (
