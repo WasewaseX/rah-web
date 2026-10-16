@@ -8,6 +8,8 @@ import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart } f
 import { Card, Chip, Note, Bar, Btn } from "./ui";
 import { Radar, AccuracyTimeline } from "./WarRoom";
 import MindReader from "./MindReader";
+import Replay from "./Replay";
+import Portfolio from "./Portfolio";
 import BattleCardButton from "./BattleCardButton";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
@@ -286,6 +288,12 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
 
       {/* Mind reader: the coach's memory, visible and editable */}
       <MindReader onChange={() => undefined} />
+
+      {/* Replay theater: watch graded exams back turn by turn */}
+      <Replay />
+
+      {/* Writing portfolio: every graded essay + the growth diff */}
+      <Portfolio />
 
       {/* Coach advice */}
       {data.advice.length > 0 && (

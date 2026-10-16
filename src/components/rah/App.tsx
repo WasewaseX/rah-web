@@ -31,7 +31,7 @@ import ProgressView from "./Progress";
 import ArcadeView from "./Arcade";
 import { applyTheme } from "@/lib/theme-bus";
 
-import type { GameView, RivalView } from "@/lib/arcade";
+import type { GameView, RivalView, LeagueView } from "@/lib/arcade";
 
 export interface QuestView {
   id: string;
@@ -69,6 +69,8 @@ export interface AppState {
   game: GameView;
   rival: RivalView;
   quests: QuestView[];
+  league?: LeagueView;
+  chain?: { chain: number; mult: number; label: string };
 }
 
 export const VIEWS = [
@@ -234,6 +236,11 @@ export default function RahApp() {
                 <Sparkles className="h-3 w-3" /> {state.today.xp} XP today
               </Chip>
               {state.game && <Chip tone="violet">Lv {state.game.level.level} · {state.game.level.name}</Chip>}
+              {state.chain && state.chain.chain >= 5 && (
+                <Chip tone="amber">
+                  <Flame className="h-3 w-3" /> {state.chain.chain}-chain · {state.chain.mult}x
+                </Chip>
+              )}
             </div>
           </div>
         )}
