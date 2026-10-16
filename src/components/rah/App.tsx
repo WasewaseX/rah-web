@@ -16,6 +16,7 @@ import {
   BarChart3,
   Flame,
   Sparkles,
+  Gamepad2,
 } from "lucide-react";
 import { Chip } from "./ui";
 import HomeView from "./Home";
@@ -27,6 +28,7 @@ import ListenView from "./Listen";
 import SpeakView from "./Speak";
 import ReadView from "./Read";
 import ProgressView from "./Progress";
+import ArcadeView from "./Arcade";
 import { applyTheme } from "@/lib/theme-bus";
 
 import type { GameView, RivalView } from "@/lib/arcade";
@@ -78,6 +80,7 @@ export const VIEWS = [
   { id: "listen", label: "Listening", icon: Headphones },
   { id: "read", label: "Reading", icon: BookOpen },
   { id: "placement", label: "Placement", icon: Target },
+  { id: "arcade", label: "Arcade", icon: Gamepad2 },
   { id: "progress", label: "Progress", icon: BarChart3 },
 ] as const;
 
@@ -250,6 +253,7 @@ export default function RahApp() {
             {view === "speak" && <SpeakView state={state} onChange={refresh} />}
             {view === "read" && <ReadView state={state} />}
             {view === "progress" && <ProgressView state={state} go={go} />}
+            {view === "arcade" && <ArcadeView state={state} onChange={refresh} />}
           </div>
         )}
       </main>
