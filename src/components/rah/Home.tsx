@@ -1,7 +1,8 @@
 "use client";
 
-import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake } from "lucide-react";
+import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake, Zap } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, Ring } from "./ui";
+import { handCoach } from "@/lib/bus";
 import type { AppState, ViewId } from "./App";
 
 const TILES: {
@@ -199,6 +200,19 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
                   <p className="mt-1.5 text-[11px] text-[#5c6678]">
                     Out-gain the rival by Sunday night to take the week. The rival trains at ~80% of your pace - fall behind and it pulls away.
                   </p>
+                  {!winning && (
+                    <Btn
+                      variant="soft"
+                      className="mt-3 !min-h-10 text-xs"
+                      onClick={() =>
+                        handCoach(
+                          `My rival ${state.rival.name} is beating me ${state.rival.weekXp} to ${state.rival.you} XP this week. Give me a tight day-by-day plan to flip the race before Sunday, built around my weakest skills.`,
+                        )
+                      }
+                    >
+                      <Zap className="h-3.5 w-3.5" /> Get a revenge plan from the coach
+                    </Btn>
+                  )}
                 </>
               );
             })()}
