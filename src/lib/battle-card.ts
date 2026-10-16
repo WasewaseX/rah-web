@@ -123,14 +123,18 @@ export async function buildBattleCard(d: BattleCardData): Promise<Blob | null> {
     ctx.beginPath();
     order.forEach((_, i) => {
       const [x, y] = at(i, ring);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
     ctx.closePath();
     ctx.stroke();
   }
   const polyPts = order.map((k, i) => at(i, Math.max(0.05, byId.get(k)?.score ?? 0)));
   ctx.beginPath();
-  polyPts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  polyPts.forEach(([x, y], i) => {
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
   ctx.closePath();
   ctx.fillStyle = "rgba(78,140,255,.22)";
   ctx.fill();
