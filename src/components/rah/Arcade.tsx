@@ -5,11 +5,12 @@
 // live on Home; this floor is pure play.
 
 import { useState } from "react";
-import { Swords, Zap, Trophy, Medal, Mic } from "lucide-react";
+import { Swords, Zap, Trophy, Medal, Mic, Flame } from "lucide-react";
 import { Card, Chip } from "./ui";
 import SpeedRound from "./games/SpeedRound";
 import BossBattle from "./games/BossBattle";
 import VoiceArena from "./games/VoiceArena";
+import BattleCardButton from "./BattleCardButton";
 import type { AppState } from "./App";
 
 const TABS = [
@@ -61,8 +62,22 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
             <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
               <Medal className="h-4 w-4 text-[#ffd08a]" /> Trophy cabinet
             </div>
-            <div className="mb-4 text-xs font-medium text-[#7d889c]">
-              {unlockedSet.size} of {state.game?.all?.length ?? 0} earned. Trophies read your real numbers - streaks, heals, boss kills, combos.
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="text-xs font-medium text-[#7d889c]">
+                {unlockedSet.size} of {state.game?.all?.length ?? 0} earned. Trophies read your real numbers - streaks, heals, boss kills, combos.
+              </div>
+              <BattleCardButton />
+            </div>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Chip tone="amber">
+                <Flame className="h-3 w-3" /> {state.learner.streak} day streak
+              </Chip>
+              {state.game?.stats?.find((s) => s.key === "speed:best")?.best ? (
+                <Chip tone="violet">speed best {state.game.stats.find((s) => s.key === "speed:best")?.best}</Chip>
+              ) : null}
+              {state.game?.stats?.find((s) => s.key === "boss:wins")?.best ? (
+                <Chip tone="rose">boss wins {state.game.stats.find((s) => s.key === "boss:wins")?.best}</Chip>
+              ) : null}
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {(state.game?.all ?? []).map((a) => {

@@ -8,6 +8,7 @@ import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart } f
 import { Card, Chip, Note, Bar, Btn } from "./ui";
 import { Radar, AccuracyTimeline } from "./WarRoom";
 import MindReader from "./MindReader";
+import BattleCardButton from "./BattleCardButton";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
 
@@ -270,6 +271,17 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
               </div>
             ))}
         </div>
+      </Card>
+
+      {/* Shareable battle card */}
+      <Card className="flex flex-col items-center gap-3 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div>
+          <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Your week, framed</div>
+          <p className="mt-1 max-w-md text-sm leading-relaxed text-[#a9b4c6]">
+            Export a 1080×1350 battle card: level ring, streak, mastery radar, boss record and the rival race - ready for the group chat.
+          </p>
+        </div>
+        <BattleCardButton variant="primary" />
       </Card>
 
       {/* Mind reader: the coach's memory, visible and editable */}
