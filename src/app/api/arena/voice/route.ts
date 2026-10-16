@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
   const s = scoreShadow(t, g);
   const xpGain = s.accuracy >= 90 ? 30 : s.accuracy >= 70 ? 20 : 10;
-  const xp = await awardXp(xpGain);
+  const xp = await awardXp(xpGain, { chainHit: s.accuracy >= 70 });
   await bumpDaily("spoken");
   await touchStreak();
   await progressQuest("arena_5", 1);

@@ -7,7 +7,168 @@
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
-import { bumpDaily } from "@/lib/server";
+import { bumpDaily, getLearner } from "@/lib/server";
+
+// ---------- Momentum (cross-surface combo chains) ----------
+
+// Every correct answer on any surface extends today's chain; any miss halves
+// it (the chain_shield talent absorbs the first miss of the day), and a new
+// day resets it. Heat tiers turn the chain into an XP multiplier, so a hot
+// streak anywhere - reviews, exams, speed rounds, duels - pays everywhere.
+
+export const HEAT_TIERS = [
+  { min: 0, mult: 1, label: "cold" },
+  { min: 5, mult: 1.05, label: "warming" },
+  { min: 10, mult: 1.1, label: "warm" },
+  { min: 15, mult: 1.2, label: "hot" },
+  { min: 25, mult: 1.3, label: "blazing" },
+] as const;
+
+export function heatOf(chain: number): { min: number; mult: number; label: string } {
+  let t: { min: number; mult: number; label: string } = HEAT_TIERS[0];
+  for (const tier of HEAT_TIERS) if (chain >= tier.min) t = tier;
+  return { min: t.min, mult: t.mult, label: t.label };
+}
+
+async function freshChain(l: { chain: number; chainDay: number }): Promise<number> {
+  const today = dayIndex();
+  return l.chainDay === today ? l.chain : 0;
+}
+
+export async function getChain(): Promise<{ chain: number; mult: number; label: string }> {
+  const l = await getLearner();
+  const chain = await freshChain(l);
+  const heat = heatOf(chain);
+  return { chain, ...heat };
+}
+
+export async function registerHit(): Promise<{ chain: number; mult: number; label: string }> {
+  const l = await getLearner();
+  const today = dayIndex();
+  const base = await freshChain(l);
+  const chain = base + 1;
+  await db.learner.update({ where: { id: "me" }, data: { chain, chainDay: today } });
+  await bumpStat("chain:best", chain);
+  const heat = heatOf(chain);
+  await progressQuest("heat_15", chain);
+  return { chain, ...heat };
+}
+
+export async function registerMiss(): Promise<void> {
+  const l = await getLearner();
+  const today = dayIndex();
+  const base = await freshChain(l);
+  if (base === 0) return;
+  const shielded = hasPerk(l.perks, "chain_shield");
+  if (shielded) {
+    const key = `shield:${today}`;
+    const used = await db.gameStat.findUnique({ where: { key } });
+    if (!used) {
+      await db.gameStat.create({ data: { key, best: 1, plays: 0 } });
+      return; // shield ate the miss; chain keeps running
+    }
+  }
+  const chain = Math.floor(base / 2);
+  await db.learner.update({ where: { id: "me" }, data: { chain, chainDay: today } });
+}
+
+// ---------- Talents (perk tree) ----------
+
+export interface PerkDef {
+  key: string;
+  branch: string; // SkillLevel skill the branch hangs from
+  tier: number; // 1..4, bought in order, tier N requires SP N
+  title: string;
+  desc: string;
+}
+
+export const PERKS: PerkDef[] = [
+  { key: "xp_review", branch: "reading", tier: 1, title: "Fast Reader", desc: "+15% XP from every review grade." },
+  { key: "chain_shield", branch: "vocabulary", tier: 2, title: "Chain Shield", desc: "The first miss each day no longer halves your momentum chain." },
+  { key: "duel_time", branch: "writing", tier: 1, title: "Cool Head", desc: "+10 seconds on every Rival Duel timer." },
+  { key: "dungeon_heart", branch: "listening", tier: 2, title: "Iron Lungs", desc: "Enter the Daily Dungeon with 4 hearts instead of 3." },
+  { key: "freeze_cap", branch: "speaking", tier: 3, title: "Deep Freezer", desc: "Streak freeze bank grows to 3 (from 2)." },
+  { key: "quest_boost", branch: "grammar", tier: 2, title: "Overachiever", desc: "Quest payouts pay +15% XP." },
+] as const;
+
+const PERK_ORDER = ["xp_review", "chain_shield", "duel_time", "dungeon_heart", "freeze_cap", "quest_boost"];
+
+export function hasPerk(perksJson: string, key: string): boolean {
+  if (!perksJson) return false;
+  try {
+    return (JSON.parse(perksJson) as string[]).includes(key);
+  } catch {
+    return false;
+  }
+}
+
+export async function learnerPerks(): Promise<string[]> {
+  const l = await getLearner();
+  if (!l.perks) return [];
+  try {
+    return JSON.parse(l.perks) as string[];
+  } catch {
+    return [];
+  }
+}
+
+export interface PerksView {
+  sp: number;
+  owned: string[];
+  perks: PerkDef[];
+  skills: { skill: string; score: number }[];
+  leveled: boolean;
+}
+
+export async function getPerksView(): Promise<PerksView> {
+  const l = await getLearner();
+  // Retroactive catch-up: the tree arrives when the learner is already deep
+  // in the ladder, so their earned SP is granted once on first open.
+  const init = await db.gameStat.findUnique({ where: { key: "talents:init" } });
+  let sp = l.sp;
+  let leveled = false;
+  if (!init) {
+    const level = levelFromXp(l.xp);
+    sp += Math.max(0, level - 1);
+    await db.learner.update({ where: { id: "me" }, data: { sp } });
+    await db.gameStat.create({ data: { key: "talents:init", best: level, plays: 0 } });
+    leveled = true;
+  }
+  const skills = await db.skillLevel.findMany();
+  return {
+    sp,
+    owned: learnerPerksFrom(l.perks),
+    perks: PERKS,
+    skills: skills.map((s) => ({ skill: s.skill, score: s.score })),
+    leveled,
+  };
+}
+
+function learnerPerksFrom(json: string): string[] {
+  if (!json) return [];
+  try {
+    return JSON.parse(json) as string[];
+  } catch {
+    return [];
+  }
+}
+
+export async function buyPerk(key: string): Promise<{ ok: boolean; error?: string; sp: number; owned: string[] }> {
+  const def = PERKS.find((p) => p.key === key);
+  if (!def) return { ok: false, error: "Unknown perk", sp: 0, owned: [] };
+  const l = await getLearner();
+  const owned = learnerPerksFrom(l.perks);
+  if (owned.includes(key)) return { ok: false, error: "Already unlocked", sp: l.sp, owned };
+  const earlier = PERKS.filter((p) => p.key !== key && p.tier < def.tier && PERK_ORDER.indexOf(p.key) < PERK_ORDER.indexOf(key));
+  const branchesBought = owned.filter((k) => PERKS.find((p) => p.key === k)?.branch === def.branch).length;
+  if (branchesBought < def.tier - 1) return { ok: false, error: `Unlock ${def.tier - 1} earlier ${def.branch} talents first`, sp: l.sp, owned };
+  void earlier;
+  if (l.sp < def.tier) return { ok: false, error: `Needs ${def.tier} SP (you have ${l.sp})`, sp: l.sp, owned };
+  const sp = l.sp - def.tier;
+  const perks = JSON.stringify([...owned, key]);
+  await db.learner.update({ where: { id: "me" }, data: { sp, perks } });
+  return { ok: true, sp, owned: [...owned, key] };
+}
 
 // ---------- Levels ----------
 
@@ -87,6 +248,13 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: "rival_slayer", title: "Rival Slayer", desc: "Out-gain your rival for a full week.", icon: "Trophy" },
   { key: "level_10", title: "Double Digits", desc: "Reach level 10.", icon: "Star" },
   { key: "level_20", title: "Gladiator", desc: "Reach level 20.", icon: "Star" },
+  { key: "chain_25", title: "Blaze", desc: "Hold a 25-answer momentum chain.", icon: "Flame" },
+  { key: "league_gold", title: "Promoted", desc: "Win promotion in a League season.", icon: "Medal" },
+  { key: "dungeon_perfect", title: "Dungeon Master", desc: "Clear the Daily Dungeon without losing a heart.", icon: "Castle" },
+  { key: "duel_win", title: "Duelist", desc: "Beat your rival in a Duel.", icon: "Swords" },
+  { key: "gauntlet_25", title: "Deathless", desc: "Survive 25 Gauntlet items in one run.", icon: "Skull" },
+  { key: "flow_5", title: "In the Zone", desc: "Finish Focus Flows 5 days in a row.", icon: "Timer" },
+  { key: "anthology", title: "Anthology", desc: "Bank three graded essays in the Portfolio.", icon: "Library" },
 ];
 
 interface AchCtx {
@@ -102,10 +270,16 @@ interface AchCtx {
   bossFlawless: number;
   questsDoneToday: number;
   rivalWins: number;
+  chainBest: number;
+  leaguePromotions: number;
+  dungeonBest: number;
+  duelWins: number;
+  gauntletBest: number;
+  flowStreak: number;
 }
 
 async function achCtx(): Promise<AchCtx> {
-  const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival] = await Promise.all([
+  const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival, chainBest, leagueProm, dungeonBest, duelWins, gauntletBest, flowStreak] = await Promise.all([
     db.reviewLog.count(),
     db.writingSub.count(),
     db.speakSession.count(),
@@ -116,6 +290,12 @@ async function achCtx(): Promise<AchCtx> {
     db.gameStat.findUnique({ where: { key: "boss:flawless" } }),
     db.quest.count({ where: { day: dayIndex(), done: true } }),
     db.rival.findUnique({ where: { id: "me" } }),
+    db.gameStat.findUnique({ where: { key: "chain:best" } }),
+    db.gameStat.findUnique({ where: { key: "league:promotions" } }),
+    db.gameStat.findUnique({ where: { key: "dungeon:best" } }),
+    db.gameStat.findUnique({ where: { key: "duel:wins" } }),
+    db.gameStat.findUnique({ where: { key: "gauntlet:best" } }),
+    db.gameStat.findUnique({ where: { key: "flow:streak" } }),
   ]);
   const fams = await topMistakes(200).catch(() => []);
   return {
@@ -131,6 +311,12 @@ async function achCtx(): Promise<AchCtx> {
     bossFlawless: bossFlaw?.best ?? 0,
     questsDoneToday: doneToday,
     rivalWins: rival?.wins ?? 0,
+    chainBest: chainBest?.best ?? 0,
+    leaguePromotions: leagueProm?.best ?? 0,
+    dungeonBest: dungeonBest?.best ?? 0,
+    duelWins: duelWins?.best ?? 0,
+    gauntletBest: gauntletBest?.best ?? 0,
+    flowStreak: flowStreak?.best ?? 0,
   };
 }
 
@@ -153,6 +339,13 @@ function ctxUnlocks(c: AchCtx): string[] {
   if (c.rivalWins >= 1) out.push("rival_slayer");
   if (c.level >= 10) out.push("level_10");
   if (c.level >= 20) out.push("level_20");
+  if (c.chainBest >= 25) out.push("chain_25");
+  if (c.leaguePromotions >= 1) out.push("league_gold");
+  if (c.dungeonBest >= 3) out.push("dungeon_perfect");
+  if (c.duelWins >= 1) out.push("duel_win");
+  if (c.gauntletBest >= 25) out.push("gauntlet_25");
+  if (c.flowStreak >= 5) out.push("flow_5");
+  if (c.writes >= 3) out.push("anthology");
   return out;
 }
 
@@ -176,6 +369,9 @@ export async function evaluateAchievements(): Promise<{ key: string; title: stri
 
 export interface XpResult {
   total: number;
+  base: number; // pre-multiplier amount, for honest UI reporting
+  mult: number; // momentum multiplier that was applied
+  chain: number; // chain AFTER the hit that came with this award
   level: number;
   levelName: string;
   leveledUp: boolean;
@@ -184,20 +380,36 @@ export interface XpResult {
 
 // Single XP faucet. Routes replace their raw bumpDaily("xp") calls with this;
 // it pays the learner, keeps today's DailyStat in sync (the "XP today" chip
-// and the rival race both read it), and checks trophies.
-export async function awardXp(amount: number): Promise<XpResult> {
-  const amt = Math.max(0, Math.min(500, Math.round(amount)));
+// and the rival race both read it), and checks trophies. When opts.chainHit
+// is true the award extends today's momentum chain and the chain's heat
+// multiplier applies to THIS award; perk multipliers (Fast Reader, quest
+// boost) stack after heat.
+export async function awardXp(amount: number, opts?: { chainHit?: boolean; perkXp?: "review" | "quest" }): Promise<XpResult> {
+  const chainInfo = opts?.chainHit ? await registerHit() : await getChain();
+  let mult = chainInfo.mult;
+  const l0 = await getLearner();
+  if (opts?.perkXp === "review" && hasPerk(l0.perks, "xp_review")) mult *= 1.15;
+  if (opts?.perkXp === "quest" && hasPerk(l0.perks, "quest_boost")) mult *= 1.15;
+  const base = Math.max(0, Math.min(500, Math.round(amount)));
+  const amt = Math.min(500, Math.round(base * mult));
   const l = await db.learner.upsert({
     where: { id: "me" },
     create: { id: "me", xp: amt },
     update: { xp: { increment: amt } },
   });
-  await bumpDaily("xp", amt);
+  // Level-ups bank talent points for the tree (1 SP per level gained).
   const before = levelFromXp(l.xp - amt);
   const view = levelView(l.xp);
+  if (view.level > before) {
+    await db.learner.update({ where: { id: "me" }, data: { sp: { increment: view.level - before } } });
+  }
+  await bumpDaily("xp", amt);
   const unlocked = await evaluateAchievements();
   return {
     total: l.xp,
+    base,
+    mult: Math.round(mult * 100) / 100,
+    chain: chainInfo.chain,
     level: view.level,
     levelName: view.name,
     leveledUp: view.level > before,
@@ -229,6 +441,11 @@ export const QUEST_TEMPLATES: QuestTemplate[] = [
   { key: "boss_phase", title: "Survive 2 boss phases", fa: "۲ فاز رئیس زنده بمان", target: 2, xp: 60, kind: "max" },
   { key: "boss_win", title: "Slay The Examiner", fa: "امتحان‌دهنده را بکش", target: 1, xp: 120, kind: "sum" },
   { key: "arena_5", title: "5 Voice Arena reps", fa: "۵ تمرین میکروفونی", target: 5, xp: 70, kind: "sum" },
+  { key: "heat_15", title: "Reach a 15-chain", fa: "زنجیره ۱۵ بساز", target: 15, xp: 90, kind: "max" },
+  { key: "dungeon_1", title: "Clear the Daily Dungeon", fa: "سیاهچال امروز را بزن", target: 1, xp: 80, kind: "sum" },
+  { key: "duel_1", title: "Win a Rival Duel", fa: "یک دوئل را ببر", target: 1, xp: 80, kind: "sum" },
+  { key: "gauntlet_10", title: "Survive 10 Gauntlet items", fa: "۱۰ آیتم گانتلت زنده بمان", target: 10, xp: 90, kind: "max" },
+  { key: "flow_1", title: "Finish a Focus Flow", fa: "یک جریان تمرکز تمام کن", target: 1, xp: 70, kind: "sum" },
 ];
 
 // Seeded pick of 3 quests per day, biased by active mistake families so the
@@ -277,11 +494,111 @@ export async function progressQuest(key: string, amount: number): Promise<void> 
   const progress = t?.kind === "max" ? Math.max(q.progress, amount) : q.progress + amount;
   if (progress >= q.target) {
     await db.quest.update({ where: { id: q.id }, data: { progress: q.target, done: true } });
-    await awardXp(q.xp);
+    await awardXp(q.xp, { perkXp: "quest" });
     await evaluateAchievements();
   } else {
     await db.quest.update({ where: { id: q.id }, data: { progress } });
   }
+}
+
+// ---------- League (weekly divisions with ghost standings) ----------
+
+export const DIVISIONS = ["Wood", "Bronze", "Silver", "Gold", "Platinum", "Rahiator"] as const;
+const LEAGUE_SIZE = 8; // you + 7 ghosts
+const PROMOTE_PLACES = 3; // top 3 climb
+const DEMOTE_PLACES = 3; // bottom 3 drop
+
+export interface LeagueStanding {
+  name: string;
+  xp: number;
+  you: boolean;
+}
+
+export interface LeagueView {
+  division: number;
+  divisionName: string;
+  standings: LeagueStanding[];
+  place: number;
+  daysLeft: number;
+  promoteCut: number; // xp of the last promoted slot
+  demoteCut: number; // xp above the demotion zone
+  history: { week: number; division: number; place: number; promoted: boolean; demoted: boolean }[];
+}
+
+function ghostXp(week: number, slot: number, dailyTarget: number, dayOfWeek: number): number {
+  // Deterministic ghost accumulation, slot 0..6, mirrors the rival's rubber
+  // band so every league feels alive but beatable.
+  let sum = 0;
+  for (let d = 0; d <= dayOfWeek; d++) {
+    const jitter = 0.55 + seededUnit(week * 977 + slot * 61 + d) * 0.95;
+    sum += Math.round(dailyTarget * jitter);
+  }
+  return sum;
+}
+
+export async function getLeagueView(): Promise<LeagueView> {
+  const day = dayIndex();
+  const wk = weekOf(day);
+  const dayOfWeek = day - wk * 7;
+  const recent = await db.dailyStat.findMany({ where: { day: { gte: day - 7, lt: day } } });
+  const avg = recent.reduce((s, r) => s + r.xp, 0) / 7;
+  const dailyTarget = Math.max(70, Math.round(avg * 0.8));
+
+  let row = await db.league.findUnique({ where: { id: "me" } });
+  if (!row) {
+    const l = await getLearner();
+    const lvl = levelFromXp(l.xp);
+    const startDivision = lvl >= 25 ? 3 : lvl >= 15 ? 2 : lvl >= 8 ? 1 : 0;
+    row = await db.league.create({ data: { id: "me", weekKey: wk, division: startDivision } });
+  }
+
+  if (row.weekKey !== wk) {
+    // Settle last week: compute final place, apply promotion/demotion.
+    const settled = row;
+    const lastDow = 6;
+    const thisWkDays = Array.from({ length: 7 }, (_, i) => settled.weekKey * 7 + i);
+    const youRows = await db.dailyStat.findMany({ where: { day: { in: thisWkDays } } });
+    const youXp = youRows.reduce((s, r) => s + r.xp, 0);
+    const lastAvg = Math.max(70, Math.round(avg * 0.8));
+    const ghosts = Array.from({ length: LEAGUE_SIZE - 1 }, (_, i) => ghostXp(settled.weekKey, i, lastAvg, lastDow));
+    const place = 1 + ghosts.filter((g) => g > youXp).length;
+    const promoted = place <= PROMOTE_PLACES && settled.division < DIVISIONS.length - 1;
+    const demoted = place > LEAGUE_SIZE - DEMOTE_PLACES && settled.division > 0;
+    const division = Math.max(0, Math.min(DIVISIONS.length - 1, settled.division + (promoted ? 1 : demoted ? -1 : 0)));
+    const history = JSON.parse(settled.history || "[]") as LeagueView["history"];
+    history.push({ week: settled.weekKey, division: settled.division, place, promoted, demoted });
+    if (promoted) {
+      const prev = (await db.gameStat.findUnique({ where: { key: "league:promotions" } }))?.best ?? 0;
+      await bumpStat("league:promotions", prev + 1);
+      await awardXp(150);
+    }
+    row = await db.league.update({ where: { id: "me" }, data: { weekKey: wk, division, history: JSON.stringify(history.slice(-12)) } });
+  }
+
+  const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
+  const youRows = await db.dailyStat.findMany({ where: { day: { in: thisWkDays } } });
+  const youXp = youRows.reduce((s, r) => s + r.xp, 0);
+  const standings: LeagueStanding[] = [
+    { name: "You", xp: youXp, you: true },
+    ...Array.from({ length: LEAGUE_SIZE - 1 }, (_, i) => ({
+      name: RIVAL_NAMES[(wk * 13 + i * 5) % RIVAL_NAMES.length],
+      xp: ghostXp(wk, i, dailyTarget, dayOfWeek),
+      you: false,
+    })),
+  ].sort((a, b) => b.xp - a.xp);
+  const place = 1 + standings.findIndex((s) => s.you);
+  const promoteCut = standings[PROMOTE_PLACES - 1]?.xp ?? 0;
+  const demoteCut = standings[LEAGUE_SIZE - DEMOTE_PLACES]?.xp ?? 0;
+  return {
+    division: row.division,
+    divisionName: DIVISIONS[row.division],
+    standings,
+    place,
+    daysLeft: 6 - dayOfWeek,
+    promoteCut,
+    demoteCut,
+    history: JSON.parse(row.history || "[]") as LeagueView["history"],
+  };
 }
 
 // ---------- GameStat ----------

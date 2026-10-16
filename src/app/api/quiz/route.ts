@@ -32,6 +32,6 @@ export async function POST(req: Request) {
   }
 
   await db.quizItem.create({ data: { src: String(source ?? "text"), quiz: JSON.stringify(quiz) } });
-  await awardXp(10);
+  await awardXp(10, { chainHit: true });
   return NextResponse.json(quiz);
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex, review, preview, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner, bumpDaily, touchStreak } from "@/lib/server";
-import { awardXp, progressQuest } from "@/lib/arcade";
+import { awardXp, progressQuest, registerMiss } from "@/lib/arcade";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,8 @@ export async function POST(req: Request) {
 
   await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today } });
   await bumpDaily("reviews");
-  await awardXp(grade >= 3 ? 10 : 5);
+  await awardXp(grade >= 3 ? 10 : 5, { chainHit: grade >= 3, perkXp: "review" });
+  if (grade < 2) await registerMiss();
   if (grade >= 2) await bumpDaily("correct");
   await touchStreak();
   await progressQuest("reviews_20", 1);

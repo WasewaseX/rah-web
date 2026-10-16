@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   }
 
   await bumpDaily("reviews");
-  await awardXp(8);
+  await awardXp(8, { chainHit: true });
   await progressQuest("chat_10", 1);
   await touchStreak();
 
