@@ -4,7 +4,7 @@
 // per skill leak rate, writing and speaking score trends, coach advice.
 
 import { useEffect, useState } from "react";
-import { Flame, TrendingUp, Target } from "lucide-react";
+import { Flame, TrendingUp, Target, Snowflake } from "lucide-react";
 import { Card, Chip, Note, Bar, Btn } from "./ui";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
@@ -80,6 +80,46 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
           <div className="mt-2 text-xs font-semibold text-[#7d889c]">day streak</div>
         </Card>
       </div>
+
+      {/* Streak forge */}
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Streak forge</span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#7d889c]">
+            <Snowflake className="h-3.5 w-3.5 text-[var(--rah-accent)]" />
+            {state.learner.freezes} freeze{state.learner.freezes === 1 ? "" : "s"} banked
+          </span>
+        </div>
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2 rounded-2xl bg-[#ffb02e]/[0.08] px-4 py-3">
+            <Flame className="h-7 w-7 text-[#ffb02e]" />
+            <div>
+              <div className="text-2xl font-black leading-none tracking-tight text-[#ffd08a]">{state.learner.streak}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#7d889c]">day chain</div>
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-relaxed text-[#a9b4c6]">
+              Every 7-day streak mints one freeze (bank caps at two). Miss a single day and a freeze absorbs it automatically - the chain survives.
+            </p>
+            <div className="mt-2 flex items-center gap-1.5">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl border ${i < state.learner.freezes ? "border-[var(--rah-accent)]/40 bg-[var(--rah-accent)]/[0.1]" : "border-white/[0.06] bg-white/[0.02] opacity-40"}`}
+                >
+                  <Snowflake className={`h-4 w-4 ${i < state.learner.freezes ? "text-[#9de6fb]" : "text-[#5c6678]"}`} />
+                </div>
+              ))}
+              <span className="ml-2 text-xs font-medium text-[#7d889c]">
+                {state.learner.streak > 0
+                  ? `next freeze in ${7 - (state.learner.streak % 7)} day${7 - (state.learner.streak % 7) === 1 ? "" : "s"}`
+                  : "day one starts the chain"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Activity grid */}
       <Card>
