@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { gradeExamSubmission } from "@/lib/agent/exam";
 import { bumpDaily, touchStreak } from "@/lib/server";
-import { awardXp, progressQuest } from "@/lib/arcade";
+import { awardXp, progressQuest, registerMiss } from "@/lib/arcade";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   if (!result) return NextResponse.json({ error: "exam not found" }, { status: 404 });
   await bumpDaily("reviews", result.total);
   await bumpDaily("correct", result.correct);
-  await awardXp(10 + result.correct * 5);
+  await awardXp(10 + result.correct * 5, { chainHit: result.correct > 0 });
+  if (result.correct < result.total) await registerMiss();
   await touchStreak();
   await progressQuest("exam_1", 1);
   return NextResponse.json(result);

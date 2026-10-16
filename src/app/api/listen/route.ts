@@ -35,6 +35,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Listening builder is unreachable: ${(e as Error).message}` }, { status: 502 });
   }
   await bumpDaily("listened");
-  await awardXp(10);
+  await awardXp(10, { chainHit: true });
   return NextResponse.json(out);
 }

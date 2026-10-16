@@ -138,3 +138,117 @@ export async function buildBossFight(itemsPerPhase: number, phases: number): Pro
 export function normalizeAnswer(s: string): string {
   return normalize(s);
 }
+
+// ---------- Seeded builders for the server-graded games (Dungeon, Duel,
+// Gauntlet). Same seed = same run, so the Daily Dungeon is identical all day
+// and the Duel's rival par refers to the exact items you faced. ----------
+
+function seededShuffle<T>(a: T[], seed: number): T[] {
+  const out = [...a];
+  let s = (seed * 2654435761) % 4294967296;
+  const rnd = () => {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    return s / 2147483648;
+  };
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+async function weakTags(): Promise<string[]> {
+  const fams = await topMistakes(10).catch(() => []);
+  return fams.filter((f) => !f.resolvedAt).map((f) => f.tag);
+}
+
+export interface DungeonFloor {
+  n: number;
+  name: string;
+  items: ArcadeItem[];
+}
+
+const FLOOR_META = [
+  { name: "The Gate", pick: 0 },
+  { name: "The Long Dark", pick: 1 },
+  { name: "The Vault", pick: 2 },
+] as const;
+
+// The Daily Dungeon: 3 floors x 4 items, seeded by the day index so every
+// attempt today walks the same rooms. Difficulty climbs floor by floor and
+// weak-tag cards are stacked into the deep floors where they hurt most.
+export async function buildDungeonFloors(day: number): Promise<DungeonFloor[]> {
+  const favored = await weakTags();
+  const hot = DECK.filter((c) => c.traps.some((t) => favored.includes(t)));
+  const b1 = DECK.filter((c) => ["A2", "B1"].includes(c.level));
+  const b2 = DECK.filter((c) => c.level === "B2");
+  const c1 = DECK.filter((c) => c.level === "C1");
+  const hotPool = seededShuffle(hot, day);
+  const rest = seededShuffle(DECK.filter((c) => !hot.includes(c)), day + 1);
+  const fill = (n: number, pool: Card[], start: number): Card[] => {
+    const out: Card[] = [];
+    for (const c of pool) {
+      if (out.length >= n) break;
+      if (!out.includes(c) && !hotPool.slice(0, start).includes(c)) out.push(c);
+    }
+    for (const c of rest) {
+      if (out.length >= n) break;
+      if (!out.includes(c)) out.push(c);
+    }
+    return out;
+  };
+  const floors: DungeonFloor[] = [];
+  const plans = [
+    { cards: [...seededShuffle(b1, day + 2), ...rest], kind: 0, meta: FLOOR_META[0] },
+    { cards: [...hotPool.slice(0, 6), ...seededShuffle(b2, day + 3), ...rest], kind: 1, meta: FLOOR_META[1] },
+    { cards: [...hotPool.slice(2, 10), ...seededShuffle(c1.length ? c1 : b2, day + 4), ...rest], kind: 2, meta: FLOOR_META[2] },
+  ];
+  let used = new Set<string>();
+  for (const p of plans) {
+    const picked: Card[] = [];
+    for (const c of p.cards) {
+      if (picked.length >= 4) break;
+      if (used.has(c.id)) continue;
+      used.add(c.id);
+      picked.push(c);
+    }
+    const items = picked.map((c, i) => ((p.kind + i) % 3 === 2 ? toCloze(c) : toMcq(c)));
+    floors.push({ n: floors.length + 1, name: p.meta.name, items });
+  }
+  return floors;
+}
+
+// Rival par for a duel: deterministic per run seed, calibrated so the rival
+// hits roughly the learner's own recent accuracy band with seeded jitter.
+export function duelPar(seed: number, items: number, accuracy: number): number {
+  let hits = 0;
+  for (let i = 0; i < items; i++) {
+    const p = Math.min(0.92, Math.max(0.3, accuracy + (seededUnit2(seed * 97 + i * 13) - 0.5) * 0.3));
+    if (seededUnit2(seed * 31 + i * 7) < p) hits++;
+  }
+  return hits;
+}
+
+function seededUnit2(n: number): number {
+  let s = (n * 2654435761) % 4294967296;
+  s = (s * 1103515245 + 12345) % 2147483648;
+  return s / 2147483648;
+}
+
+// The Gauntlet draws its next item from an escalating pool: as the streak
+// climbs, easy cards drain away and the learner's worst tags take over.
+export async function buildGauntletItem(streak: number, seed: number): Promise<ArcadeItem> {
+  const favored = await weakTags();
+  const hot = DECK.filter((c) => c.traps.some((t) => favored.includes(t)));
+  const easy = DECK.filter((c) => ["A2", "B1"].includes(c.level));
+  const mid = DECK.filter((c) => c.level === "B2");
+  const hard = DECK.filter((c) => c.level === "C1");
+  let pool: Card[];
+  if (streak < 5) pool = [...easy, ...mid];
+  else if (streak < 10) pool = [...mid, ...easy.slice(0, 20)];
+  else if (streak < 15) pool = [...hard.length ? hard : mid, ...mid];
+  else pool = hot.length >= 5 ? [...hot, ...(hard.length ? hard : mid)] : [...(hard.length ? hard : mid), ...mid];
+  const shuffled = seededShuffle(pool, seed * 7 + streak * 13 + 1);
+  const c = shuffled[0] ?? seededShuffle(DECK, seed + streak)[0];
+  return streak >= 8 && streak % 2 === 0 ? toCloze(c) : toMcq(c);
+}

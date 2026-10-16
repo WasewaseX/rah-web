@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildSpeedPool, type ArcadeItem } from "@/lib/arcade-items";
-import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
+import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
 
@@ -51,7 +51,8 @@ export async function POST(req: Request) {
   await bumpStat("speed:plays");
   await bumpDaily("reviews", total);
   await bumpDaily("correct", correct);
-  const xp = await awardXp(Math.min(80, Math.round(score / 12)));
+  const xp = await awardXp(Math.min(80, Math.round(score / 12)), { chainHit: correct > 0 });
+  if (correct < total) await registerMiss();
   await touchStreak();
   await progressQuest("speed_play", 1);
   if (maxCombo > 0) await progressQuest("speed_combo_8", maxCombo);

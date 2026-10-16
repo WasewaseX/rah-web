@@ -40,7 +40,8 @@ export async function touchStreak() {
     froze = true;
     streak = l.streak + 1;
   } else streak = 1;
-  if (streak > 0 && streak % 7 === 0 && !froze) freezes = Math.min(2, freezes + 1);
+  const cap = l.perks.includes("freeze_cap") ? 3 : 2; // Deep Freezer talent widens the bank
+  if (streak > 0 && streak % 7 === 0 && !froze) freezes = Math.min(cap, freezes + 1);
   return db.learner.update({ where: { id: "me" }, data: { streak, lastActiveDay: today, freezes } });
 }
 

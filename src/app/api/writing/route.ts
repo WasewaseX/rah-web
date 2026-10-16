@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
   await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify(result) } });
   await bumpDaily("written");
-  await awardXp(15);
+  await awardXp(15, { chainHit: true });
   await progressQuest("write_1", 1);
   await touchStreak();
   // Mistake memory: essay errors feed persistent families by their trap type.

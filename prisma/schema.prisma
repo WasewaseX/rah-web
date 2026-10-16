@@ -24,6 +24,11 @@ model Learner {
   modeData       String  @default("") // JSON state for the active conversation mode
   xp             Int     @default(0) // lifetime XP; levels are derived from it in arcade.ts
   freezes        Int     @default(0) // streak freezes: auto-consumed when one missed day would break a chain (cap 2)
+  chain          Int     @default(0) // momentum chain: consecutive correct answers across ALL surfaces today
+  chainDay       Int     @default(-1) // the day the chain belongs to; a new day resets it
+  sp             Int     @default(0) // talent points banked (1 per level-up, catch-up granted on first tree open)
+  perks          String  @default("") // JSON array of unlocked perk keys (talent tree)
+  persona        String  @default("mentor") // mentor | drill | zen - flavors the AI director and the coach
   createdAt      DateTime @default(now())
 }
 
@@ -164,6 +169,32 @@ model Rival {
   wins        Int    @default(0) // weeks the learner out-gained the rival
   losses      Int    @default(0)
   taunt       String @default("")
+}
+
+// Weekly league: one row, lazily rolled over. Division index into the
+// DIVISIONS ladder; history keeps every settled week (place, promoted...).
+model League {
+  id       String @id // "me"
+  weekKey  Int    @default(-1)
+  division Int    @default(0) // 0=Wood .. 5=Rahiator
+  history  String @default("[]") // JSON: [{ week, division, place, promoted, demoted }]
+}
+
+// Generic run state for server-graded games: the Daily Dungeon keeps one row
+// per day (id "day:<n>"), the Gauntlet keeps a single live row (id
+// "gauntlet"). All gameplay lives in the JSON blob.
+model RunState {
+  id    String @id
+  day   Int    @default(0)
+  state String @default("{}") // JSON: { floors, hearts, shieldUsed, streak, seed, done, cleared }
+  updatedAt DateTime @updatedAt
+}
+
+// The AI Director's daily briefing, cached per day so it never re-bills.
+model Briefing {
+  day  Int      @id
+  text String   @default("")
+  at   DateTime @default(now())
 }
 
 // Recurring production-mistake families, mined from corrections across chat,

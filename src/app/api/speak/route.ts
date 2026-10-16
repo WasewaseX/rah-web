@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
   await db.speakSession.create({ data: { prompt: String(prompt ?? ""), transcript: t.slice(0, 5000), round: Number(round ?? 1), result: JSON.stringify(result) } });
   await bumpDaily("spoken");
-  await awardXp(20);
+  await awardXp(20, { chainHit: true });
   await touchStreak();
   await progressQuest("speak_1", 1);
   // Mistake memory: spoken errors feed persistent families by their trap tag.

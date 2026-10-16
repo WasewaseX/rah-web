@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildBossFight, type BossPhase } from "@/lib/arcade-items";
 import { db } from "@/lib/db";
-import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
+import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,8 @@ export async function POST(req: Request) {
   await bumpDaily("reviews", total);
   await bumpDaily("correct", correct);
   const gain = won ? 120 + heartsLeft * 20 : 25 + (phaseReached - 1) * 5;
-  const xp = await awardXp(gain);
+  const xp = await awardXp(gain, { chainHit: won });
+  if (!won) await registerMiss();
   await touchStreak();
   await progressQuest("boss_phase", phaseReached);
   if (won) await progressQuest("boss_win", 1);
