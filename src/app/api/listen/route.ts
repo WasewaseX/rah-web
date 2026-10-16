@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiJson, listenSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily } from "@/lib/server";
+import { awardXp } from "@/lib/arcade";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Listening builder is unreachable: ${(e as Error).message}` }, { status: 502 });
   }
   await bumpDaily("listened");
-  await bumpDaily("xp", 10);
+  await awardXp(10);
   return NextResponse.json(out);
 }

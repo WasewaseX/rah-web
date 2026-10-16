@@ -21,12 +21,27 @@ export async function bumpDaily(field: "reviews" | "correct" | "xp" | "spoken" |
   });
 }
 
+// Streak forge: consecutive days extend the chain, a single missed day is
+// absorbed by a freeze if one is banked (that is what freezes are for), and
+// every full week mints one more freeze (banked max 2). A two-day gap with
+// no freeze, or any longer gap, resets the chain - honest again.
 export async function touchStreak() {
   const l = await getLearner();
   const today = dayIndex();
   if (l.lastActiveDay === today) return l;
-  const streak = l.lastActiveDay === today - 1 ? l.streak + 1 : 1;
-  return db.learner.update({ where: { id: "me" }, data: { streak, lastActiveDay: today } });
+  const gap = today - l.lastActiveDay;
+  let streak: number;
+  let freezes = l.freezes;
+  let froze = false;
+  if (l.lastActiveDay < 0) streak = 1;
+  else if (gap === 1) streak = l.streak + 1;
+  else if (gap === 2 && freezes > 0) {
+    freezes -= 1;
+    froze = true;
+    streak = l.streak + 1;
+  } else streak = 1;
+  if (streak > 0 && streak % 7 === 0 && !froze) freezes = Math.min(2, freezes + 1);
+  return db.learner.update({ where: { id: "me" }, data: { streak, lastActiveDay: today, freezes } });
 }
 
 export async function dueCount(): Promise<number> {
