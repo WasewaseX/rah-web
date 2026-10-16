@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { cardById, DECK } from "@/lib/content";
 import { diagnose } from "@/lib/server";
+import { getSkillLevels } from "@/lib/agent/levels";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET() {
   const days = Array.from({ length: 35 }, (_, i) => {
     const d = today - 34 + i;
     const s = statMap.get(d);
-    return { day: d, reviews: s?.reviews ?? 0, xp: s?.xp ?? 0 };
+    return { day: d, reviews: s?.reviews ?? 0, correct: s?.correct ?? 0, xp: s?.xp ?? 0 };
   });
 
   const states = await db.cardState.findMany();
@@ -61,6 +62,7 @@ export async function GET() {
 
   const totalReviews = await db.reviewLog.count();
   const totalLapses = await db.reviewLog.count({ where: { grade: 1 } });
+  const skillLevels = await getSkillLevels();
 
   return NextResponse.json({
     days,
@@ -69,6 +71,7 @@ export async function GET() {
     advice: diag.advice,
     writeTrend,
     speakTrend,
+    skillLevels,
     totals: {
       reviews: totalReviews,
       lapses: totalLapses,

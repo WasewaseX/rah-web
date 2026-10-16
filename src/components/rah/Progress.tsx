@@ -4,8 +4,10 @@
 // per skill leak rate, writing and speaking score trends, coach advice.
 
 import { useEffect, useState } from "react";
-import { Flame, TrendingUp, Target, Snowflake } from "lucide-react";
+import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart } from "lucide-react";
 import { Card, Chip, Note, Bar, Btn } from "./ui";
+import { Radar, AccuracyTimeline } from "./WarRoom";
+import MindReader from "./MindReader";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
 
@@ -23,12 +25,13 @@ interface SkillRow {
   reps: number;
 }
 interface Data {
-  days: { day: number; reviews: number; xp: number }[];
+  days: { day: number; reviews: number; correct: number; xp: number }[];
   byUnit: UnitRow[];
   bySkill: SkillRow[];
   advice: string[];
   writeTrend: { avg: number }[];
   speakTrend: { avg: number }[];
+  skillLevels: { skill: string; level: string; score: number; samples: number }[];
   totals: { reviews: number; lapses: number; cards: number; started: number };
 }
 
@@ -119,6 +122,62 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
             </div>
           </div>
         </div>
+      </Card>
+
+      {/* War room: mastery radar */}
+      <Card>
+        <div className="mb-1 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]">
+            <RadarIcon className="h-4 w-4" />
+          </div>
+          <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Mastery radar</span>
+        </div>
+        <div className="mb-3 text-xs font-medium text-[#7d889c]">
+          Six measured skills, one honest hexagon. Uneven shapes are normal - the plan feeds the dents.
+        </div>
+        <Radar skills={data.skillLevels ?? []} />
+        {(() => {
+          const measured = (data.skillLevels ?? []).filter((s) => s.samples > 0);
+          if (measured.length === 0) return null;
+          const avg = measured.reduce((s, r) => s + r.score, 0) / measured.length;
+          const gap = Math.max(0, 0.85 - avg);
+          const lagging = [...measured].sort((a, b) => a.score - b.score).slice(0, 2);
+          // Rough items-to-C1: each graded item moves a skill ~ 0.3/(samples+5);
+          // sum the per-skill need, then divide by recent daily evidence.
+          const itemsNeeded = lagging.reduce((s, r) => s + Math.ceil(((0.85 - r.score) * (r.samples + 5)) / 0.3), 0);
+          const recent = data.days.slice(-14).reduce((s, d) => s + d.reviews, 0);
+          const perDay = recent / 14;
+          const daysOut = perDay > 0.2 ? Math.round((itemsNeeded * 2) / perDay) : null;
+          return (
+            <div className="mt-3 rounded-2xl bg-[#171c28] p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs font-bold text-[#8b96a9]">distance to C1 (0.85 mastery)</span>
+                <span className="text-sm font-black text-[#9dc0ff]">{Math.round(gap * 100)} pts</span>
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#7d889c]">
+                {lagging.map((s) => `${s.skill} (${Math.round(s.score * 100)})`).join(" and ")} drag the average. Close the gap with roughly {itemsNeeded} graded items in those two -
+                {daysOut !== null && daysOut < 400 ? ` at your current pace that lands in ~${daysOut} days.` : " keep feeding the coach daily and the estimate sharpens."}
+              </p>
+            </div>
+          );
+        })()}
+      </Card>
+
+      {/* War room: accuracy timeline */}
+      <Card>
+        <div className="mb-1 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#3ccb7f]/[0.12] text-[#7fe0ac]">
+            <LineChart className="h-4 w-4" />
+          </div>
+          <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Accuracy trail</span>
+          {(() => {
+            const activeDays = data.days.filter((d) => d.reviews > 0);
+            if (activeDays.length < 2) return null;
+            const acc = Math.round((activeDays.reduce((s, d) => s + d.correct, 0) / activeDays.reduce((s, d) => s + d.reviews, 0)) * 100);
+            return <Chip tone={acc >= 80 ? "emerald" : "amber"}>{acc}% over 35 days</Chip>;
+          })()}
+        </div>
+        <AccuracyTimeline days={data.days} />
       </Card>
 
       {/* Activity grid */}
@@ -213,35 +272,8 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
         </div>
       </Card>
 
-      {/* Mistake memory */}
-      {state.profile?.mistakes && state.profile.mistakes.length > 0 && (
-        <Card>
-          <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
-            Recurring mistakes
-            {!!state.profile?.mistakesHealed && (
-              <span className="rounded-full border border-[#3ccb7f]/30 bg-[#3ccb7f]/[0.1] px-2 py-0.5 text-[10px] font-black text-[#7fe0ac]">
-                {state.profile.mistakesHealed} healed
-              </span>
-            )}
-          </div>
-          <div className="mb-4 text-xs font-medium text-[#7d889c]">
-            Mined from your corrections. The tutor hunts these first; exams build items around them. Two clean exam hits retire a family.
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {state.profile.mistakes.map((m) => (
-              <div key={m.tag} className="flex items-center justify-between gap-3 rounded-2xl bg-[#171c28] px-3.5 py-2.5">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-bold text-[#c3cddd]">{m.label}</div>
-                  <div className="text-[11px] font-medium text-[#5c6678]">tag: {m.tag}</div>
-                </div>
-                <div className="shrink-0 rounded-full bg-[var(--rah-primary)]/[0.14] px-2.5 py-1 text-[11px] font-black text-[#9dc0ff]">
-                  {m.count}x
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* Mind reader: the coach's memory, visible and editable */}
+      <MindReader onChange={() => undefined} />
 
       {/* Coach advice */}
       {data.advice.length > 0 && (
