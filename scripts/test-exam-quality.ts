@@ -23,7 +23,13 @@ async function exam(label: string, message: string): Promise<NonNullable<ChatRes
     body: JSON.stringify({ message, history: [] }),
   });
   const data = (await res.json()) as ChatResp;
-  if (!res.ok || !data.exam) throw new Error(`${label}: no exam returned (status ${res.status})`);
+  if (!res.ok || !data.exam) {
+    // Provider quota windows (429) make the coach fall back to a text reply.
+    // That is infrastructure, not exam quality - SKIP the run, do not FAIL it.
+    const quota = /429|too many requests|rate/i.test(data.reply ?? "");
+    console.log(`${quota ? "SKIP" : "FAIL"} ${label}: no exam returned (status ${res.status})${quota ? " - provider quota window" : ""}`);
+    process.exit(quota ? 2 : 1);
+  }
   console.log(`\n== ${label} (${((Date.now() - t0) / 1000).toFixed(1)}s) -> ${data.exam.count} items, focus [${data.exam.spec.targetSkills.join(", ")}]`);
   return data.exam;
 }

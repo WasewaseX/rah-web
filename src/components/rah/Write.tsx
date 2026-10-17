@@ -15,6 +15,7 @@ interface Result {
   errors: { bad: string; good: string; fa: string; type: string }[];
   upgrades: { plain: string; c1: string; fa: string }[];
   next_focus: string;
+  ruleChecks?: { engine: string; errors: number; style: number; backfilled: number } | null;
 }
 
 export default function WriteView({ state, onChange }: { state: AppState; onChange: () => void }) {
@@ -123,6 +124,24 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
                 <ScoreRow name="Accuracy" value={result.scores.accuracy} tone={result.scores.accuracy < 6 ? "rose" : "emerald"} />
               </div>
               <p className="mt-5 text-sm leading-relaxed text-[#a9b4c6]">{result.verdict}</p>
+              {result.ruleChecks && (
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[#8b96a9]">
+                  <span className="rounded-full border border-[#5c6678]/40 px-2.5 py-1">
+                    Rule engine: {result.ruleChecks.engine}
+                  </span>
+                  <span className="rounded-full border border-[#ff8ba0]/30 px-2.5 py-1">
+                    {result.ruleChecks.errors} error{result.ruleChecks.errors === 1 ? "" : "s"} flagged
+                  </span>
+                  <span className="rounded-full border border-[#5c6678]/40 px-2.5 py-1">
+                    {result.ruleChecks.style} style note{result.ruleChecks.style === 1 ? "" : "s"}
+                  </span>
+                  {result.ruleChecks.backfilled > 0 && (
+                    <span className="rounded-full border border-[#7fe0ac]/30 px-2.5 py-1">
+                      {result.ruleChecks.backfilled} caught by rules alone
+                    </span>
+                  )}
+                </div>
+              )}
               {result.next_focus && (
                 <div className="mt-4">
                   <Note tone="amber">Next: {result.next_focus}</Note>

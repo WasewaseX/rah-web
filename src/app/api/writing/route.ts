@@ -4,6 +4,7 @@ import { aiJson, writingSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
+import { screenText, findingsBlock, mergeRuleErrors } from "@/lib/languagetool";
 
 export const dynamic = "force-dynamic";
 
@@ -38,16 +39,36 @@ export async function POST(req: Request) {
   if (body.length < 60) return NextResponse.json({ error: "Write at least 60 characters so there is something to grade." }, { status: 400 });
 
   const profile = await buildProfile();
+
+  // Fast path FIRST: the LanguageTool rule engine screens the raw essay for
+  // free, deterministically, with offset-accurate findings. Its output grounds
+  // the LLM pass (confirm/explain, not hunt typos) and backstops it (real
+  // errors the model missed still reach the learner even on a bad AI day).
+  const ruleReport = await screenText(body);
+
   let result: WritingResult;
   try {
     result = await aiJson<WritingResult>(writingSystem(profile), [
-      { role: "user", content: `Prompt: ${prompt}\n\nEssay:\n${body}` },
+      { role: "user", content: `Prompt: ${prompt}\n\nEssay:\n${body}\n\n${findingsBlock(ruleReport)}` },
     ]);
   } catch (e) {
     return NextResponse.json({ error: `The examiner is unreachable: ${(e as Error).message}` }, { status: 502 });
   }
 
-  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify(result) } });
+  // Backstop merge: rule-engine ERRORS the model ignored still ship, mapped
+  // onto mistake-family tags. Style findings stay out of the error list.
+  const { merged: mergedErrors, added } = mergeRuleErrors(result.errors ?? [], ruleReport);
+  result.errors = mergedErrors;
+  const ruleChecks = ruleReport
+    ? {
+        engine: "LanguageTool" as const,
+        errors: ruleReport.errors.length,
+        style: ruleReport.style.length,
+        backfilled: added,
+      }
+    : null;
+
+  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify({ ...result, ruleChecks }) } });
   await bumpDaily("written");
   await awardXp(15, { chainHit: true });
   await progressQuest("write_1", 1);
@@ -58,7 +79,7 @@ export async function POST(req: Request) {
       result.errors.map((e) => ({ kind: "writing" as const, tag: String(e.type ?? "none"), wrong: String(e.bad ?? ""), right: String(e.good ?? "") })),
     );
   }
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, ruleChecks });
 }
 
 function safeParse(s: string): WritingResult | null {

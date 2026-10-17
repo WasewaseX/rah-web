@@ -1,5 +1,10 @@
-// FSRS-5 scheduler, ported 1:1 from crates/rah-core/src/fsrs.rs which agrees
-// with py-fsrs v5.1.1 / ts-fsrs v4.6.1 / fsrs-rs 1.4.3 defaults.
+// FSRS-5 scheduler, ported from crates/rah-core/src/fsrs.rs and verified by
+// scripts/test-fsrs-parity.ts against the reference implementation
+// (ts-fsrs v4.6.1, the exact version these formulas follow):
+//   - recall/forget stability take the PRE-REVIEW difficulty (ts-fsrs feeds
+//     the old D into (11 - D); the updated D only becomes the card's state);
+//   - post-lapse stability is clamp(preS, S_MIN, S_forget) - the long-term
+//     scheduler rule; the app schedules by day, never in minutes.
 // Grades: 1=Again 2=Hard 3=Good 4=Easy.
 
 export const W: number[] = [
@@ -73,11 +78,12 @@ export function recallStability(s: number, d: number, r: number, grade: number):
 }
 
 export function lapseStability(s: number, d: number, r: number): number {
-  let sf =
+  const sf =
     W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1.0, W[13]) - 1.0) * Math.exp(W[14] * (1.0 - r));
-  const cap = s / Math.exp(W[17] * W[18]);
-  if (sf > cap) sf = cap;
-  return clamp(sf, S_MIN, S_MAX);
+  // Reference (ts-fsrs v4.6.1 long-term scheduler, class B.next_ds):
+  //   stability_after_again = clamp(preStability, S_MIN, forgetStability)
+  // The forgotten card cannot come back MORE stable than it was.
+  return Math.min(Math.max(s, S_MIN), sf);
 }
 
 export function sameDayStability(s: number, grade: number): number {
@@ -90,6 +96,14 @@ export interface ReviewOutcome {
   due: number;
 }
 
+// Reference interval ordering (ts-fsrs v4.6.1 scheduler next_interval):
+// Again <= Hard <= Good <= Easy with a minimum one-day gap between neighbors.
+function orderConstrain(base: number[]): [number, number, number, number] {
+  const out = [base[0]];
+  for (let i = 1; i < 4; i++) out[i] = Math.max(base[i], out[i - 1] + 1);
+  return out as [number, number, number, number];
+}
+
 // Apply one review. `day` is the day index (days since epoch, UTC),
 // `retention` the desired retention in 0..1.
 export function review(state: FsrsState, grade: number, day: number, retention: number): ReviewOutcome {
@@ -100,7 +114,11 @@ export function review(state: FsrsState, grade: number, day: number, retention: 
   if (isNew) {
     const ns = s0(g);
     const nd = d0(g);
-    const ivl = intervalFor(ns, retention);
+    // Reference (class B.newState): all four grade intervals are computed,
+    // then order-constrained - a new Hard never schedules shorter than a
+    // new Again plus one day, and so on up the ladder.
+    const chain = orderConstrain([1, 2, 3, 4].map((i) => intervalFor(s0(i), retention)));
+    const ivl = chain[g - 1];
     fs.s = ns;
     fs.d = nd;
     fs.due = day + ivl;
@@ -114,29 +132,45 @@ export function review(state: FsrsState, grade: number, day: number, retention: 
   const nd = nextDifficulty(state.d, g);
 
   if (t < 1) {
+    // Same-day re-reviews only occur in the post-Again learning ladder
+    // (a graded card leaves today's queue otherwise). Reference: ts-fsrs
+    // short-term scheduler, learningState transitions.
     const ns = sameDayStability(state.s, g);
-    if (g === 1) {
-      fs.s = ns;
-      fs.d = nd;
-      fs.due = day;
-      fs.state = "review";
-      fs.lastivl = 0;
-      fs.lapses += 1;
-      return { fsrs: fs, ivl: 0, due: day };
-    }
-    const ivl = intervalFor(ns, retention);
     fs.s = ns;
     fs.d = nd;
-    fs.due = day + ivl;
     fs.state = "review";
+    if (g === 1 || g === 2) {
+      // Again (+5 min) / Hard (+10 min) stay in today's relearning queue;
+      // in day-granular form that is due = today, interval 0.
+      if (g === 1) fs.lapses += 1;
+      fs.due = day;
+      fs.lastivl = 0;
+      return { fsrs: fs, ivl: 0, due: day };
+    }
+    // Good exits the ladder; Easy must clear a Good-graded card by a day.
+    const ivl =
+      g === 4
+        ? Math.max(intervalFor(ns, retention), intervalFor(sameDayStability(state.s, 3), retention) + 1)
+        : intervalFor(ns, retention);
+    fs.due = day + ivl;
     fs.lastivl = ivl;
     return { fsrs: fs, ivl, due: fs.due };
   }
 
   const r = retrievability(t, state.s);
-  const ns =
-    g === 1 ? lapseStability(state.s, nd, r) : recallStability(state.s, nd, r, g);
-  const ivl = intervalFor(ns, retention);
+  // Reference semantics: the stability formulas consume the PRE-review
+  // difficulty (state.d), not the just-updated one (nd). All four candidate
+  // stabilities are computed, their intervals order-constrained, and the
+  // graded one is kept - exactly like the reference scheduler.
+  const sAgain = lapseStability(state.s, state.d, r);
+  const sHard = recallStability(state.s, state.d, r, 2);
+  const sGood = recallStability(state.s, state.d, r, 3);
+  const sEasy = recallStability(state.s, state.d, r, 4);
+  const ns = g === 1 ? sAgain : g === 2 ? sHard : g === 3 ? sGood : sEasy;
+  const chain = orderConstrain(
+    [sAgain, sHard, sGood, sEasy].map((s) => intervalFor(s, retention)),
+  );
+  const ivl = chain[g - 1];
   fs.s = ns;
   fs.d = nd;
   fs.due = day + ivl;
