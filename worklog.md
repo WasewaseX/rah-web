@@ -368,3 +368,18 @@ Stage Summary:
 - The scheduler is no longer "ported 1:1" as a claim - it is a regression-locked fact: 400 randomized sequences, zero divergence from the reference implementation, permanent gate in scripts/test-fsrs-parity.ts.
 - The writing coach now stands on a deterministic rule engine: free, offline-grade findings with offset-accurate excerpts ground the LLM and backstop its misses; errors and style are separated and only errors feed the mistake memory.
 - The user's pasted broken exam classes remain regression-locked by the answerability gate (fixtures in test-exam-gate.ts); exam focus + quality suites re-prove count/focus promises live.
+
+---
+Task ID: 26-final
+Agent: Super Z (main)
+Task: harden + live-prove the LanguageTool fast path; ship everything.
+
+Work Log:
+- Live writing drives: first two returned ruleChecks null - isolated via direct LT probes (1s responses, healthy) to the public API's per-IP BURST throttle triggered by our rapid successive calls during the AI-quota retries. Hardened src/lib/languagetool.ts: timeout 8s->10s, dedicated RETRY_BACKOFF_MS 6000.
+- Final live writing run PROVED the full architecture end to end: LanguageTool screened 4 errors -> grounded LLM confirmed all 4 (backfilled: 0 - zero misses by the AI on rule-engine findings) -> added its own 5th -> ruleChecks strip populated in the response; corrections are real teaching pairs ("should to spend"->"should spend", "childrens"->"children", "the parks is"->"the parks are").
+- Final gates: tsc clean, GRAMMAR CHECK 16 pass / 0 fail / 1 skip (endpoint check raced the writing drive's spacing - unit + live client checks all green), FSRS PARITY PASS.
+- PUSHED: 8bf26ce (RE slice) + 85000ce (hardening) to github.com/WasewaseX/rah-web main. Push backlog DRAINED (was 15 commits behind).
+- Beacons: localhost AND preview both serve 85000ce314e3 dirty:0. Tree clean.
+
+Stage Summary:
+- Reverse engineering delivered the real thing: a differential parity gate that caught 3 genuine scheduler bugs and now permanently locks our FSRS-5 to the reference implementation; a rule-engine fast path under the writing coach with error/style separation and mistake-memory tagging; everything regression-locked, deployed (dirty:0 both surfaces), and on GitHub.
