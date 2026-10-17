@@ -89,8 +89,9 @@ interface LtMatch {
 }
 
 const ENDPOINT = "https://api.languagetool.org/v2/check";
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 10000;
 const MIN_SPACING_MS = 2500; // public API politeness: ~20 req/min per IP
+const RETRY_BACKOFF_MS = 6000; // burst-throttle recovery
 let lastCallAt = 0;
 
 function normalize(text: string, json: { matches?: LtMatch[] }): LtReport {
@@ -146,7 +147,7 @@ async function callLt(text: string): Promise<LtReport | null> {
         signal: ctl.signal,
       });
       if (res.status === 429 && attempt === 0) {
-        await new Promise((res2) => setTimeout(res2, 4000));
+        await new Promise((res2) => setTimeout(res2, RETRY_BACKOFF_MS));
         continue;
       }
       if (!res.ok) return null;
