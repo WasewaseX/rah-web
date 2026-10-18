@@ -461,3 +461,20 @@ Work Log:
 Stage Summary:
 - The web app regained what the Tauri build had: installable, own window, offline shell - plus SHA-versioned caches that self-evict on deploy and a notification habit nudge that promises exactly what a local-only setup can deliver. The deploy beacon stays honest because the worker refuses to cache it.
 - Next wave per the spec: P3 content ladder v2 (one shared difficulty envelope steering Read/Listen/Speak/games off the placement level + mastery).
+
+---
+Task ID: 31
+Agent: Super Z (main)
+Task: MEGA-UPDATE wave, P3 - content ladder v2 ("placement steers everything").
+
+Work Log:
+- src/lib/ladder.ts: the shared difficulty envelope. ladderFor(level) -> {band, monologueWords, sentenceWords, idiomDensity, ttsRate, speakStrictness, quizLevels, readOrder}; ladderBrief(l, what) emits deterministic instruction blocks; orderReadings sorts the shelf (own band first, adjacent after). Pure, synchronous, unit-provable; "?" defaults to B2 (the app's standing assumption).
+- Consumers wired: listen route injects the brief and returns ladder {band, ttsRate}; Listen client paces TTS from the envelope, chips stay RELATIVE (baseRate x multiplier, clamped 0.5..2); listenSystem de-hardcoded so the envelope wins over defaults; speak route grades under the ladder bar (GENTLE = intelligibility first for B1, STRICT = register/collocation for C1); dungeon floors take the band as the staircase FLOOR (B1 climbs B2-first with C1 as spice; C1 gets C1 mixed into floor 1; B2 keeps the classic staircase); Read shelf orders by band with a "your band" badge on matching texts.
+- Drive scripts/test-ladder.ts: 20/20 ALL PASS. Two drive-only findings fixed: (1) the item payload carries no level - ArcadeItem ids encode the source card, resolve through the deck; (2) the drive's RunState cleanup used the wrong prefix (dungeon*; real id is day:<n>) so a stale morning row masked the route-level proof with all-C1 floors - after the prefix fix the route proves both bands live. The drive caught this by asserting through the REAL route, not just the builder.
+- Live listen generation carried the envelope in the payload (B1 band + rate) during the active window.
+- Gates: LADDER 20/20, ARCADE 18/0, MAXIMUM 55/55, ANSWERABILITY ALL, tsc + eslint clean.
+- PUSHED 9200670. Beacons 9200670c2900 dirty:0 on localhost AND preview. Spec tracker: P1/P2/P3 marked shipped.
+
+Stage Summary:
+- The placement level now steers EVERY generator through one deterministic envelope: the engine decides the difficulty, the AI words it. A B1 learner gets slower, plainer, shorter listening material at a gentler grading bar and a B2-first dungeon; a C1 learner gets dense, fast material judged strictly. The drive proves the shift through the real routes with forced levels and full state restore.
+- Next wave per the spec: P4 listening lab v2 (dictation with word-diff -> scheduled targets, pronunciation proximity scoring).

@@ -15,7 +15,7 @@ Status tracker: `[ ]` todo, `[~]` in progress, `[x]` shipped with gate green.
 
 ---
 
-## P1. Exam↔FSRS unification — "the schedule knows" `[ ]`
+## P1. Exam↔FSRS unification — "the schedule knows" `[x] a6299f7`
 
 **Gap (verified).** `api/exam/grade` feeds `TagMastery`, `MistakeFamily`, and
 `updateSkillLevelsFromExam`, then stops. It never touches `CardState`. A vocab item the
@@ -42,7 +42,7 @@ into today and `lapses` increments; prove a correct item on a due card → inter
 `ReviewLog.source` shows `exam`; next queue build surfaces the bombed card; state fully
 restored. Regression battery stays green.
 
-## P2. PWA + habit loop — "installable, unbrappable" `[ ]`
+## P2. PWA + habit loop — "installable, unbrappable" `[x] 2e42115`
 
 **Gap (verified).** No `manifest.json`, no service worker, no notifications anywhere in
 `src/`. The Tauri v2.0.0 build was installable; the web app lost installability, offline
@@ -67,7 +67,7 @@ external trigger.
 with network cut (drive: offline reload renders shell, `/api/state` falls back gracefully),
 install prompt fires, notification permission + fire + click-through-to-review proven.
 
-## P3. Content ladder v2 — "placement steers everything" `[~]`
+## P3. Content ladder v2 — "placement steers everything" `[x] 9200670`
 
 **Gap (verified).** Exam generation is level-steered (`spec.level`, edge toward C1) and
 the daily quiz takes `profile.level`. But Read is six static texts (level displayed,
