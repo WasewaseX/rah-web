@@ -442,3 +442,22 @@ Work Log:
 Stage Summary:
 - The last open loop between surfaces is closed: knowledge proven or broken in an exam now moves the FSRS schedule. A bombed vocab word comes back tomorrow at the post-lapse minimum; a proven word's interval extends; a tagged miss becomes a review-queue healing card rendered from the learner's own recorded evidence. Every outcome carries ReviewLog.source=exam provenance, and the app can now separate scheduled reviews from exam-verified outcomes in stats.
 - Next wave per the spec: P2 PWA + habit loop (manifest, service worker with SHA-versioned caches, honest local notifications).
+
+---
+Task ID: 30
+Agent: Super Z (main)
+Task: MEGA-UPDATE wave, P2 - PWA + habit loop ("installable, unbrappable").
+
+Work Log:
+- Icons: scripts/gen_pwa_icons.py renders the Tauri road glyph as 192/512/maskable-512/apple-180 PNGs into public/icons/ (same brand, same colors: #10131a bg, #2dd4a7 road).
+- src/app/manifest.ts: standalone manifest served at /manifest.webmanifest, layout metadata wired (manifest link, apple-web-app, icons).
+- public/sw.js, honesty-first: cache name = rah-<git SHA> read LIVE from /api/version at install; activate evicts every non-current cache (a new deploy self-evicts stale shells); /api/version is NEVER cached (the deploy guarantee must not be maskable by a cache hit); /api/* network-first with 4.5s timeout, cached grace when offline, honest 503 JSON when nothing cached; navigations network-first with cached-shell fallback; static/_next/icons cache-first; local reminder messages (RAH_REMIND) and notificationclick focus-or-open.
+- PwaBootstrap client half: registers the worker, install banner on beforeinstallprompt (dismiss once per session), habit nudge: on a fresh open with due>0 or streak-at-risk, asks notification permission ONCE and fires one local notification; no push server, so nothing beyond local is promised; app must run clean when SW or notifications are unavailable.
+- Drive scripts/test-pwa.py (browser-level, Playwright): 12/12 ALL PASS - manifest shape (standalone + 192/512 + maskable), SW registered AND controlling, SHA-versioned cache carrying the live SHA, shell precached, OFFLINE reload renders the real app (title + body), /api/version un-fetchable offline (never cached), /api/state offline = grace or honest 503, clean boot with notifications ungranted, install banner renders on a synthetic beforeinstallprompt.
+- Lint caught a real ordering bug in my first PwaBootstrap (maybeNotify referenced before declaration inside the effect) - hoisted to module scope, dead block removed, tsc+eslint clean, drive re-run green.
+- Gates: PWA 12/12, ENGINE SMOKE 10/10, ARCADE 18/0, tsc+eslint clean.
+- PUSHED 2e42115. Beacons 2e4211512112 dirty:0 on localhost AND preview (preview serves the manifest).
+
+Stage Summary:
+- The web app regained what the Tauri build had: installable, own window, offline shell - plus SHA-versioned caches that self-evict on deploy and a notification habit nudge that promises exactly what a local-only setup can deliver. The deploy beacon stays honest because the worker refuses to cache it.
+- Next wave per the spec: P3 content ladder v2 (one shared difficulty envelope steering Read/Listen/Speak/games off the placement level + mastery).
