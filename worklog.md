@@ -422,3 +422,23 @@ Work Log:
 Stage Summary:
 - The exam architecture's promise chain is now enforced end to end: count (slice guard), answerability (gate), focus (skill filter), and NOW the weakness quota - every promise the exam card makes is backed by deterministic machinery, with AI as the generator and evidence items as the last-resort floor.
 - The healing loop can no longer stall: a family with evidence ALWAYS gets its hunting item, even with the AI provider completely down.
+
+---
+Task ID: 29
+Agent: Super Z (main)
+Task: "countinue never stop" - mega-update spec ("Close Every Loop" wave) + ship P1 (exam->FSRS unification).
+
+Work Log:
+- Re-orient: clean tree at 8776e10, both Task-28 P0s confirmed closed, PAT live (ls-remote OK), beacons healthy. Gap audit grounded in grep evidence: exam grades never touched CardState; no manifest/SW/notifications; Read static six texts; Listen lab already strong (5 steps) but no dictation/proximity scoring; no JSON export.
+- MEGA-UPDATE.md: the Close Every Loop wave spec - five pillars, each with a verified gap, concrete design, and a live gate: P1 exam->FSRS unification, P2 PWA + habit loop, P3 content ladder v2, P4 listening lab v2 (dictation + pronunciation proximity), P5 portability + CEFR map. Wave order justified. Pushed 87864f1.
+- P1 SHIP: ReviewLog.source column (review|exam|dictation|shadow, additive, db:push clean). New src/lib/exam-cards.ts: resolveExamCardTargets (deck match by answer/en/alt case-insensitive, tagged fallback to exam:<tag> namespace, unresolvable items schedule NOTHING, same-card outcomes merge to the WORST grade so one exam can never inflate stability twice), scheduleExamOutcomes (SAME review() pipe as the review route, no arcade calls - scheduling is evidence capture, not a second reward; suspended cards respected), derivedExamCard (renders exam:<tag> at queue time from the family's own wrong->right evidence).
+- blankCorrection extracted from exam-gate.evidenceItem so the exam gate and the schedule share ONE definition of what "the correction" is; evidenceItem refactored onto it.
+- exam.ts: scheduling after verdicts are final (post-arbiter, post-healing), wrapped in try/catch so it can never break grading; ExamResult.scheduled surfaced to the client. Queue route resolves due states through cardById ?? derivedExamCard - the old code silently DROPPED unknown cardIds, so healing cards would have existed but never surfaced; caught in design review before the drive.
+- Drive test-exam-fsrs.ts (state-restoring, full snapshot incl. CardStates, exam-source logs, family, ledger, learner, DailyStat, quests, achievements): 18/18 ALL PASS. Two drive-only calibration findings, both assertions corrected to test the true claim: (1) the engine is a long-term FSRS - a grade-1 lapse schedules the post-lapse minimum (lastivl 1, due tomorrow, lapses+1, stability crushed), identical to the review route for the same grade; (2) queue surfacing proven on the real-world timeline (yesterday's bomb due today). Live-proven: route grading writes both targets, provenance rows exist, queue renders the healing cloze with the family label in its note, unknown tags yield null honestly.
+- Ops: one controlled server restart (single supervisor) after the drive exposed stale-module grading (scheduled: []) - the known class; rerun clean.
+- Gates: EXAM-FSRS 18/18, ANSWERABILITY ALL, FUZZY 15/15, FSRS PARITY 400 seq, ENGINE 10/10, MASTERY 29/29, HEALING ALL, EXAM FOCUS ALL, EXAM QUALITY partial (1 honest SKIP, provider 429), SKILLS+MODES ALL (5 SKIP), GRAMMAR 20/0, ARCADE 18/0, MAXIMUM EDITION 55/55. tsc + eslint clean.
+- PUSHED a6299f7. Beacons a6299f734edd dirty:0 on localhost AND preview.
+
+Stage Summary:
+- The last open loop between surfaces is closed: knowledge proven or broken in an exam now moves the FSRS schedule. A bombed vocab word comes back tomorrow at the post-lapse minimum; a proven word's interval extends; a tagged miss becomes a review-queue healing card rendered from the learner's own recorded evidence. Every outcome carries ReviewLog.source=exam provenance, and the app can now separate scheduled reviews from exam-verified outcomes in stats.
+- Next wave per the spec: P2 PWA + habit loop (manifest, service worker with SHA-versioned caches, honest local notifications).
