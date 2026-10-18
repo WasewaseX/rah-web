@@ -1,0 +1,84 @@
+// The agent endpoint. POST { message } -> an SSE stream of agent events:
+// thought / tool / observe / final - the sidebar renders them live as they happen.
+// History persists in the same ChatMsg table the coach always used, so the
+// sidebar remembers across reloads. Auth required.
+
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
+import { getSessionUser } from "@/lib/auth";
+import { awardXp } from "@/lib/arcade";
+import { runAgent, type AgentEvent } from "@/lib/coach-agent/loop";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 180;
+
+export async function POST(req: Request) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Sign in to talk to your coach." }, { status: 401 });
+
+  const { message } = await req.json().catch(() => ({ message: "" }));
+  const text = String(message ?? "").trim();
+  if (!text) return NextResponse.json({ error: "message required" }, { status: 400 });
+
+  const profile = await buildProfile();
+  const history = await db.chatMsg.findMany({ orderBy: { id: "desc" }, take: 10 });
+  const flat = history
+    .reverse()
+    .map((h) => ({
+      role: h.role === "user" ? "user" : "assistant",
+      content: h.role === "user" ? h.content : h.content.slice(0, 700),
+    }));
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (e: AgentEvent) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+        } catch {
+          // client gone; the loop still finishes and persists
+        }
+      };
+
+      let turn: Awaited<ReturnType<typeof runAgent>>;
+      try {
+        turn = await runAgent(text, flat, profile, send);
+      } catch (e) {
+        send({ type: "error", label: "Agent crashed", detail: (e as Error).message });
+        turn = {
+          reply: `The agent hit an unexpected wall (${(e as Error).message}). One more try usually clears it.`,
+          corrections: [],
+          commands: [],
+          steps: [],
+          toolsUsed: [],
+        };
+      }
+
+      // Persist the turn (user text + final agent answer) so the sidebar has memory.
+      await db.chatMsg.create({ data: { role: "user", content: text } });
+      await db.chatMsg.create({
+        data: {
+          role: "coach",
+          content: JSON.stringify({ skill: "agent", reply: turn.reply, corrections: turn.corrections, commands: turn.commands, toolsUsed: turn.toolsUsed }),
+        },
+      });
+
+      // Same surface rewards as the old chat tab: talking to the coach counts.
+      await bumpDaily("reviews");
+      await awardXp(8, { chainHit: true });
+      await touchStreak().catch(() => undefined);
+
+      send({ type: "done", stepsUsed: turn.steps.length });
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
+}

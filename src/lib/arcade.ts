@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
 import { bumpDaily, getLearner } from "@/lib/server";
+import { GEMS, awardGems, boostActive } from "@/lib/shop";
 
 // ---------- Momentum (cross-surface combo chains) ----------
 
@@ -390,6 +391,8 @@ export async function awardXp(amount: number, opts?: { chainHit?: boolean; perkX
   const l0 = await getLearner();
   if (opts?.perkXp === "review" && hasPerk(l0.perks, "xp_review")) mult *= 1.15;
   if (opts?.perkXp === "quest" && hasPerk(l0.perks, "quest_boost")) mult *= 1.15;
+  // Shop XP boost (Duolingo RE): 2x every payout while active. Stacks after heat + talents.
+  if (boostActive(l0.boostUntil)) mult *= 2;
   const base = Math.max(0, Math.min(500, Math.round(amount)));
   const amt = Math.min(500, Math.round(base * mult));
   const l = await db.learner.upsert({
@@ -397,11 +400,12 @@ export async function awardXp(amount: number, opts?: { chainHit?: boolean; perkX
     create: { id: "me", xp: amt },
     update: { xp: { increment: amt } },
   });
-  // Level-ups bank talent points for the tree (1 SP per level gained).
+  // Level-ups bank talent points for the tree (1 SP per level gained) and mint gems (Duolingo RE).
   const before = levelFromXp(l.xp - amt);
   const view = levelView(l.xp);
   if (view.level > before) {
-    await db.learner.update({ where: { id: "me" }, data: { sp: { increment: view.level - before } } });
+    const gained = view.level - before;
+    await db.learner.update({ where: { id: "me" }, data: { sp: { increment: gained }, gems: { increment: GEMS.levelUp * gained } } });
   }
   await bumpDaily("xp", amt);
   const unlocked = await evaluateAchievements();
@@ -495,6 +499,7 @@ export async function progressQuest(key: string, amount: number): Promise<void> 
   if (progress >= q.target) {
     await db.quest.update({ where: { id: q.id }, data: { progress: q.target, done: true } });
     await awardXp(q.xp, { perkXp: "quest" });
+    await awardGems(GEMS.questDone).catch(() => undefined);
     await evaluateAchievements();
   } else {
     await db.quest.update({ where: { id: q.id }, data: { progress } });

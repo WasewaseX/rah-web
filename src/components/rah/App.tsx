@@ -8,7 +8,6 @@ import {
   Home,
   RotateCcw,
   Target,
-  MessagesSquare,
   PenLine,
   Headphones,
   Mic,
@@ -23,13 +22,14 @@ import HomeView from "./Home";
 import PwaBootstrap from "./PwaBootstrap";
 import ReviewView from "./Review";
 import PlacementView from "./Placement";
-import ChatView from "./Chat";
 import WriteView from "./Write";
 import ListenView from "./Listen";
 import SpeakView from "./Speak";
 import ReadView from "./Read";
 import ProgressView from "./Progress";
 import ArcadeView from "./Arcade";
+import CoachSidebar from "./CoachSidebar";
+import LoginView from "./Login";
 import { applyTheme } from "@/lib/theme-bus";
 
 import type { GameView, RivalView, LeagueView } from "@/lib/arcade";
@@ -56,6 +56,8 @@ export interface AppState {
     focusSkill: string;
     placementPhase: string;
     freezes: number;
+    gems?: number;
+    boostActive?: boolean;
   };
   theme: { primary?: string; primaryDeep?: string; bg?: string; surface?: string; accent?: string } | null;
   today: { reviews: number; correct: number; xp: number; spoken: number; written: number; listened: number };
@@ -85,7 +87,6 @@ export interface AppState {
 export const VIEWS = [
   { id: "home", label: "Home", icon: Home },
   { id: "review", label: "Review", icon: RotateCcw },
-  { id: "chat", label: "Coach", icon: MessagesSquare },
   { id: "write", label: "Writing", icon: PenLine },
   { id: "speak", label: "Speaking", icon: Mic },
   { id: "listen", label: "Listening", icon: Headphones },
@@ -101,6 +102,8 @@ export default function RahApp() {
   const [view, setView] = useState<ViewId>("home");
   const [state, setState] = useState<AppState | null>(null);
   const [toasts, setToasts] = useState<{ key: string; title: string; desc: string; icon: string }[]>([]);
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   // Trophy fanfare: recent unlocks surface once per session, then never again.
   const announceUnlocks = (recent: { key: string; title: string; desc: string; icon: string }[]) => {
@@ -119,6 +122,35 @@ export default function RahApp() {
       setTimeout(() => setToasts((t) => t.filter((x) => x.key !== a.key)), 6500);
     }
   };
+
+  // Coach/toast announcements from anywhere (agent commands, shop purchases, ...).
+  const pushToast = useCallback((t: { title: string; desc: string }) => {
+    const key = `t${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+    setToasts((cur) => [...cur, { key, title: t.title, desc: t.desc, icon: "sparkles" }].slice(-3));
+    setTimeout(() => setToasts((cur) => cur.filter((x) => x.key !== key)), 5000);
+  }, []);
+
+  // Auth gate: resolve the session once; the shell renders the login screen until signed in.
+  useEffect(() => {
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((s: { user: { email: string; name: string } | null }) => {
+        if (s.user) setUser(s.user);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Ctrl/Cmd+J opens the coach sidebar from any tab.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setCoachOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -158,6 +190,18 @@ export default function RahApp() {
     window.history.pushState(null, "", `#${id}`);
     setView(id);
   };
+
+  // Not signed in: the login gate owns the screen. After sign-in, load the app.
+  if (!user) {
+    return (
+      <LoginView
+        onSignedIn={(u) => {
+          setUser(u);
+          setTimeout(() => void refresh(), 150);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--rah-bg)] md:flex-row">
@@ -201,14 +245,20 @@ export default function RahApp() {
             );
           })}
         </nav>
-        <div className="mt-auto rounded-2xl border border-[var(--rah-primary)]/20 bg-gradient-to-br from-[#16233e] to-[#131b2c] p-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#9dc0ff]">
-            <Sparkles className="h-3.5 w-3.5" />
-            Built-in AI coach
-          </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-[#8b96a9]">
-            No keys, no setup. It already knows your level and your leaks.
-          </p>
+        <div className="mt-auto space-y-2">
+          <button
+            onClick={() => setCoachOpen(true)}
+            className="w-full rounded-2xl border border-[var(--rah-primary)]/20 bg-gradient-to-br from-[#16233e] to-[#131b2c] p-4 text-left transition-colors hover:border-[var(--rah-primary)]/45"
+          >
+            <div className="flex items-center gap-2 text-xs font-bold text-[#9dc0ff]">
+              <Sparkles className="h-3.5 w-3.5" />
+              Coach sidebar
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[#8b96a9]">
+              The agent rides along on every tab: reads your state, writes files, runs code, acts.
+            </p>
+          </button>
+          {user && <div className="px-2 text-[10px] font-semibold text-[#5d6879]">Signed in as {user.email}</div>}
         </div>
       </aside>
 
@@ -261,10 +311,9 @@ export default function RahApp() {
           </div>
         ) : (
           <div key={view} className="rah-rise">
-            {view === "home" && <HomeView state={state} go={go} />}
+            {view === "home" && <HomeView state={state} go={go} openCoach={() => setCoachOpen(true)} onChange={refresh} toast={pushToast} />}
             {view === "review" && <ReviewView state={state} onChange={refresh} />}
             {view === "placement" && <PlacementView state={state} onChange={refresh} />}
-            {view === "chat" && <ChatView state={state} onChange={refresh} />}
             {view === "write" && <WriteView state={state} onChange={refresh} />}
             {view === "listen" && <ListenView state={state} />}
             {view === "speak" && <SpeakView state={state} onChange={refresh} />}
@@ -299,8 +348,22 @@ export default function RahApp() {
           })}
         </div>
       </nav>
-      {/* Trophy fanfare toasts */}
-      <div className="pointer-events-none fixed bottom-24 right-4 z-50 flex flex-col gap-2 md:bottom-6">
+      {/* Coach sidebar: the agent, available on every tab */}
+      <CoachSidebar
+        open={coachOpen}
+        onOpenChange={setCoachOpen}
+        state={state}
+        go={go}
+        refresh={refresh}
+        toast={pushToast}
+        onSignOut={() => {
+          setUser(null);
+          setState(null);
+        }}
+      />
+
+      {/* Trophy fanfare toasts (above the coach FAB) */}
+      <div className="pointer-events-none fixed bottom-24 right-4 z-40 flex flex-col gap-2 md:bottom-24">
         {toasts.map((t) => (
           <div
             key={t.key}

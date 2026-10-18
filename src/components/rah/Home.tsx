@@ -1,13 +1,14 @@
 "use client";
 
-import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake, Zap } from "lucide-react";
+import { useState } from "react";
+import { Flame, Sparkles, Target, RotateCcw, MessagesSquare, PenLine, Mic, Headphones, BookOpen, ArrowRight, Stethoscope, CheckCircle2, ScrollText, Swords, Snowflake, Zap, Gem } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, Ring } from "./ui";
 import { handCoach } from "@/lib/bus";
 import Briefing from "./Briefing";
 import type { AppState, ViewId } from "./App";
 
 const TILES: {
-  id: ViewId;
+  id: ViewId | "coach";
   title: string;
   desc: string;
   icon: typeof Mic;
@@ -16,9 +17,9 @@ const TILES: {
   stat: (s: AppState) => string | null;
 }[] = [
   {
-    id: "chat",
-    title: "Coach chat",
-    desc: "Socratic turns, corrections with the Farsi why.",
+    id: "coach",
+    title: "Coach agent",
+    desc: "The sidebar agent: reads your state, writes files, runs code, acts on any tab.",
     icon: MessagesSquare,
     tint: "bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]",
     glow: "group-hover:shadow-[0_16px_40px_-20px_rgba(78,140,255,.5)]",
@@ -62,7 +63,94 @@ const TILES: {
   },
 ];
 
-export default function HomeView({ state, go }: { state: AppState; go: (v: ViewId) => void }) {
+// The shop strip: spend earned gems on streak freezes and XP boosts.
+// Items and costs mirror the Duolingo store loop (reverse-engineered slice):
+// currency comes from level-ups and quests, sinks are insurance + amplifiers.
+function ShopStrip({
+  gems,
+  freezes,
+  boostActive,
+  onChange,
+  toast,
+}: {
+  gems: number;
+  freezes: number;
+  boostActive: boolean;
+  onChange?: () => void;
+  toast?: (t: { title: string; desc: string }) => void;
+}) {
+  const [busy, setBusy] = useState("");
+
+  const buy = async (item: string) => {
+    setBusy(item);
+    try {
+      const r = await fetch("/api/shop", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ item }),
+      });
+      const data = (await r.json()) as { ok?: boolean; error?: string; title?: string; desc?: string };
+      if (data.ok) {
+        toast?.({ title: data.title ?? "Purchased", desc: data.desc ?? "" });
+        onChange?.();
+      } else {
+        toast?.({ title: "Shop said no", desc: data.error ?? "Try again." });
+      }
+    } catch {
+      toast?.({ title: "Shop unreachable", desc: "Check the connection and retry." });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <Card className="rah-rise-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#4ade80]/[0.12] text-[#7ff0a8]">
+            <Gem className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-sm font-black text-[#f2f5fa]">Shop</div>
+            <div className="text-[11px] font-semibold text-[#7d889c]">
+              <span className="text-[#7ff0a8]">{gems} gems</span> · level up and finish quests to earn
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {boostActive && (
+            <Chip tone="violet">
+              <Zap className="h-3 w-3" /> 2x XP running
+            </Chip>
+          )}
+          <Chip tone="cyan">
+            <Snowflake className="h-3 w-3" /> {freezes} banked
+          </Chip>
+          <Btn onClick={() => void buy("streak_freeze")} disabled={busy !== ""} className="!min-h-9 !px-3 text-xs">
+            {busy === "streak_freeze" ? "…" : "Freeze · 100"}
+          </Btn>
+          <Btn onClick={() => void buy("xp_boost")} disabled={busy !== "" || boostActive} className="!min-h-9 !px-3 text-xs">
+            {busy === "xp_boost" ? "…" : "Boost 2x · 150"}
+          </Btn>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export default function HomeView({
+  state,
+  go,
+  openCoach,
+  onChange,
+  toast,
+}: {
+  state: AppState;
+  go: (v: ViewId) => void;
+  openCoach?: () => void;
+  onChange?: () => void;
+  toast?: (t: { title: string; desc: string }) => void;
+}) {
   const goal = state.learner.dailyGoal;
   const done = state.today.reviews;
   const accuracy = state.today.reviews > 0 ? Math.round((state.today.correct / state.today.reviews) * 100) : 0;
@@ -286,13 +374,26 @@ export default function HomeView({ state, go }: { state: AppState; go: (v: ViewI
         </div>
       )}
 
+      {/* Shop: gems wallet (Duolingo RE) - freezes and XP boosts, bought with earned gems */}
+      <ShopStrip
+        gems={state.learner.gems ?? 0}
+        freezes={state.learner.freezes}
+        boostActive={Boolean(state.learner.boostActive)}
+        onChange={onChange}
+        toast={toast}
+      />
+
       {/* Feature tiles */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {TILES.map((t, i) => {
           const Icon = t.icon;
           const stat = t.stat(state);
           return (
-            <button key={t.id} onClick={() => go(t.id)} className={`group rah-rise-${Math.min(3, i + 1)} text-left`}>
+            <button
+              key={t.id}
+              onClick={() => (t.id === "coach" ? openCoach?.() : go(t.id as ViewId))}
+              className={`group rah-rise-${Math.min(3, i + 1)} text-left`}
+            >
               <Card
                 className={`h-full transition-all duration-200 group-hover:-translate-y-1 group-hover:border-white/[0.14] ${t.glow}`}
               >

@@ -29,7 +29,43 @@ model Learner {
   sp             Int     @default(0) // talent points banked (1 per level-up, catch-up granted on first tree open)
   perks          String  @default("") // JSON array of unlocked perk keys (talent tree)
   persona        String  @default("mentor") // mentor | drill | zen - flavors the AI director and the coach
+  gems           Int     @default(0) // soft currency (Duolingo RE): earned from levels, quests, leagues; spent in the Shop
+  boostUntil     Int     @default(-1) // day index until which all XP payouts are doubled (Shop item, Duolingo XP boost RE)
   createdAt      DateTime @default(now())
+}
+
+// Accounts. The learner data stays the singleton above; users gate access to it.
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String   @default("Learner")
+  provider  String   @default("email") // email | google
+  createdAt DateTime @default(now())
+  sessions  Session[]
+}
+
+// One-time login codes emailed to the user (10-minute TTL, single use).
+model LoginCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Server sessions. The token lives in an httpOnly cookie; nothing client-side reads it.
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // FSRS-5 memory state per card. Keys mirror the verified Rust core.

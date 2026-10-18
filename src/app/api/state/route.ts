@@ -6,6 +6,7 @@ import { deckStats } from "@/lib/content";
 import { ensureQuests, getGameView, getRivalView, getLeagueView, getChain } from "@/lib/arcade";
 import { getMasteryView } from "@/lib/mastery";
 import { nextBestActions } from "@/lib/next-best";
+import { shopView } from "@/lib/shop";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function GET() {
   const profile = await buildProfile();
   const theme = l.theme ? JSON.parse(l.theme) : null;
   await ensureQuests();
-  const [game, rival, quests, league, chain, mastery, nextBest] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain(), getMasteryView(), nextBestActions()]);
+  const [game, rival, quests, league, chain, mastery, nextBest, shop] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain(), getMasteryView(), nextBestActions(), Promise.resolve(shopView(l.gems, l.freezes, l.boostUntil))]);
   return NextResponse.json({
     learner: {
       level: l.level,
@@ -33,6 +34,9 @@ export async function GET() {
       focusSkill: l.focusSkill,
       placementPhase: l.placementPhase,
       freezes: l.freezes,
+      gems: l.gems,
+      boostUntil: l.boostUntil,
+      boostActive: shop.boostActive,
     },
     theme,
     today: stat ?? { reviews: 0, correct: 0, xp: 0, spoken: 0, written: 0, listened: 0 },
@@ -51,5 +55,6 @@ export async function GET() {
     chain,
     mastery,
     nextBest,
+    shop,
   });
 }
