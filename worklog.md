@@ -404,3 +404,21 @@ Work Log:
 Stage Summary:
 - The app now owns a real central learner model: per-tag success ledger with statistical honesty (Wilson), recency-weighted form (EWMA), trend arrows, and a deterministic next-best-action engine that decides the day's moves and hands them to the learner with one tap. The AI Director executes the engine's plan instead of improvising its own.
 - The drive caught and locked a key-unification fork that would have silently split the ledger from the family memory for any tag containing a hyphen or space.
+
+---
+Task ID: 28
+Agent: Super Z (main)
+Task: regression battery + root-cause the stochastic healing-loop failures (user's standing "root out the architecture flaw" directive applied one layer deeper).
+
+Work Log:
+- Regression battery exposed a SECOND stochastic flaw in the exam architecture, same bug class as P0-2: the weakness quota was prompt-steered, not enforced. When the model skipped the quota OR the AI vet stripped every tag (both observed live), tag honesty collapsed spec.weakTags to [] and the exam shipped with ZERO hunting items - the healing loop stalled randomly (mistake-loop drive: 4, then 7, then 15-check failure variance across runs).
+- Fix, exam.ts: tag honesty evaluated ONCE at the end; hunted tags with zero surviving items trigger (1) a tag-locked CRITICAL OVERRIDE generation round, then (2) deterministic evidence items from exam-gate.evidenceItem() - the family's recorded "wrong -> right" IS a forced cloze; stem-similarity heuristic blanks the correction token ("childrens -> children are playing" blanks "children", not "playing"). Quota items sort first so the count slice can never amputate them. spec.weakTags re-honested after enforcement.
+- Placement 500 flaw (exposed live): the writing action had no provider-failure fallback - a 429 bricked placement completion. Now degrades to the MCQ-derived level with writingFallback flag; placement always completes. The drive PROVED the fallback live during the active quota window.
+- test-skills-smoke.ts: adopted the established SKIP-on-429 protocol + cascade guards (throttled mode start skips its continuation checks) + full-detail diagnostics; suite now separates app-broken from provider-throttled (5 honest SKIPs, 0 false FAILs).
+- test-placement-live.ts: null-body guard with actionable failure instead of a TypeError crash.
+- Gates: MASTERY 29/29, ANSWERABILITY ALL (4 new evidence-item checks incl. gate-compatibility), HEALING 15/15 DETERMINISTIC, EXAM FOCUS ALL, ENGINE 10/10, FUZZY 15/15, FSRS PARITY PASS, MAXIMUM EDITION 55/55, PLACEMENT LIVE ALL, SKILLS+MODES ALL (5 SKIP), GRAMMAR 16/0/1. tsc + eslint clean.
+- PUSHED 3884649. Beacons 3884649b4b03 dirty:0 on localhost AND preview.
+
+Stage Summary:
+- The exam architecture's promise chain is now enforced end to end: count (slice guard), answerability (gate), focus (skill filter), and NOW the weakness quota - every promise the exam card makes is backed by deterministic machinery, with AI as the generator and evidence items as the last-resort floor.
+- The healing loop can no longer stall: a family with evidence ALWAYS gets its hunting item, even with the AI provider completely down.
