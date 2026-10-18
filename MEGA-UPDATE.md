@@ -114,7 +114,7 @@ card created, due today, appears in queue; one shadow round with mumbled speech 
 proximity score renders per-word; state restored. ASR-unavailable browsers degrade
 honestly (mode hidden, not broken).
 
-## P5. Portability + CEFR map — "the learner owns the state" `[ ]`
+## P5. Portability + CEFR map — "the learner owns the state" `[x] df9a170`
 
 **Gap (verified).** The only export is a 1080×1350 battle-card PNG for the group chat.
 There is no data export/import of learner state. The CEFR level exists as a string with

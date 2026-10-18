@@ -496,3 +496,19 @@ Work Log:
 Stage Summary:
 - Listening slips now live in the same physics as every other miss: a word your ear (or tongue) dropped comes back tomorrow as a review card rendered from your own typed-vs-target sentence pair. The lab's five existing passes gained a measurement layer instead of replacing anything.
 - Remaining per the spec: P5 portability + CEFR map (full JSON export/import, War Room band map with proven vs assumed evidence).
+
+---
+Task ID: 33
+Agent: Super Z (main)
+Task: MEGA-UPDATE wave, P5 - portability + CEFR map ("the learner owns the state"). Wave complete.
+
+Work Log:
+- src/lib/portable.ts: the 20-table registry (fixed order, rows sorted, stable JSON) behind a deterministic sha256 content hash. planImport validates format + hash + per-table presence BEFORE any write; commitImport runs one transaction of delete-then-create with DateTime coercion - idempotent by construction.
+- api/export (hash-sealed rah.v1 bundle, attachment disposition) + api/import (dryRun reports counts and writes nothing; commit is all-or-nothing; wrong hash/missing table -> 422 with an actionable message).
+- Progress: the CEFR band map - A1..C1 cells colored by REAL evidence only (measured skills, recent graded exams with pass counts and best pct), "unproven" rendered honestly otherwise, "you are here" on the placement band; computed server-side from rows, the AI never rates it. Plus the BackupPanel: download, pick file, dry-run diff message, confirm-to-restore.
+- Drive test-portable.ts 15/15 ALL PASS: hash verifies locally from tables alone, wipe (15 cards + 1 family) -> dryRun leaves state untouched -> import restores a hash-IDENTICAL export, second import idempotent, tampered bundle refused with zero writes, missing table refused, bands from real rows, Playwright confirms the map renders.
+- Full wave battery re-run: EXAM-FSRS 18/18, DICTATION 18/18, LADDER 20/20, PWA 12/12, ANSWERABILITY ALL. tsc + eslint clean.
+- PUSHED df9a170. Beacons df9a170d05dc dirty:0 on localhost AND preview. Tracker: ALL FIVE PILLARS SHIPPED. RELEASE-NOTES.md gains the Close Every Loop entry.
+
+Stage Summary:
+- The Close Every Loop wave is complete: exam->FSRS unified (P1), PWA + habit loop (P2), one ladder steering every generator (P4's dictation slips included), listening slips scheduled as reviews (P4), and the learner owns a hash-sealed portable state with an honest band map (P5). Every pillar shipped with its own live drive, and the standing regression battery stayed green throughout.

@@ -1,3 +1,24 @@
+# Rah — The Close Every Loop Update
+
+Five pillars, every one grounded in a verified gap and proven live before shipping (spec: MEGA-UPDATE.md).
+
+## The schedule hears everything (P1)
+Exam outcomes now land on the FSRS schedule. Bomb a vocab item and its card comes back tomorrow at the post-lapse minimum; prove one and the interval extends; tagged misses resurface as review cards rendered from your own wrong->right evidence. Every outcome carries provenance (ReviewLog.source=exam).
+
+## Installable, offline, honestly reminded (P2)
+Rah is a real PWA: own window, SHA-versioned caches that self-evict on deploy, offline shell, and a habit nudge that promises exactly what local notifications can deliver - never more.
+
+## One ladder steers everything (P3)
+The placement level now sets a deterministic difficulty envelope under every generator: slower, plainer listening at a gentler grading bar for B1; dense, fast, strictly-judged material for C1; the dungeon's staircase floor follows your band; the reading shelf orders itself around you.
+
+## Slips become reviews (P4)
+The listening lab gained a Dictate pass: type or speak each sentence, get word-level hits/near/slip coloring, and every slipped content word lands on your FSRS schedule - resurfacing tomorrow as a card built from your own typed-vs-target pair.
+
+## The learner owns the state (P5)
+Download the entire app state as one hash-sealed file, or restore from one: the hash is verified before anything is touched, the restore is a single transaction, and a re-import lands on an identical state. The Progress page now shows the CEFR band map - proven bands in green from measured skills and exams, unproven bands honest about it.
+
+Gates: EXAM-FSRS 18/18, PWA 12/12, LADDER 20/20, DICTATION 18/18, PORTABILITY 15/15, plus the standing battery (MASTERY 29/29, HEALING, EXAM FOCUS, FUZZY 15/15, FSRS PARITY, ENGINE 10/10, ARCADE 18/18, MAXIMUM 55/55, GRAMMAR, ANSWERABILITY) - all green.
+
 # Rah v2.0.0 — The Agent Release
 
 ## Coach is now an agent
