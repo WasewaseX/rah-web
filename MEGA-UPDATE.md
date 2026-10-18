@@ -91,7 +91,7 @@ are static five, and game pools climb only by weak-tag density.
 different envelopes; one live generation per surface proves the material actually shifts;
 state restored.
 
-## P4. Listening lab v2 — dictation + pronunciation proximity `[ ]`
+## P4. Listening lab v2 — dictation + pronunciation proximity `[x] 6e679c1`
 
 **Gap (verified).** Listen already owns a real 5-step lab (Gist→Decode→Shadow→Transcript
 →Final) and Speak scores free talk with trap tags. Missing: typed dictation whose misses

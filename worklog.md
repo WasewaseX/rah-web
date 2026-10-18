@@ -478,3 +478,21 @@ Work Log:
 Stage Summary:
 - The placement level now steers EVERY generator through one deterministic envelope: the engine decides the difficulty, the AI words it. A B1 learner gets slower, plainer, shorter listening material at a gentler grading bar and a B2-first dungeon; a C1 learner gets dense, fast material judged strictly. The drive proves the shift through the real routes with forced levels and full state restore.
 - Next wave per the spec: P4 listening lab v2 (dictation with word-diff -> scheduled targets, pronunciation proximity scoring).
+
+---
+Task ID: 32
+Agent: Super Z (main)
+Task: MEGA-UPDATE wave, P4 - listening lab v2 (dictation + pronunciation proximity).
+
+Work Log:
+- src/lib/proximity.ts: the single word-level diff engine behind dictation AND read-aloud checks - exact after normalization, NEAR at char-similarity >= 0.8 (edit distance over the longer length; the fuzzy module's similarity() turned out to be token-set overlap, wrong tool for single words - caught by the drive's near-typo check), function-word stoplist so "the" never becomes an FSRS event, greedy consume for repeats, deterministic. Client display and server scheduling share this one source of truth.
+- api/listen/dictation: server-authoritative diff; slips resolve to FSRS targets (deckCardForToken precedence - a slipped word that IS a deck word schedules the REAL card; listen:<token> healing card otherwise) through the SAME scheduleExamOutcomes pipe (now takes source: exam|dictation|shadow); ReviewLog provenance "dictation"; listen families via recordMistakes (kind union extended) with evidence "typed -> target"; caps 8 sentences / 6 tokens per call.
+- derivedExamCard serves both namespaces (exam: + listen:) from the shared blanking heuristic; the queue renders listen cards with unit listen_healing and a "Listening slip" note.
+- Listen.tsx: 6th Dictate pass - play sentence by sentence, type OR hold the mic (webkitSpeechRecognition fills the same field, so mumbled speech goes through the same diff), per-word hit/near/slip coloring, scheduled-count feedback. State resets on new generation; ASR-missing browsers hide the mic, never break.
+- Drive test-dictation.ts 18/18 ALL PASS, full state restore. The drive caught TWO engine bugs pre-ship: similarity() misuse (near-typo marked slip) and "the" being scheduled (stoplist added). EXAM-FSRS provenance assertion made snapshot-aware (a stray pre-existing exam-source row from an earlier crashed run broke the naive arithmetic).
+- Gates: DICTATION 18/18, EXAM-FSRS 18/18, LADDER 20/20, FUZZY 15/15, tsc + eslint clean.
+- PUSHED 6e679c1. Beacons 6e679c10992f dirty:0 on localhost AND preview. Tracker: P4 shipped.
+
+Stage Summary:
+- Listening slips now live in the same physics as every other miss: a word your ear (or tongue) dropped comes back tomorrow as a review card rendered from your own typed-vs-target sentence pair. The lab's five existing passes gained a measurement layer instead of replacing anything.
+- Remaining per the spec: P5 portability + CEFR map (full JSON export/import, War Room band map with proven vs assumed evidence).
