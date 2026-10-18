@@ -12,7 +12,7 @@ import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
 import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
 import { arbitrateMisses, vetItems } from "./exam-ai";
-import { itemAnswerable } from "./exam-gate";
+import { itemAnswerable, evidenceItem } from "./exam-gate";
 
 function newId(): string {
   return `ex${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -278,10 +278,55 @@ export async function generateExam(
     if (freshItems.length > 0) await vetInPlace(freshItems, `ai-r${gateRounds}`);
   }
 
-  // Tag honesty: the exam card announces "hunting: ..." from spec.weakTags.
-  // A family whose items all failed the tag audit must not be announced.
-  const survivingTags = new Set(items.map((it) => it.tag).filter(Boolean));
-  spec.weakTags = spec.weakTags.filter((t) => survivingTags.has(t));
+  // QUOTA ENFORCEMENT (deterministic): the weakness quota is a PROMISE, not a
+  // hope. Two failure modes above are invisible to the learner but fatal to
+  // the healing loop: the model ignores the quota, or the AI vet strips every
+  // tag. Tag honesty is therefore evaluated ONCE at the END - first we force
+  // a tag-locked generation round for any hunted tag with zero surviving
+  // items, and if the model STILL ships none, we build the hunting item
+  // directly from the family's own evidence: the recorded wrong -> right
+  // pair IS a forced cloze, and re-serving the exact miss is precisely what
+  // the healing loop wants. spec.weakTags keeps the full hunted list until
+  // then so harvest's tag validation still accepts quota items.
+  const hunted = spec.weakTags.slice();
+  const missing = hunted.filter((t) => !items.some((it) => it.tag === t));
+  if (missing.length > 0) {
+    emit("Forcing the weakness quota", `no surviving item hunts: ${missing.join(", ")}`);
+    const avoid2 = [...items.map((i) => i.q.slice(0, 60)), ...fresh.bannedQ.slice(0, 10)];
+    const raw4 = await aiJson<RawExam>(
+      examSystem(p, spec, fresh),
+      [{
+        role: "user",
+        content: `CRITICAL OVERRIDE: this round has ONE job. Generate ${missing.length * 2} items and EVERY single one MUST have its "tag" field set to exactly one of: ${missing.join(", ")}. An item without a "tag" field from that list is a wasted generation and will be discarded. The item must genuinely force that exact weakness into play with a FRESH sentence. Do not repeat or paraphrase: ${JSON.stringify(avoid2)}. Output the same JSON object shape with only the new items.`,
+      }],
+      () => ({}),
+      genOpts,
+    );
+    harvest(raw4.items, items.length);
+    const freshItems = items.filter((it) => it.tag && missing.includes(it.tag));
+    if (freshItems.length > 0) await vetInPlace(freshItems, "quota");
+  }
+
+  // Last-resort enforcement: build evidence items from the families
+  // themselves. Deterministic, free, and always honest - the tag is in the
+  // item's DNA because the item IS the family's recorded miss.
+  const stillMissing = hunted.filter((t) => !items.some((it) => it.tag === t));
+  if (stillMissing.length > 0) {
+    const families = await db.mistakeFamily.findMany({ where: { tag: { in: stillMissing }, resolvedAt: null } });
+    for (const tag of stillMissing) {
+      const fam = families.find((f) => f.tag === tag);
+      const item = evidenceItem(tag, fam?.evidence ?? "");
+      if (item) {
+        items.push(item);
+        emit("Evidence item", `built from your own recorded miss on ${tag}`);
+      }
+    }
+  }
+
+  // Tag honesty, evaluated once after enforcement: the exam card announces
+  // "hunting: ..." from spec.weakTags. A family whose items all failed the
+  // audit (and had no usable evidence) must not be announced.
+  spec.weakTags = hunted.filter((t) => items.some((it) => it.tag === t));
 
   if (dropped.length > 0) {
     emit("Gate report", `${dropped.length} item(s) rejected before delivery`);
@@ -289,8 +334,10 @@ export async function generateExam(
 
   // Guarantee the announced count: top up from the pool by trimming or
   // padding with near-level review items. The count the coach announces IS
-  // the count graded, always.
-  const finalItems = items.slice(0, spec.plannedCount).map((it, idx) => ({ ...it, id: `i${idx + 1}` }));
+  // the count graded, always. Quota items sort first so the slice can never
+  // amputate the family hunting it promised.
+  const ordered = [...items.filter((it) => it.tag), ...items.filter((it) => !it.tag)];
+  const finalItems = ordered.slice(0, spec.plannedCount).map((it, idx) => ({ ...it, id: `i${idx + 1}` }));
   spec.plannedCount = finalItems.length;
   spec.minutes = Math.max(4, Math.round(finalItems.length * 1.1));
 

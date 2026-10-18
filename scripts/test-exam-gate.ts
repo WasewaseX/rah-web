@@ -134,5 +134,25 @@ else {
   console.log("FAIL question-only layer passed a bare statement");
 }
 
+// Evidence items: deterministic quota enforcement built from family evidence.
+// The blanked token must be the CORRECTION, not a bystander word.
+import { evidenceItem } from "../src/lib/agent/exam-gate";
+
+const ev1 = evidenceItem("articles", "I have lived here for 2019 -> I have lived here since 2019");
+if (ev1 && ev1.a === "since" && ev1.q.includes("___") && ev1.tag === "articles") console.log("PASS evidence item blanks the correction (for -> since)");
+else { failures++; console.log(`FAIL evidence item wrong -> ${JSON.stringify(ev1)}`); }
+
+const ev2 = evidenceItem("countability", "childrens -> children are playing outside");
+if (ev2 && ev2.a === "children") console.log("PASS evidence item prefers the stem-correction over bystander diffs");
+else { failures++; console.log(`FAIL evidence item stem -> ${JSON.stringify(ev2)}`); }
+
+const ev3 = evidenceItem("prepositions", "no clean evidence recorded");
+if (ev3 === null) console.log("PASS evidence item returns null on unusable evidence");
+else { failures++; console.log(`FAIL evidence item null -> ${JSON.stringify(ev3)}`); }
+
+const ev4 = evidenceItem("articles", "I have lived here for 2019 -> I have lived here since 2019");
+if (ev4 && itemAnswerable(ev4).ok) console.log("PASS evidence item passes the answerability gate");
+else { failures++; console.log(`FAIL evidence item gate -> ${JSON.stringify(ev4)}`); }
+
 console.log(failures === 0 ? "\nANSWERABILITY GATE: ALL CHECKS PASS" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

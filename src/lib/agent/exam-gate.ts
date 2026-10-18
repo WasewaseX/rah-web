@@ -11,6 +11,8 @@
 // Deterministic and free; the AI vetting layer (exam-ai.vetItems) handles
 // what regex cannot see. Deterministic gates run on EVERY harvest round.
 
+import type { ExamItem } from "./types";
+
 export interface GateInput {
   type?: string;
   q?: string;
@@ -105,4 +107,44 @@ export function itemAnswerable(r: GateInput): GateVerdict {
     if (frame.includes(a)) return { ok: false, reason: "key leaks into the sentence" };
   }
   return { ok: true, reason: "" };
+}
+
+// ---------- Quota enforcement: the evidence item ----------
+//
+// The gate does not only reject - when the weakness quota collapses (the
+// model ignored it, or the vet stripped every tag), the exam builds its
+// hunting item from the family's own evidence. A family's evidence is
+// literally "wrong -> right": the token in the right sentence that fixes the
+// wrong one is the forced answer; blank it and the family hunts itself.
+// Deterministic, free, and honest by construction. The correction is
+// preferred over bystander diffs: "childrens -> children are playing" must
+// blank "children", not "playing".
+export function evidenceItem(tag: string, evidence: string): ExamItem | null {
+  const [wrong, right] = evidence.split(" -> ").map((s) => s.trim());
+  if (!wrong || !right) return null;
+  const wrongTokens = (wrong.match(/[A-Za-z']+/g) ?? []).map((t) => t.toLowerCase());
+  const wrongSet = new Set(wrongTokens);
+  const tokens = right.match(/[A-Za-z']+/g) ?? [];
+  const diffs = tokens.filter((t) => !wrongSet.has(t.toLowerCase()));
+  if (diffs.length === 0) return null;
+  const correction = diffs.find((t) =>
+    wrongTokens.some((w) => {
+      if (w === t.toLowerCase() || Math.min(w.length, t.length) < 4) return false;
+      return t.toLowerCase().startsWith(w.slice(0, 4)) || w.startsWith(t.toLowerCase().slice(0, 4));
+    }),
+  );
+  const answer = correction ?? [...diffs].sort((a, b) => b.length - a.length)[0];
+  if (answer.length < 2) return null;
+  const blanked = right.replace(new RegExp(`\\b${answer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), "___");
+  if (!blanked.includes("___")) return null;
+  return {
+    id: `ev-${tag}-${Math.random().toString(36).slice(2, 7)}`,
+    type: "cloze",
+    skill: "grammar",
+    q: blanked,
+    a: answer,
+    accept: [...new Set([answer, answer.toLowerCase()])],
+    why: "Resurfaced from your own recorded miss on this pattern.",
+    tag,
+  };
 }

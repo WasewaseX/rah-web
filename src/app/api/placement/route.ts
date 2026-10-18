@@ -224,14 +224,22 @@ export async function POST(req: Request) {
   if (action === "writing") {
     const text = String(body.text ?? "").trim();
     if (text.length < 40) return NextResponse.json({ error: "Write at least a few sentences." }, { status: 400 });
-    type WRes = { level: string; confidence: number; reasons: string };
-    const res = await aiJson<WRes>(placementWritingSystem(), [{ role: "user", content: text }]);
+    type WRes = { level: string; confidence: number; reasons: string; writingFallback?: boolean };
     const s = await loadSession();
     const g = s.sectionScores["grammar"] ?? 50;
     const v = s.sectionScores["vocab"] ?? 50;
     const r = s.sectionScores["reading"] ?? 50;
     const mcq = pctToLevel(Math.round(0.35 * g + 0.35 * v + 0.3 * r));
     // Writing sample is the strongest single signal; MCQ is the cross-check.
+    // The grader is never allowed to brick placement: if the AI is unreachable
+    // (quota window, outage), the MCQ sections place the learner and the flag
+    // says so - completion first, refinement whenever the model is back.
+    let res: WRes;
+    try {
+      res = await aiJson<WRes>(placementWritingSystem(), [{ role: "user", content: text }]);
+    } catch {
+      res = { level: mcq, confidence: 0.3, reasons: "Writing grader was unreachable, so this level comes from your multiple-choice sections alone. It will sharpen as you use the app.", writingFallback: true };
+    }
     const finalLevel = RUNGS.indexOf(res.level) >= 0 ? res.level : mcq;
     await db.placement.upsert({
       where: { id: "main" },

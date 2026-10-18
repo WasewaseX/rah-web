@@ -119,12 +119,18 @@ try {
       text: "In my opinion money can buy comfort but not happiness. For example last year I bought a new phone and I was happy for two days, after that it was just a phone. Real happiness for me is time with my family, when we travel together or cook dinner. My friend has a lot of money but he works all the time and he is always tired, so I think money is a tool, not a goal.",
     }),
   });
-  const done = (await wr.json()) as {
+  const doneRaw = await wr.json();
+  const done = doneRaw as {
     phase: string;
     level?: string;
     traps?: { tag: string; label: string; count: number }[];
-  };
-  check(wr.ok && done.phase === "done", "writing submission completes placement", JSON.stringify(done).slice(0, 120));
+  } | null;
+  check(
+    wr.ok && !!done && done.phase === "done",
+    "writing submission completes placement",
+    done ? JSON.stringify(done).slice(0, 120) : `HTTP ${wr.status} empty/error body`,
+  );
+  if (!done) throw new Error("placement writing action returned no body - cannot continue the done-phase checks");
 
   const tags = (done.traps ?? []).map((t) => t.tag);
   check(tags.includes("word_choice"), "done response carries word_choice in trap summary", JSON.stringify(done.traps ?? []));
