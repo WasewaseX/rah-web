@@ -383,3 +383,24 @@ Work Log:
 
 Stage Summary:
 - Reverse engineering delivered the real thing: a differential parity gate that caught 3 genuine scheduler bugs and now permanently locks our FSRS-5 to the reference implementation; a rule-engine fast path under the writing coach with error/style separation and mistake-memory tagging; everything regression-locked, deployed (dirty:0 both surfaces), and on GitHub.
+
+---
+Task ID: 27
+Agent: Super Z (main)
+Task: "countinue never stop" - ship Learner Model v2 (the central learner model from the repo brief): per-tag mastery + uncertainty + deterministic next-best-action.
+
+Work Log:
+- Orientation: tree was clean at db3f610, both P0s confirmed closed (handCoach navigates; answerability gate live). Pushed the queued worklog commit db3f610.
+- Schema: TagMastery {tag @id, ok, no, ewma, lastOk, lastNo} - the fine-grained half of the learner model; MistakeFamily only ever tracked failures, so the app could not say "articles: 45%, rising". db:push clean.
+- src/lib/mastery.ts: noteTagOutcome (EWMA alpha 0.35, swallows its own errors so the ledger never breaks a surface), wilsonLower (95% z=1.96) - 2/2 correct stays "unproven" (bound ~0.34) instead of 100%, classifyTag statuses danger/fragile/rising/solid/unproven with trend arrows on a 0.12 ewma-vs-raw gap, getMasteryView (sorted, human summary line), masteryWeakTags (danger+fragile for the exam quota).
+- src/lib/next-best.ts: deterministic selector, urgency-ordered, max 4: review (due cards, 0.98 when full queue), drill (Wilson danger tags, urgency scaled by depth), test (near-healed families streakClean>=1 - cheapest win, retires them), review fragile, test hot unresolved families, teach weakest measured band. Every action carries its measured reason + a coach command string.
+- KEY-UNIFICATION BUG (caught by my own drive before shipping): mastery.normalizeTag originally collapsed to hyphens while mistakes.normalizeTag canonizes to lowercase underscores - same raw tag would fork into two keys across ledger/family memory. Fixed by mirroring the family canon exactly; the drive now proves "Drive Prepositions!" lands on the same row as drive_prepositions and NO hyphen fork exists. Display side replaces [_-] with spaces.
+- Evidence wired: exam grade (Promise.all noteExamAnswer + noteTagOutcome per tagged item, BOTH outcomes), mode-flow daily challenge, writing route (LanguageTool trap tags debit on confirmed production errors), placement foldPlacementMisses (debits per miss tag).
+- Surfaces: /api/state carries mastery + nextBest; Progress War Room gains "Mastery ledger" panel (wilson bars, trend arrows, status colors, ok/no counts) and "Coach's next moves" panel (urgency-ordered actions with one-tap handCoach handoff); briefing route grounds the Director with enginePlan (priority+plan MUST follow the engine's decided moves - engine decides, AI words it); exam generator weakTags = families + proven danger/fragile tags (cap 3).
+- Ops incident handled the safe way: dev server had loaded the pre-generate Prisma client (db.tagMastery undefined, /api/state 500); ONE controlled restart via pkill + ensure-server.sh (single supervisor, no rogue loops) - healthy in 4s.
+- Gates: MASTERY DRIVE 29/29 (state-restoring: ledger math, real exam-grade route integration credits AND debits, family-key unification, state payload, selector ordering/cap/commands, near-healed close-out, summary names the leak). ANSWERABILITY GATE ALL. FSRS PARITY PASS (400 seq). ENGINE SMOKE 10/10. FUZZY 15/15. tsc clean, eslint clean. Healing-loop + arcade drives hit the provider-429 quota window mid-run (exam 2 generation 429) - SKIP per protocol, retried below.
+- PUSHED 8230ef4 to WasewaseX/rah-web main. Beacons 8230ef402eaa dirty:0 on localhost AND preview.
+
+Stage Summary:
+- The app now owns a real central learner model: per-tag success ledger with statistical honesty (Wilson), recency-weighted form (EWMA), trend arrows, and a deterministic next-best-action engine that decides the day's moves and hands them to the learner with one tap. The AI Director executes the engine's plan instead of improvising its own.
+- The drive caught and locked a key-unification fork that would have silently split the ledger from the family memory for any tag containing a hyphen or space.
