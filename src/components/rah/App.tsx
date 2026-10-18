@@ -15,6 +15,7 @@ import {
   BarChart3,
   Flame,
   Sparkles,
+  GraduationCap,
   Gamepad2,
 } from "lucide-react";
 import { Chip } from "./ui";
@@ -251,7 +252,7 @@ export default function RahApp() {
             className="w-full rounded-2xl border border-[var(--rah-primary)]/20 bg-gradient-to-br from-[#16233e] to-[#131b2c] p-4 text-left transition-colors hover:border-[var(--rah-primary)]/45"
           >
             <div className="flex items-center gap-2 text-xs font-bold text-[#9dc0ff]">
-              <Sparkles className="h-3.5 w-3.5" />
+              <GraduationCap className="h-3.5 w-3.5" />
               Coach sidebar
             </div>
             <p className="mt-1.5 text-[11px] leading-relaxed text-[#8b96a9]">

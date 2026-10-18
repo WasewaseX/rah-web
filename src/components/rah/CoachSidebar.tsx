@@ -8,7 +8,7 @@
 // This is the "access anything, show anything on all tabs" surface.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Send, Sparkles, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut } from "lucide-react";
+import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut } from "lucide-react";
 import { Chip, Btn } from "./ui";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
@@ -44,6 +44,21 @@ const SUGGESTIONS = [
   "Search the web for B2 listening resources and save the best to a file",
 ];
 
+// History written before the agent's JSON-repair fix can carry raw turn objects
+// as the reply. Scrub them at render: unwrap a nested reply, never show braces.
+function scrubHistoryReply(reply: string | undefined): string | undefined {
+  const r = (reply ?? "").trim();
+  if (!r.startsWith("{") || !/"(thought|tool|final|args|reply)"/.test(r)) return reply;
+  const m = r.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (m) {
+    try {
+      const unwrapped = JSON.parse(`"${m[1]}"`) as string;
+      if (unwrapped.trim() && !unwrapped.trim().startsWith("{")) return unwrapped;
+    } catch {}
+  }
+  return "(older turn - the raw agent protocol leaked here; it is fixed now)";
+}
+
 export default function CoachSidebar({
   open,
   onOpenChange,
@@ -64,6 +79,7 @@ export default function CoachSidebar({
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [steps, setSteps] = useState<LiveStep[]>([]);
   const [running, setRunning] = useState(false);
+  const [finalArrived, setFinalArrived] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
@@ -83,7 +99,7 @@ export default function CoachSidebar({
             id: m.id,
             role: m.role as "user" | "coach",
             text: m.text,
-            reply: m.parsed?.reply,
+            reply: scrubHistoryReply(m.parsed?.reply),
             corrections: m.parsed?.corrections,
             commands: m.parsed?.commands,
             toolsUsed: m.parsed?.toolsUsed,
@@ -130,6 +146,7 @@ export default function CoachSidebar({
       setInput("");
       setRunning(true);
       setSteps([]);
+      setFinalArrived(false);
       setMessages((m) => [...m, { id: Date.now(), role: "user", text: message }]);
 
       try {
@@ -148,6 +165,7 @@ export default function CoachSidebar({
         const decoder = new TextDecoder();
         let buf = "";
         let final: { reply?: string; corrections?: { wrong: string; right: string }[]; commands?: AgentCommand[]; toolsUsed?: string[] } | null = null;
+        let lastError = "";
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -165,6 +183,7 @@ export default function CoachSidebar({
             } else if (ev.type === "observe") {
               setSteps((s) => [...s, { kind: "observe", label: ev.label ?? "", detail: ev.detail, ok: ev.ok }]);
             } else if (ev.type === "error") {
+              lastError = ev.label ?? "error";
               setSteps((s) => [...s, { kind: "error", label: ev.label ?? "error", detail: ev.detail }]);
             } else if (ev.type === "final") {
               final = { reply: ev.reply, corrections: ev.corrections, commands: ev.commands };
@@ -174,7 +193,20 @@ export default function CoachSidebar({
         if (final?.reply) {
           setMessages((m) => [...m, { id: Date.now() + 1, role: "coach", reply: final.reply, corrections: final.corrections, commands: final.commands }]);
           (final.commands ?? []).forEach(executeCommand);
+          setFinalArrived(true);
           void refresh();
+        } else {
+          // A run that ends without a final answer must still SAY something.
+          setMessages((m) => [
+            ...m,
+            {
+              id: Date.now() + 1,
+              role: "coach",
+              reply: lastError
+                ? `I hit a snag (${lastError}) before I could answer. Your message stands - send it again in a moment.`
+                : "The connection dropped mid-run. Send that again and I will pick it up.",
+            },
+          ]);
         }
       } catch {
         setSteps((s) => [...s, { kind: "error", label: "Connection dropped mid-run" }]);
@@ -197,7 +229,7 @@ export default function CoachSidebar({
           aria-label="Open coach sidebar"
           className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white shadow-[0_12px_32px_-8px_rgba(78,140,255,.7)] transition-transform hover:scale-105 active:scale-95"
         >
-          <Sparkles className="h-6 w-6" />
+          <GraduationCap className="h-6 w-6" />
           {state && state.due > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#ffb02e] text-[10px] font-black text-[#1a1405]">
               {state.due > 99 ? "99" : state.due}
@@ -217,7 +249,7 @@ export default function CoachSidebar({
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-white">
-              <Sparkles className="h-4.5 w-4.5" />
+              <GraduationCap className="h-4.5 w-4.5" />
             </div>
             <div>
               <div className="text-sm font-black text-[#f2f5fa]">Coach</div>
@@ -252,7 +284,7 @@ export default function CoachSidebar({
           {messages.length === 0 && steps.length === 0 && (
             <div className="rounded-2xl border border-[var(--rah-primary)]/20 bg-[#131c30] p-4">
               <div className="flex items-center gap-2 text-xs font-bold text-[#9dc0ff]">
-                <Sparkles className="h-3.5 w-3.5" /> An agent, not a chatbot
+                <GraduationCap className="h-3.5 w-3.5" /> An agent, not a chatbot
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-[#8b96a9]">
                 I can read your live state, write files, run code, search the web, and act across every tab. Ask for a plan, a drill file, or a decision - I will show my steps as I work.
@@ -309,20 +341,22 @@ export default function CoachSidebar({
             ),
           )}
 
-          {/* Live agent trace */}
-          {steps.length > 0 && (
+          {/* Live agent trace: visible WHILE working (and after a failure so the
+              steps stay inspectable); collapses once the final answer lands, so
+              the conversation shows one clean reply instead of tool noise. */}
+          {steps.length > 0 && (running || !finalArrived) && (
             <div className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-[#101726] p-3">
               <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#7d889c]">
-                <FileText className="h-3 w-3" /> working
+                <FileText className="h-3 w-3" /> agent trace
               </div>
               {steps.map((s, i) => (
-                <div key={i} className="flex items-start gap-2 text-[12px]">
-                  <span className={`mt-0.5 ${s.kind === "error" ? "text-[#ff6b6b]" : s.kind === "observe" ? (s.ok === false ? "text-[#ffb02e]" : "text-[#4ade80]") : s.kind === "tool" ? "text-[#9dc0ff]" : "text-[#8b96a9]"}`}>
+                <div key={i} className="flex items-start gap-2 text-[11px] leading-snug">
+                  <span className={`mt-0.5 shrink-0 ${s.kind === "error" ? "text-[#ff6b6b]" : s.kind === "observe" ? (s.ok === false ? "text-[#ffb02e]" : "text-[#4ade80]") : s.kind === "tool" ? "text-[#9dc0ff]" : "text-[#8b96a9]"}`}>
                     {stepIcon(s.kind)}
                   </span>
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-semibold text-[#dbe3f0]">{s.label}</span>
-                    {s.detail && <span className="text-[#7d889c]"> — {s.detail.slice(0, 160)}</span>}
+                    {s.detail && <span className="text-[#6b7688]"> — {s.detail.length > 110 ? `${s.detail.slice(0, 110)}…` : s.detail}</span>}
                   </div>
                 </div>
               ))}

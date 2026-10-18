@@ -54,6 +54,7 @@ or, when you have everything you need:
 
 RULES:
 1. Multi-step is expected: read_state before data-dependent advice; write_file + run_js for anything computational; web_search/page_reader for current facts. Chain tools across steps; one tool per turn.
+   MANDATORY: any question about the learner's level, streak, XP, gems, reviews, mistakes, progress, or "what should I do" REQUIRES read_state (and, when acting on it, a follow-up tool) BEFORE your final answer. Answering such questions without a tool call is a protocol violation - the [live context] hint is NOT enough.
 2. If a tool fails, fix the inputs and retry (different args, different approach). Do not give up after one failure.
 3. Workspace file paths are RELATIVE (e.g. "plan.md", "drills/week1.csv"). The sandbox rejects anything outside it.
 4. commands (client actions) you may include in the final object:
@@ -76,17 +77,134 @@ interface TurnDecision {
   commands?: AgentCommand[];
 }
 
-function extractTurn(raw: string): TurnDecision {
-  const cleaned = raw.trim().replace(/```(?:json)?/g, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  const body = start !== -1 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+// ---------- JSON repair: the model's #1 failure mode is a broken turn object ----------
+
+function tryParse(s: string): TurnDecision | null {
   try {
-    return JSON.parse(body) as TurnDecision;
+    const v = JSON.parse(s) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as TurnDecision) : null;
   } catch {
-    // Non-JSON reply: treat the whole text as a final answer rather than failing the turn.
-    return { final: true, reply: cleaned.slice(0, 2000), corrections: [], commands: [] };
+    return null;
   }
+}
+
+// String-aware scanner: finds the first COMPLETE top-level object, or repairs
+// trailing-unbalanced braces by closing the open stack. Handles quotes/escapes.
+function salvageObject(s: string): string | null {
+  const start = s.indexOf("{");
+  if (start === -1) return null;
+  let inStr = false;
+  let esc = false;
+  const stack: string[] = [];
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") {
+      const open = stack.pop();
+      if (!open || (open === "{" && c !== "}") || (open === "[" && c !== "]")) return null; // mismatched: unrepairable
+      if (stack.length === 0) return s.slice(start, i + 1); // first complete object
+    }
+  }
+  if (inStr) return null; // dangling string: unrepairable
+  if (stack.length && stack[0] !== "{") return null;
+  let out = s.slice(start);
+  while (stack.length) out += stack.pop() === "{" ? "}" : "]"; // close what the model left open
+  return out;
+}
+
+// Balanced-scan salvage for "args": { ... } even when the envelope is mangled.
+function salvageArgs(s: string): Record<string, unknown> | null {
+  const m = s.match(/"args"\s*:\s*/);
+  if (!m || m.index === undefined) return null;
+  const obj = salvageObject(s.slice(m.index + m[0].length));
+  if (!obj) return null;
+  const parsed = tryParse(obj);
+  return (parsed?.args as Record<string, unknown>) ?? null;
+}
+
+function salvageString(s: string, key: string): string | null {
+  const m = s.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`, "s"));
+  if (!m) return null;
+  try {
+    return JSON.parse(`"${m[1]}"`) as string;
+  } catch {
+    return m[1];
+  }
+}
+
+const looksLikeJson = (s: string) => /^\s*\{[\s\S]*"(thought|tool|final|reply|args)"[\s\S]*\}?\s*$/.test(s);
+
+// Exported for the drive battery: the repair logic is exactly what used to
+// leak raw JSON into the learner's chat, so the battery pins it.
+export function extractTurn(raw: string): { turn: TurnDecision; kind: "json" | "prose" | "junk" } {
+  const cleaned = raw.trim().replace(/```(?:json)?/g, "").trim();
+  if (!cleaned) return { turn: {}, kind: "junk" };
+
+  const start = cleaned.indexOf("{");
+  if (start === -1) {
+    // Prose without any braces: an acceptable final answer.
+    return { turn: { final: true, reply: cleaned.slice(0, 2000), corrections: [], commands: [] }, kind: "prose" };
+  }
+
+  const body = cleaned.slice(start);
+  let turn = tryParse(body) ?? tryParse(salvageObject(body) ?? "");
+  if (turn) return { turn, kind: "json" };
+
+  // Mangled JSON: salvage the pieces. A tool call must NEVER leak to the learner.
+  const toolM = body.match(/"tool"\s*:\s*"([a-zA-Z_]+)"/);
+  if (toolM) {
+    const args = salvageArgs(body) ?? {};
+    return { turn: { thought: salvageString(body, "thought") ?? "", tool: toolM[1], args }, kind: "json" };
+  }
+  const reply = salvageString(body, "reply");
+  if (reply) {
+    return { turn: { final: true, reply, corrections: [], commands: [] }, kind: "json" };
+  }
+  // JSON-shaped garbage (e.g. just a thought): junk - the loop nudges the model
+  // instead of showing the learner a wall of braces.
+  return { turn: {}, kind: looksLikeJson(body) ? "junk" : "prose" };
+}
+
+// Last line of defense: a final reply must never BE a turn object.
+export function sanitizeReply(reply: string, fallback: string): string {
+  const r = reply.trim();
+  if (!r) return fallback;
+  if (r.startsWith("{") && /"(thought|tool|final|args|reply)"/.test(r)) {
+    const inner = extractTurn(r);
+    const unwrapped = inner.turn.reply?.trim();
+    return unwrapped && !unwrapped.startsWith("{") ? unwrapped : fallback;
+  }
+  return r.slice(0, 4000);
+}
+
+// Model call with 429/quota-aware retries: one hiccup should not kill the turn.
+const MODEL_RETRY_DELAYS = [1500, 4000];
+async function callModel(
+  zai: { chat: { completions: { create: (args: unknown) => Promise<{ choices?: { message?: { content?: string } }[] }> } } },
+  messages: { role: string; content: string }[],
+  emit?: (e: AgentEvent) => void,
+): Promise<string | null> {
+  for (let attempt = 0; attempt <= MODEL_RETRY_DELAYS.length; attempt++) {
+    try {
+      const res = await zai.chat.completions.create({ messages } as never);
+      return String(res?.choices?.[0]?.message?.content ?? "");
+    } catch (e) {
+      const msg = (e as Error).message ?? String(e);
+      const retriable = /429|rate|quota|temporar|timeout|timed out|502|503|504|529|network|econn|fetch failed|socket/i.test(msg);
+      if (attempt < MODEL_RETRY_DELAYS.length && retriable) {
+        emit?.({ type: "error", label: `Model hiccup (${attempt + 1}) - retrying`, detail: msg.slice(0, 140) });
+        await new Promise((r) => setTimeout(r, MODEL_RETRY_DELAYS[attempt]));
+        continue;
+      }
+      emit?.({ type: "error", label: "Model unreachable", detail: msg.slice(0, 200) });
+      return null;
+    }
+  }
+  return null;
 }
 
 export async function runAgent(
@@ -111,29 +229,41 @@ export async function runAgent(
     },
   ];
 
-  const zai = await ZAI.create();
+  const zai = (await ZAI.create()) as unknown as Parameters<typeof callModel>[0];
+
+  const UNREACHABLE = "The model is unreachable right now (quota or network). Your message stands; try again in a moment.";
+  let nudges = 0; // thought-only / junk turns: feed the model back on track instead of dead-ending
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    let raw: string;
-    try {
-      const res = await zai.chat.completions.create({ messages } as never);
-      raw = String(res?.choices?.[0]?.message?.content ?? "");
-    } catch (e) {
-      push({ type: "error", label: "Model unreachable", detail: (e as Error).message });
-      return {
-        reply: "The model is unreachable right now (quota or network). Your message stands; try again in a moment.",
-        corrections: [],
-        commands: [],
-        steps,
-        toolsUsed,
-      };
+    const raw = await callModel(zai, messages, push);
+    if (raw === null) {
+      return { reply: UNREACHABLE, corrections: [], commands: [], steps, toolsUsed };
     }
 
-    const turn = extractTurn(raw);
+    const { turn, kind } = extractTurn(raw);
     const thought = turn.thought ?? "";
 
+    // Thought-only / JSON junk: NOT a final answer. Nudge the model back on
+    // protocol (max twice) instead of showing the learner "no output".
+    if (!turn.final && !turn.tool && kind !== "prose") {
+      if (nudges < 2 && step < MAX_STEPS - 1) {
+        nudges += 1;
+        push({ type: "error", label: "Unclear step - re-running", ok: false });
+        messages.push({ role: "assistant", content: raw });
+        messages.push({
+          role: "user",
+          content: 'That was not a valid turn (a thought without a tool call and without final:true). Answer with EXACTLY one JSON object: {"thought":"...","tool":"<tool>","args":{...}} to act, or {"thought":"...","final":true,"reply":"...","corrections":[],"commands":[]} to answer the learner directly.',
+        });
+        continue;
+      }
+      // Nudge budget spent: close from whatever the model DID say.
+      const reply = sanitizeReply(thought || raw, "I could not form a clean answer that time. Send it again and I will take another run.");
+      push({ type: "final", reply, commands: [] });
+      return { reply, corrections: [], commands: [], steps, toolsUsed };
+    }
+
     if (turn.final || !turn.tool) {
-      const reply = String(turn.reply ?? "").trim() || "I ran out of useful moves; rephrase and I will take another run at it.";
+      const reply = sanitizeReply(String(turn.reply ?? ""), "I ran out of useful moves; rephrase and I will take another run at it.");
       push({ type: "final", reply, commands: turn.commands ?? [] });
       return {
         reply,
@@ -179,13 +309,8 @@ export async function runAgent(
     role: "user",
     content: 'Step budget exhausted. Emit the final object NOW: {"thought":"...","final":true,"reply":"...","corrections":[],"commands":[]}',
   });
-  try {
-    const res = await zai.chat.completions.create({ messages } as never);
-    const turn = extractTurn(String(res?.choices?.[0]?.message?.content ?? ""));
-    const reply = String(turn.reply ?? "").trim() || "I ran my step budget before finishing; ask me to continue and I will pick up where I left off.";
-    push({ type: "final", reply, commands: turn.commands ?? [] });
-    return { reply, corrections: Array.isArray(turn.corrections) ? turn.corrections : [], commands: Array.isArray(turn.commands) ? turn.commands : [], steps, toolsUsed };
-  } catch {
+  const raw = await callModel(zai, messages, push);
+  if (raw === null) {
     return {
       reply: "I hit the step budget and the model went quiet. The work so far is in my step trace; ask again and I will resume.",
       corrections: [],
@@ -194,4 +319,11 @@ export async function runAgent(
       toolsUsed,
     };
   }
+  const { turn } = extractTurn(raw);
+  const reply = sanitizeReply(
+    String(turn.reply ?? "") || (turn.thought ?? ""),
+    "I ran my step budget before finishing; ask me to continue and I will pick up where I left off.",
+  );
+  push({ type: "final", reply, commands: turn.commands ?? [] });
+  return { reply, corrections: Array.isArray(turn.corrections) ? turn.corrections : [], commands: Array.isArray(turn.commands) ? turn.commands : [], steps, toolsUsed };
 }
