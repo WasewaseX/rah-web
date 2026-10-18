@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Chip } from "./ui";
 import HomeView from "./Home";
+import PwaBootstrap from "./PwaBootstrap";
 import ReviewView from "./Review";
 import PlacementView from "./Placement";
 import ChatView from "./Chat";
@@ -160,6 +161,7 @@ export default function RahApp() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--rah-bg)] md:flex-row">
+      <PwaBootstrap />
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0e1421] via-[#101725] to-[#0d1119] px-4 py-6 md:flex">
         <div className="mb-9 flex items-center gap-3 px-2">

@@ -23,6 +23,12 @@ export const metadata: Metadata = {
   description:
     "English learning platform for Farsi speakers: FSRS-5 spaced retrieval, a built-in AI coach, writing and speaking labs, listening decoding, and honest measurement.",
   keywords: ["English", "Farsi", "Persian", "B2", "C1", "FSRS", "spaced repetition", "AI tutor"],
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Rah" },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
