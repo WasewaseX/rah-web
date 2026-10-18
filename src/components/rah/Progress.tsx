@@ -3,7 +3,7 @@
 // Progress: honest numbers only. 5 week activity grid, per unit maturity,
 // per skill leak rate, writing and speaking score trends, coach advice.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart, Scale, Compass } from "lucide-react";
 import { Card, Chip, Note, Bar, Btn } from "./ui";
 import { handCoach } from "@/lib/bus";
@@ -36,6 +36,8 @@ interface Data {
   writeTrend: { avg: number }[];
   speakTrend: { avg: number }[];
   skillLevels: { skill: string; level: string; score: number; samples: number }[];
+  bands?: { band: string; skills: { skill: string; score: number; samples: number }[]; exams: { graded: number; passed: number; bestPct: number }; proven: boolean }[];
+  placementBand?: string;
   totals: { reviews: number; lapses: number; cards: number; started: number };
 }
 
@@ -127,6 +129,53 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
           </div>
         </div>
       </Card>
+
+      {/* P5: CEFR band map - proven vs honestly unproven */}
+      {data.bands && data.bands.length > 0 && (
+        <Card>
+          <div className="mb-1 flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]">
+              <Compass className="h-4 w-4" />
+            </div>
+            <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Band map</span>
+          </div>
+          <div className="mb-3 text-xs font-medium text-[#7d889c]">
+            Where the evidence actually sits. Green = measured by skills or exams; dim = no proof yet. The engine rates it, never the AI.
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {data.bands.map((b) => {
+              const isPlacement = (data.placementBand ?? "?").toUpperCase() === b.band;
+              return (
+                <div
+                  key={b.band}
+                  className={`rounded-2xl border p-3 text-center ${
+                    b.proven
+                      ? "border-[#7ee0b8]/40 bg-[#7ee0b8]/[0.08]"
+                      : "border-white/[0.06] bg-white/[0.02]"
+                  }`}
+                >
+                  <div className={`text-lg font-black tracking-tight ${b.proven ? "text-[#7ee0b8]" : "text-[#5b6577]"}`}>{b.band}</div>
+                  {isPlacement && <div className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-[#ffd08a]">you are here</div>}
+                  {b.proven ? (
+                    <div className="mt-1.5 space-y-0.5 text-[10px] font-semibold leading-tight text-[#9db3a8]">
+                      {b.skills.slice(0, 2).map((s) => (
+                        <div key={s.skill}>{s.skill} {Math.round(s.score * 100)}%</div>
+                      ))}
+                      {b.exams.graded > 0 && (
+                        <div>
+                          exams {b.exams.passed}/{b.exams.graded}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 text-[10px] font-semibold text-[#5b6577]">unproven</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* War room: mastery radar */}
       <Card>
@@ -361,6 +410,9 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
         <BattleCardButton variant="primary" />
       </Card>
 
+      {/* P5: the learner owns the state - full export / validated restore */}
+      <BackupPanel />
+
       {/* Mind reader: the coach's memory, visible and editable */}
       <MindReader onChange={() => undefined} />
 
@@ -398,5 +450,97 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
         </Card>
       )}
     </div>
+  );
+}
+
+// P5: the learner owns the state. Download the hash-sealed bundle, or
+// restore from one - dry-run first, real import only after the learner
+// confirms the diff. A wrong or edited file is refused before any write.
+function BackupPanel() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: "emerald" | "rose"; text: string } | null>(null);
+  const pending = useRef<{ bundle: unknown; counts: Record<string, number> } | null>(null);
+
+  const pickFile = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setBusy(true);
+      setMsg(null);
+      try {
+        const bundle = JSON.parse(await file.text());
+        const dry = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundle, dryRun: true }),
+        });
+        const dj = await dry.json();
+        if (!dry.ok) throw new Error(dj.error ?? "This file cannot be restored.");
+        const total = Object.values(dj.counts as Record<string, number>).reduce((a, b) => a + b, 0);
+        pending.current = { bundle, counts: dj.counts };
+        setMsg({ tone: "emerald", text: `Valid bundle (${total} rows). Press Restore to replace ALL current data with it.` });
+      } catch (e) {
+        setMsg({ tone: "rose", text: (e as Error).message });
+      } finally {
+        setBusy(false);
+      }
+    };
+    input.click();
+  };
+
+  const restore = async () => {
+    if (!pending.current) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bundle: pending.current.bundle }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Restore failed.");
+      setMsg({ tone: "emerald", text: "Restored. Reloading with your imported state." });
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      setMsg({ tone: "rose", text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Your data, portable</div>
+      <p className="mt-1 text-sm leading-relaxed text-[#a9b4c6]">
+        Download every table as one hash-sealed file, or restore from a previous export. The hash is verified before anything is touched - an edited or corrupt file is refused, never half-applied.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Btn
+          variant="primary"
+          disabled={busy}
+          onClick={() => {
+            window.open("/api/export", "_blank");
+          }}
+        >
+          Download backup
+        </Btn>
+        <Btn disabled={busy} onClick={pickFile}>
+          {busy ? "Working..." : "Choose a backup to restore"}
+        </Btn>
+        {pending.current && (
+          <Btn variant="primary" disabled={busy} onClick={restore}>
+            Restore
+          </Btn>
+        )}
+      </div>
+      {msg && (
+        <div className="mt-3">
+          <Note tone={msg.tone}>{msg.text}</Note>
+        </div>
+      )}
+    </Card>
   );
 }

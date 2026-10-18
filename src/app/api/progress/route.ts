@@ -64,6 +64,34 @@ export async function GET() {
   const totalLapses = await db.reviewLog.count({ where: { grade: 1 } });
   const skillLevels = await getSkillLevels();
 
+  // P5: the CEFR band map's evidence, computed from real rows only - the
+  // engine decides what is proven, nothing here asks the AI. A band is
+  // PROVEN when a measured skill sits at that level or a recent graded exam
+  // targeted it; otherwise the band is honestly unproven.
+  const learner = await db.learner.findUnique({ where: { id: "me" } });
+  const gradedExams = await db.exam.findMany({ where: { status: "graded" }, orderBy: { createdAt: "desc" }, take: 20 });
+  const examByBand: Record<string, { graded: number; passed: number; bestPct: number }> = {};
+  for (const e of gradedExams) {
+    try {
+      const spec = JSON.parse(e.spec) as { level?: string };
+      const result = JSON.parse(e.result ?? "{}") as { pct?: number };
+      const band = String(spec.level ?? "?").toUpperCase();
+      if (!band) continue;
+      examByBand[band] ??= { graded: 0, passed: 0, bestPct: 0 };
+      examByBand[band].graded += 1;
+      if ((result.pct ?? 0) >= 60) examByBand[band].passed += 1;
+      examByBand[band].bestPct = Math.max(examByBand[band].bestPct, result.pct ?? 0);
+    } catch {
+      // malformed spec: skip that exam's band evidence
+    }
+  }
+  const BANDS = ["A1", "A2", "B1", "B2", "C1"] as const;
+  const bands = BANDS.map((band) => {
+    const skills = skillLevels.filter((s) => s.level === band).map((s) => ({ skill: s.skill, score: s.score, samples: s.samples }));
+    const exams = examByBand[band] ?? { graded: 0, passed: 0, bestPct: 0 };
+    return { band, skills, exams, proven: skills.length > 0 || exams.graded > 0 };
+  });
+
   return NextResponse.json({
     days,
     byUnit: Object.entries(byUnit).map(([unit, u]) => ({ unit, ...u })),
@@ -72,6 +100,8 @@ export async function GET() {
     writeTrend,
     speakTrend,
     skillLevels,
+    bands,
+    placementBand: learner?.level ?? "?",
     totals: {
       reviews: totalReviews,
       lapses: totalLapses,
