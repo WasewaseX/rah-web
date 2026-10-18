@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
+import { ladderFor } from "@/lib/ladder";
 import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
 import { buildDungeonFloors, normalizeAnswer, type ArcadeItem, type DungeonFloor } from "@/lib/arcade-items";
 import type { XpResult } from "@/lib/arcade";
@@ -38,7 +39,7 @@ async function loadRun(): Promise<{ id: string; state: DungeonState; isNew: bool
       // corrupted row: fall through to rebuild
     }
   }
-  const floors = await buildDungeonFloors(day);
+  const floors = await buildDungeonFloors(day, ladderFor(l.level).band);
   const maxHearts = freshHearts() + (hasPerk(l.perks, "dungeon_heart") ? 1 : 0);
   const state: DungeonState = { floors, answers: Array(ITEM_COUNT).fill(null), hearts: maxHearts, maxHearts, done: false, cleared: 0, hits: 0 };
   await db.runState.upsert({ where: { id }, create: { id, day, state: JSON.stringify(state) }, update: { day, state: JSON.stringify(state) } });

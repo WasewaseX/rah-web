@@ -4,6 +4,7 @@ import { aiJson, speakSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
+import { ladderFor, ladderBrief } from "@/lib/ladder";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +39,12 @@ export async function POST(req: Request) {
   if (t.length < 30) return NextResponse.json({ error: "The transcript is too short. Speak for at least 30 seconds." }, { status: 400 });
 
   const profile = await buildProfile();
+  // P3: the ladder sets the grading bar - a B1 learner is judged on
+  // intelligibility, a C1 speaker on register and collocation precision.
+  const lad = ladderFor(profile.level);
   let result: SpeakResult;
   try {
-    result = await aiJson<SpeakResult>(speakSystem(profile.level), [
+    result = await aiJson<SpeakResult>(`${speakSystem(profile.level)}\n\n${ladderBrief(lad, "speak")}`, [
       { role: "user", content: `Prompt: ${prompt}\nRound: ${round ?? 1}\nTranscript:\n${t.slice(0, 5000)}` },
     ]);
   } catch (e) {

@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { BookOpen, Clock, Sparkles, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "./ui";
 import { READINGS } from "@/lib/content";
+import { ladderFor, orderReadings, type Band } from "@/lib/ladder";
 import type { AppState } from "./App";
 
 interface Quiz {
@@ -23,6 +24,12 @@ export default function ReadView({ state }: { state: AppState }) {
   const [error, setError] = useState<string | null>(null);
 
   const reading = useMemo(() => READINGS.find((r) => r.id === openId), [openId]);
+  // P3: the ladder orders the shelf - the learner's band first, adjacent
+  // bands after. The six anchor texts stay; their ORDER follows the band.
+  const shelf = useMemo(
+    () => orderReadings(READINGS, ladderFor(state.learner.level).band as Band),
+    [state.learner.level],
+  );
 
   const makeQuiz = useCallback(async (id: string) => {
     const r0 = READINGS.find((x) => x.id === id);
@@ -54,7 +61,7 @@ export default function ReadView({ state }: { state: AppState }) {
           </p>
         )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {READINGS.map((r) => (
+          {shelf.map((r) => (
             <button key={r.id} onClick={() => setOpenId(r.id)} className="group text-left">
               <Card className="h-full transition-all duration-200 group-hover:-translate-y-1 group-hover:border-white/[0.14] group-hover:shadow-[0_16px_40px_-20px_rgba(78,140,255,.35)]">
                 <div className="flex items-start gap-4">
@@ -64,7 +71,7 @@ export default function ReadView({ state }: { state: AppState }) {
                   <div>
                     <div className="font-extrabold tracking-tight text-[#f2f5fa]">{r.title}</div>
                     <div className="mt-1.5 flex items-center gap-2">
-                      <Chip tone="blue">{r.level}</Chip>
+                      <Chip tone={String(r.level).toUpperCase() === ladderFor(state.learner.level).band ? "emerald" : "blue"}>{r.level}{String(r.level).toUpperCase() === ladderFor(state.learner.level).band ? " · your band" : ""}</Chip>
                       <span className="flex items-center gap-1 text-xs font-semibold text-[#7d889c]">
                         <Clock className="h-3 w-3" /> {r.minutes} min
                       </span>

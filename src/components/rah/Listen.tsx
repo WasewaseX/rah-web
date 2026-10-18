@@ -13,6 +13,7 @@ interface ListenQuiz {
   title: string;
   text: string;
   questions: { q: string; choices: string[]; a: string; why: string }[];
+  ladder?: { band: string; ttsRate: number }; // P3: the envelope the material was written against
 }
 
 const PASSES = [
@@ -30,6 +31,9 @@ export default function ListenView({ state }: { state: AppState }) {
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
+  // P3: the base pace comes from the envelope the material was written
+  // against (B1 slower, C1 faster); the chips stay RELATIVE speed on top of it.
+  const [baseRate, setBaseRate] = useState(0.92);
   const [pass, setPass] = useState(1);
   const [showText, setShowText] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -67,6 +71,7 @@ export default function ListenView({ state }: { state: AppState }) {
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "Generation failed.");
+        if (j.ladder?.ttsRate) setBaseRate(Number(j.ladder.ttsRate) || 0.92);
         setQuiz(j);
       } catch (e) {
         setError((e as Error).message);
@@ -87,7 +92,7 @@ export default function ListenView({ state }: { state: AppState }) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(quiz.text);
     u.lang = "en-US";
-    u.rate = rate;
+    u.rate = Math.min(2, Math.max(0.5, baseRate * rate));
     u.onend = () => setPlaying(false);
     utterRef.current = u;
     window.speechSynthesis.speak(u);

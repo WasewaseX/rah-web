@@ -245,7 +245,7 @@ Never use the em dash character anywhere in your output.`;
 
 // Listening decoder: generate a fresh graded monologue.
 export function listenSystem(level: string): string {
-  return `You write listening material inside Rah, an English app for Farsi speakers targeting ${level}. Produce ONE natural spoken-mono monologue (as if a person is talking, with hesitations kept minimal, contractions used) on the requested topic. Length: ${level === "C1" ? "220 to 280" : "160 to 220"} words. Then 4 comprehension questions: two literal, two inferential, each mcq with 4 choices.
+  return `You write listening material inside Rah, an English app for Farsi speakers targeting ${level}. Produce ONE natural spoken-mono monologue (as if a person is talking, with hesitations kept minimal, contractions used) on the requested topic. The user message carries a DIFFICULTY ENVELOPE - obey its word-count band, sentence-length band, and idiom density exactly; the envelope wins over any default. Then 4 comprehension questions: two literal, two inferential, each mcq with 4 choices.
 
 Output ONE JSON object, nothing else:
 {"title": "short title", "text": "the monologue", "questions": [{"q": "", "choices": ["", "", "", ""], "a": "exact correct choice", "why": "one line in English"}]}

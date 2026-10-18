@@ -185,7 +185,7 @@ const FLOOR_META = [
 // The Daily Dungeon: 3 floors x 4 items, seeded by the day index so every
 // attempt today walks the same rooms. Difficulty climbs floor by floor and
 // weak-tag cards are stacked into the deep floors where they hurt most.
-export async function buildDungeonFloors(day: number): Promise<DungeonFloor[]> {
+export async function buildDungeonFloors(day: number, band = "B2"): Promise<DungeonFloor[]> {
   const favored = await weakTags();
   const hot = DECK.filter((c) => c.traps.some((t) => favored.includes(t)));
   const b1 = DECK.filter((c) => ["A2", "B1"].includes(c.level));
@@ -206,10 +206,21 @@ export async function buildDungeonFloors(day: number): Promise<DungeonFloor[]> {
     return out;
   };
   const floors: DungeonFloor[] = [];
+  // P3: the band sets the staircase's FLOOR, not just its ceiling. A2/B1
+  // learners climb on B1/B2 material with C1 as spice; C1 learners get C1
+  // mixed in from the first floor. B2 keeps the classic staircase.
+  const lowBand = band === "A2" || band === "B1";
+  const highBand = band === "C1";
+  const floor3Pool = lowBand
+    ? [...seededShuffle(b2, day + 4), ...seededShuffle(c1, day + 5), ...rest]
+    : [...seededShuffle(c1.length ? c1 : b2, day + 4), ...rest];
+  const floor1Pool = highBand
+    ? [...seededShuffle([...b2, ...c1], day + 2), ...rest]
+    : [...seededShuffle(b1, day + 2), ...rest];
   const plans = [
-    { cards: [...seededShuffle(b1, day + 2), ...rest], kind: 0, meta: FLOOR_META[0] },
+    { cards: floor1Pool, kind: 0, meta: FLOOR_META[0] },
     { cards: [...hotPool.slice(0, 6), ...seededShuffle(b2, day + 3), ...rest], kind: 1, meta: FLOOR_META[1] },
-    { cards: [...hotPool.slice(2, 10), ...seededShuffle(c1.length ? c1 : b2, day + 4), ...rest], kind: 2, meta: FLOOR_META[2] },
+    { cards: [...hotPool.slice(2, 10), ...floor3Pool], kind: 2, meta: FLOOR_META[2] },
   ];
   let used = new Set<string>();
   for (const p of plans) {
