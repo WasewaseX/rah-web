@@ -166,7 +166,10 @@ try {
     const examLogs = await prisma.reviewLog.findMany({ where: { cardId: { in: cardCols }, source: "exam" } });
     check(examLogs.length === 2 && examLogs.every((l) => l.day === today), "provenance: two ReviewLog rows with source=exam", JSON.stringify(examLogs.length));
     const totalLogs = await prisma.reviewLog.count();
-    check(totalLogs === logsBeforeCount + 2, "provenance: exactly two new log rows", `${totalLogs} vs ${logsBeforeCount}`);
+    // Snapshot-aware: pre-existing exam-source rows for the target cards were
+    // deleted by the clean-slate step, so the expected total is
+    // before - pre-existing + 2 new.
+    check(totalLogs === logsBeforeCount - examLogsBefore.length + 2, "provenance: exactly two new log rows", `${totalLogs} vs ${logsBeforeCount - examLogsBefore.length + 2}`);
 
     // 5) queue surfacing on the real-world timeline: yesterday's bomb is
     // due TODAY. Pin the healing card due now and prove the queue renders

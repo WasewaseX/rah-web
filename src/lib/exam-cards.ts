@@ -28,6 +28,7 @@ import type { ExamItem } from "@/lib/agent/types";
 //     gives no confidence signal, so never 4), wrong = 1.
 
 export const EXAM_CARD_PREFIX = "exam:";
+export const LISTEN_CARD_PREFIX = "listen:";
 
 export interface ExamCardTarget {
   cardId: string;
@@ -89,7 +90,11 @@ export function resolveExamCardTargets(
 // Write the resolved outcomes through the SAME FSRS pipe the review route
 // uses. No arcade calls here on purpose: exam XP/misses are already awarded
 // by the exam route - scheduling is evidence capture, not a second reward.
-export async function scheduleExamOutcomes(targets: ExamCardTarget[]): Promise<ScheduledOutcome[]> {
+// source marks the ReviewLog provenance: "exam" (P1) or "dictation" (P4).
+export async function scheduleExamOutcomes(
+  targets: ExamCardTarget[],
+  source: "exam" | "dictation" | "shadow" = "exam",
+): Promise<ScheduledOutcome[]> {
   if (targets.length === 0) return [];
   const l = await getLearner();
   const today = dayIndex();
@@ -108,19 +113,39 @@ export async function scheduleExamOutcomes(targets: ExamCardTarget[]): Promise<S
       create: { cardId: t.cardId, s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl, dir: "" },
       update: { s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl },
     });
-    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source: "exam" } });
+    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source } });
     out.push({ cardId: t.cardId, due: res.due, grade: t.grade, via: t.via });
   }
   return out;
 }
 
-// Render a synthetic "exam:<tag>" card at queue time from the family's own
-// evidence. kind "sent" on purpose: its retrieval directions are cloze +
-// audio only, which is all an evidence-derived card can honestly offer (no
-// Farsi field exists for it, so fa2en/reverse would be fake).
+// Deterministic deck resolution for a single token: the deck card whose
+// answer / en / alt equals it, first in deck order. Shared by the dictation
+// route so a slipped word that IS a deck word schedules the REAL card.
+export function deckCardForToken(token: string): Card | null {
+  const key = normToken(token);
+  if (!key) return null;
+  return (
+    DECK.find(
+      (c) =>
+        normToken(c.answer) === key ||
+        normToken(c.en) === key ||
+        c.alt.some((a) => normToken(a) === key),
+    ) ?? null
+  );
+}
+
+// Render a synthetic healing card at queue time from the family's own
+// evidence. Handles BOTH namespaces the FSRS bridge writes:
+//   exam:<tag>    - a tagged exam miss resurfacing
+//   listen:<tok>  - a dictation/read-aloud slip resurfacing
+// kind "sent" on purpose: its retrieval directions are cloze + audio only,
+// which is all an evidence-derived card can honestly offer (no Farsi field
+// exists for it, so fa2en/reverse would be fake).
 export async function derivedExamCard(cardId: string): Promise<Card | null> {
-  if (!cardId.startsWith(EXAM_CARD_PREFIX)) return null;
-  const tag = cardId.slice(EXAM_CARD_PREFIX.length);
+  const prefix = [EXAM_CARD_PREFIX, LISTEN_CARD_PREFIX].find((p) => cardId.startsWith(p));
+  if (!prefix) return null;
+  const tag = cardId.slice(prefix.length);
   if (!tag) return null;
   const family = await db.mistakeFamily.findFirst({
     where: { tag, OR: [{ resolvedAt: null }, { resolvedAt: { gt: new Date(0) } }] },
@@ -131,8 +156,8 @@ export async function derivedExamCard(cardId: string): Promise<Card | null> {
   if (!blanked) return null;
   return {
     id: cardId,
-    unit: "exam_healing",
-    skill: family.kind, // where the miss happened: exam | writing | chat | ...
+    unit: prefix === LISTEN_CARD_PREFIX ? "listen_healing" : "exam_healing",
+    skill: family.kind, // where the miss happened: exam | listen | writing | chat | ...
     level: "trap",
     kind: "sent",
     prompt: blanked.prompt,
@@ -140,7 +165,7 @@ export async function derivedExamCard(cardId: string): Promise<Card | null> {
     alt: [blanked.answer.toLowerCase()],
     en: blanked.prompt.replace("___", blanked.answer),
     fa: "",
-    note: `Healing target: ${family.label}. Resurfaced from your own recorded miss.`,
+    note: `${prefix === LISTEN_CARD_PREFIX ? "Listening slip" : "Healing target"}: ${family.label}. Resurfaced from your own recorded miss.`,
     traps: [],
     distractors: [],
   };

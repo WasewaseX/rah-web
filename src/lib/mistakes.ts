@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { noteTagOutcome } from "@/lib/mastery";
 
 export interface MistakeInput {
-  kind: "chat" | "writing" | "speak" | "exam" | "placement";
+  kind: "chat" | "writing" | "speak" | "exam" | "placement" | "listen";
   tag: string; // raw trap tag from the model, e.g. "statives", "none"
   wrong: string;
   right: string;
