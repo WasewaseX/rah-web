@@ -13,6 +13,7 @@ import { noteExamAnswer } from "@/lib/mistakes";
 import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
 import { arbitrateMisses, vetItems } from "./exam-ai";
 import { itemAnswerable, evidenceItem } from "./exam-gate";
+import { resolveExamCardTargets, scheduleExamOutcomes } from "@/lib/exam-cards";
 
 function newId(): string {
   return `ex${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -420,6 +421,21 @@ export async function gradeExamSubmission(
   const correct = verdicts.filter((v) => v.correct).length;
   const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
+  // P1 exam->FSRS unification: final verdicts land on the FSRS schedule.
+  // Deck-matched items reschedule their real card (bomb pulls it due today,
+  // pass extends it); tagged items without a deck match land in the
+  // exam:<tag> healing namespace and resurface in the review queue as
+  // evidence-derived cloze cards. Nothing resolves -> nothing schedules;
+  // the learner is never charged an outcome the exam did not actually earn.
+  let scheduled: Awaited<ReturnType<typeof scheduleExamOutcomes>> = [];
+  try {
+    const targets = resolveExamCardTargets(items, verdicts);
+    scheduled = await scheduleExamOutcomes(targets);
+  } catch {
+    // Scheduling must never break grading - the exam result stands on its own.
+    scheduled = [];
+  }
+
   const bySkillMap = new Map<string, { correct: number; total: number }>();
   for (const v of verdicts) {
     const agg = bySkillMap.get(v.skill) ?? { correct: 0, total: 0 };
@@ -439,7 +455,7 @@ export async function gradeExamSubmission(
         ? `Solid: ${correct}/${total}. ${weakest ? `Your leak is ${weakest.skill}; that is where the next session goes.` : "Consistent B2 performance."}`
         : `${correct}/${total}. The gap is specific, not general: ${weakest ? `${weakest.skill} broke first. Drill it before the next exam.` : "the fundamentals need another pass."}`;
 
-  const result: ExamResult = { total, answered, correct, pct, bySkill, verdicts, headline };
+  const result: ExamResult = { total, answered, correct, pct, bySkill, verdicts, headline, scheduled };
 
   await db.exam.update({ where: { id: examId }, data: { status: "graded", result: JSON.stringify(result) } });
   // Feed the per-skill level engine with the exam outcome.

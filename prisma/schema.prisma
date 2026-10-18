@@ -54,6 +54,7 @@ model ReviewLog {
   ivl    Int
   day    Int
   at     DateTime @default(now())
+  source String   @default("review") // review | exam | dictation | shadow: where the outcome was earned
 }
 
 model Placement {

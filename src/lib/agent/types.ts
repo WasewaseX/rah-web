@@ -99,6 +99,9 @@ export interface ExamResult {
   bySkill: { skill: string; correct: number; total: number }[];
   verdicts: ExamVerdict[];
   headline: string;
+  // P1 exam->FSRS unification: the cards this exam's outcomes landed on.
+  // Empty when nothing resolved (no deck match, no tag) - never invented.
+  scheduled?: { cardId: string; due: number; grade: number; via: "deck" | "family" }[];
 }
 
 export interface SkillLevelRow {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { DECK, cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
+import { derivedExamCard } from "@/lib/exam-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,15 @@ export async function GET() {
   }).slice(0, newBudget);
 
   // Interleave: 2 due for every 1 new, shuffled inside each pool so skills mix.
-  const dueCards = dueStates.map((s) => cardById(s.cardId)).filter((c): c is Card => !!c);
+  // Deck cards resolve from content; exam:<tag> healing cards (written by the
+  // exam->FSRS bridge) resolve at queue time from the family's own recorded
+  // evidence. A family with no evidence or no unblankable correction drops
+  // out honestly instead of rendering a broken card.
+  const dueCards = (
+    await Promise.all(
+      dueStates.map(async (s) => cardById(s.cardId) ?? (await derivedExamCard(s.cardId))),
+    )
+  ).filter((c): c is Card => !!c);
   const pool: Card[] = [];
   const d = shuffle(dueCards);
   const n = shuffle(newCards);

@@ -119,7 +119,11 @@ export function itemAnswerable(r: GateInput): GateVerdict {
 // Deterministic, free, and honest by construction. The correction is
 // preferred over bystander diffs: "childrens -> children are playing" must
 // blank "children", not "playing".
-export function evidenceItem(tag: string, evidence: string): ExamItem | null {
+// Shared blanking core: given "wrong -> right" evidence, find the correction
+// token in the right sentence and blank it. Exported so the exam->FSRS bridge
+// (exam-cards.ts) derives review cards with the EXACT same heuristic the exam
+// gate uses - one source of truth for what "the correction" is.
+export function blankCorrection(evidence: string): { prompt: string; answer: string } | null {
   const [wrong, right] = evidence.split(" -> ").map((s) => s.trim());
   if (!wrong || !right) return null;
   const wrongTokens = (wrong.match(/[A-Za-z']+/g) ?? []).map((t) => t.toLowerCase());
@@ -135,13 +139,20 @@ export function evidenceItem(tag: string, evidence: string): ExamItem | null {
   );
   const answer = correction ?? [...diffs].sort((a, b) => b.length - a.length)[0];
   if (answer.length < 2) return null;
-  const blanked = right.replace(new RegExp(`\\b${answer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), "___");
-  if (!blanked.includes("___")) return null;
+  const prompt = right.replace(new RegExp(`\\b${answer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), "___");
+  if (!prompt.includes("___")) return null;
+  return { prompt, answer };
+}
+
+export function evidenceItem(tag: string, evidence: string): ExamItem | null {
+  const blanked = blankCorrection(evidence);
+  if (!blanked) return null;
+  const { prompt, answer } = blanked;
   return {
     id: `ev-${tag}-${Math.random().toString(36).slice(2, 7)}`,
     type: "cloze",
     skill: "grammar",
-    q: blanked,
+    q: prompt,
     a: answer,
     accept: [...new Set([answer, answer.toLowerCase()])],
     why: "Resurfaced from your own recorded miss on this pattern.",
