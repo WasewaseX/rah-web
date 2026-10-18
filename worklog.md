@@ -512,3 +512,23 @@ Work Log:
 
 Stage Summary:
 - The Close Every Loop wave is complete: exam->FSRS unified (P1), PWA + habit loop (P2), one ladder steering every generator (P4's dictation slips included), listening slips scheduled as reviews (P4), and the learner owns a hash-sealed portable state with an honest band map (P5). Every pillar shipped with its own live drive, and the standing regression battery stayed green throughout.
+
+---
+Task ID: 34
+Agent: Super Z (main)
+Task: "did you implement reverse engineering completely? also reverse engineer duolingo" - DUOLINGO-RE wave (differential RE of Duolingo's engine + word-bank adoption).
+
+Work Log:
+- Answered the question with live proof: Task 26's RE is complete and regression-locked (FSRS PARITY PASS re-run: 400 randomized sequences, zero divergence from ts-fsrs v4.6.1; LanguageTool fast path shipped; REA/Frida/angr correctly rejected for open-source targets in favor of differential source-level testing).
+- D1: cloned Duolingo's ACTUAL HLR reference implementation (github.com/duolingo/halflife-regression, MIT, experiment.py 304 lines, unmodified) + their py2->py3 shim (math untouched, order-pin for parity). Ported 1:1 to src/lib/hlr.ts (features sqrt(1+right)/sqrt(1+wrong), h=clip(2^(w.x), 15min..274d), p=2^(-t/h), their exact SGD gradients + hyperparams, Leitner/Pimsleur baselines, their Pearson-named-"spearmanr" quirk kept for comparability).
+- Downloaded their 13M-trace dataset (Dataverse doi:10.7910/DVN/N8XJME, 379MB gz) against aggressive throttling (chunked range downloader with per-chunk verify; 376MB prefix = 94.6% of file; sample.csv = first 300k traces).
+- Gate scripts/test-duolingo-hlr.ts: PART A machine-epsilon parity vs their Python (max |dw|=1.11e-16, max |dp|=2.22e-16, pinned order). PART B: all four of their models retrained on THEIR OWN traces, their 90/10 split, their metrics - HLR beats Leitner (mae 0.1226 vs 0.1954) and Pimsleur (vs 0.3893), only positive cor(h) (+0.139 vs -0.159/-0.165), lexeme pooling confirmed. PART C: our FSRS-5 replays their traces (continuous-time, cold-start from observed half-life, grades from objective session recall, zero-lag rows excluded) - BEST mae(p) of all engines (0.0988 vs full HLR 0.1226, Pimsleur 0.288, trivial 0.172), ties Leitner, HLR-core cor(h) edge honestly documented as information asymmetry.
+- The gate caught THREE of my own bugs on the way: namedtuple field names (right/wrong not right_this), a double-mk in the oracle, and the eval() object-destructure of a tuple return (NaN factory). Also learned: dataset must never enter git (376MB push killed by GitHub's 100MB limit - stripped, gitignored, re-pushed).
+- D2: word-bank translate (Duolingo's signature tile exercise) as the 7th review direction: src/lib/bank.ts deterministic per-(card,day) trays (mulberry32 + FNV hash), every target word present with full multiplicity, deck-fed distractors with hollow-field top-up (22 cards), 14-tile cap, day-seeded reshuffle; queue attaches tiles to bank items only; Review.tsx builds by tapping (tap built word to return it); grading = shared join-and-normalize; grade route persists dir=bank into FSRS+ReviewLog.
+- Drive test-bank.ts 18/18 ALL PASS with full state restore (forced 8 cloze cards into the audio->bank rotation surgically, snapshots restored in finally). Caught: duplicates are legal ONLY from repeated target words; rotation needed the surgical forcing.
+- DUOLINGO-RE.md teardown: engine spec + 4 undocumented quirks, duel/cross-exam tables (gate output, never hand-edited), Birdbrain-vs-LearnerModel verdict (already covered, ours inspectable), product-loop adopt/reject matrix (streak-freeze auto-protection ALREADY existed at server.ts:38-41 - grep gap corrected; hearts/gems/leaderboard-anxiety REJECTED as anti-method), D3 match-pairs sprint specced for next wave.
+- Regression battery: FSRS PARITY PASS (400 seq), ENGINE SMOKE 10/10, tsc clean, eslint clean on src.
+- PUSHED bc4c167 to WasewaseX/rah-web main (after stripping the dataset artifacts; commit 2184 insertions). Beacon bc4c1677c8e2 dirty:0 on localhost (app 200).
+
+Stage Summary:
+- The reverse-engineering question is answered twice: the existing Task-26 gates still pass, and the same doctrine now covers the industry reference itself. Our TS port of Duolingo's HLR is machine-epsilon identical to their Python; their own 13M-trace data proves HLR beats their legacy baselines (their paper's finding reproduces) AND that our FSRS-5 posts the best absolute recall error of every engine in the fight on their own traces. Their signature word-bank exercise now runs on Rah's engine, drive-locked 18/18. Next wave: D3 match-pairs sprint (specced in DUOLINGO-RE.md), and the remaining 21MB of the dataset if the throttle ever lifts.
