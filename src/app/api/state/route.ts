@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { deckStats } from "@/lib/content";
 import { ensureQuests, getGameView, getRivalView, getLeagueView, getChain } from "@/lib/arcade";
+import { getMasteryView } from "@/lib/mastery";
+import { nextBestActions } from "@/lib/next-best";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,7 @@ export async function GET() {
   const profile = await buildProfile();
   const theme = l.theme ? JSON.parse(l.theme) : null;
   await ensureQuests();
-  const [game, rival, quests, league, chain] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain()]);
+  const [game, rival, quests, league, chain, mastery, nextBest] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain(), getMasteryView(), nextBestActions()]);
   return NextResponse.json({
     learner: {
       level: l.level,
@@ -47,5 +49,7 @@ export async function GET() {
     quests,
     league,
     chain,
+    mastery,
+    nextBest,
   });
 }

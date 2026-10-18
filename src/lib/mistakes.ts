@@ -5,6 +5,7 @@
 // instead of rediscovering it every session.
 
 import { db } from "@/lib/db";
+import { noteTagOutcome } from "@/lib/mastery";
 
 export interface MistakeInput {
   kind: "chat" | "writing" | "speak" | "exam" | "placement";
@@ -211,7 +212,9 @@ export async function foldPlacementMisses(misses: PlacementMiss[]): Promise<Trap
   );
 
   // A placement miss is relapse evidence for every family sharing the tag,
-  // whatever kind originally owned it - same rule an exam miss follows.
+  // whatever kind originally owned it - same rule an exam miss follows. It
+  // also debits the mastery ledger: placement is the highest-stakes "no"
+  // evidence there is.
   for (const tag of counts.keys()) {
     try {
       await db.mistakeFamily.updateMany({
@@ -221,6 +224,7 @@ export async function foldPlacementMisses(misses: PlacementMiss[]): Promise<Trap
     } catch {
       // Memory must never break the result the learner is waiting for.
     }
+    await noteTagOutcome(tag, false);
   }
 
   return [...counts.entries()]

@@ -4,6 +4,7 @@ import { aiJson, writingSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
+import { noteTagOutcome } from "@/lib/mastery";
 import { screenText, findingsBlock, mergeRuleErrors } from "@/lib/languagetool";
 
 export const dynamic = "force-dynamic";
@@ -74,10 +75,12 @@ export async function POST(req: Request) {
   await progressQuest("write_1", 1);
   await touchStreak();
   // Mistake memory: essay errors feed persistent families by their trap type.
+  // The same trap tags debit the mastery ledger - a confirmed production
+  // error is the strongest kind of "no" evidence the model can get.
   if (Array.isArray(result.errors) && result.errors.length > 0) {
-    await recordMistakes(
-      result.errors.map((e) => ({ kind: "writing" as const, tag: String(e.type ?? "none"), wrong: String(e.bad ?? ""), right: String(e.good ?? "") })),
-    );
+    const errs = result.errors.map((e) => ({ kind: "writing" as const, tag: String(e.type ?? "none"), wrong: String(e.bad ?? ""), right: String(e.good ?? "") }));
+    await recordMistakes(errs);
+    await Promise.allSettled(errs.map((e) => noteTagOutcome(e.tag, false)));
   }
   return NextResponse.json({ ...result, ruleChecks });
 }

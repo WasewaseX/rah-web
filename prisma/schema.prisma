@@ -217,3 +217,19 @@ model MistakeFamily {
   streakClean Int     @default(0)
   resolvedAt  DateTime?
 }
+
+// The fine-grained half of the learner model. MistakeFamily tracks failures;
+// TagMastery tracks BOTH outcomes per trap tag, so the app can finally say
+// "articles: 45%, falling" instead of only "you got articles wrong twice".
+// ewma is a recency-weighted outcome estimate (0..1, alpha 0.35) that answers
+// "how are they doing lately"; wilson (computed, not stored) answers "how
+// sure are we" - a tag with 2/2 correct stays unproven instead of 100%.
+model TagMastery {
+  tag       String    @id
+  ok        Int       @default(0)
+  no        Int       @default(0)
+  ewma      Float     @default(0.5)
+  lastOk    DateTime?
+  lastNo    DateTime?
+  updatedAt DateTime  @updatedAt
+}

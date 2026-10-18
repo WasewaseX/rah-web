@@ -10,6 +10,7 @@ import { gradeAnswer } from "./fuzzy";
 import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace } from "./types";
 import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
+import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
 import { arbitrateMisses, vetItems } from "./exam-ai";
 import { itemAnswerable } from "./exam-gate";
 
@@ -139,13 +140,20 @@ export async function generateExam(
   count: number,
   emit: (l: string, d?: string) => void,
 ): Promise<{ client: ExamClient; items: ExamItem[]; spec: ExamSpec }> {
+  // Weakness quota input: mistake families carry production evidence, but the
+  // mastery ledger can prove a weakness the families have not seen yet (three
+  // exam misses on a tag with no family, or a slipping tag). Families first,
+  // then proven danger/fragile tags - the quota cap stays 3.
+  const ledgerTags = await masteryWeakTags();
+  const familyTags = p.mistakes.map((m) => m.tag);
+  const weakTags = [...new Set([...familyTags, ...ledgerTags])].slice(0, 3);
   const spec: ExamSpec = {
     level: p.level === "?" ? "B2" : p.level,
     targetSkills: targetSkills.length ? targetSkills : ["collocation", "grammar", "vocabulary"],
     plannedCount: Math.max(4, Math.min(20, count)),
     minutes: Math.max(5, Math.round(count * 1.1)),
     title: "",
-    weakTags: p.mistakes.map((m) => m.tag).slice(0, 3),
+    weakTags,
   };
 
   emit("Calibrating difficulty", `level ${spec.level}, edge of ${spec.level} toward C1`);
@@ -348,13 +356,15 @@ export async function gradeExamSubmission(
   // mistake memory - item tag first, arbiter's trap tag as the fallback so an
   // untagged miss still lands in a family. Correct answers (including
   // arbiter-accepted ones) extend the clean streak toward retirement; misses
-  // count as relapse evidence and reopen the family.
+  // count as relapse evidence and reopen the family. The same outcome feeds
+  // the mastery ledger - BOTH sides of it, so "45% on articles, rising"
+  // becomes computable instead of guessed.
   await Promise.allSettled(
     items.map((it) => {
       const v = verdicts.find((x) => x.itemId === it.id)!;
       const tag = it.tag ?? arb.get(it.id)?.tag;
       if (!tag) return Promise.resolve();
-      return noteExamAnswer(tag, v.given, it.a, v.correct);
+      return Promise.all([noteExamAnswer(tag, v.given, it.a, v.correct), noteTagOutcome(tag, v.correct)]);
     }),
   );
 

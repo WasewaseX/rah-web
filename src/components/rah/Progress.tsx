@@ -4,8 +4,9 @@
 // per skill leak rate, writing and speaking score trends, coach advice.
 
 import { useEffect, useState } from "react";
-import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart } from "lucide-react";
+import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart, Scale, Compass } from "lucide-react";
 import { Card, Chip, Note, Bar, Btn } from "./ui";
+import { handCoach } from "@/lib/bus";
 import { Radar, AccuracyTimeline } from "./WarRoom";
 import MindReader from "./MindReader";
 import Replay from "./Replay";
@@ -165,6 +166,80 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
           );
         })()}
       </Card>
+
+      {/* War room: mastery ledger - the fine-grained learner model */}
+      {state.mastery && state.mastery.tags.length > 0 && (
+        <Card>
+          <div className="mb-1 flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#ffb02e]/[0.12] text-[#ffd08a]">
+              <Scale className="h-4 w-4" />
+            </div>
+            <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Mastery ledger</span>
+          </div>
+          <div className="mb-3 text-xs font-medium text-[#7d889c]">{state.mastery.summary}</div>
+          <div className="flex flex-col gap-2">
+            {state.mastery.tags.slice(0, 8).map((t) => {
+              const pct = Math.round(t.wilson * 100);
+              const statusTone =
+                t.status === "danger" ? "text-[#ff6b81]" : t.status === "fragile" ? "text-[#ffb02e]" : t.status === "rising" ? "text-[#2fc273]" : t.status === "solid" ? "text-[#2fc273]" : "text-[#7d889c]";
+              const arrow = t.trend === "rising" ? "\u2197" : t.trend === "falling" ? "\u2198" : "\u2192";
+              return (
+                <div key={t.tag} className="rounded-2xl bg-[#171c28] px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-bold text-[#e7ecf5]">{t.tag.replace(/[_-]/g, " ")}</span>
+                    <span className={`flex shrink-0 items-center gap-2 text-xs font-black ${statusTone}`}>
+                      <span className="text-[10px] opacity-80">{arrow}</span>
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className={`h-full rounded-full ${t.status === "danger" ? "bg-[#ff6b81]" : t.status === "fragile" ? "bg-[#ffb02e]" : t.status === "unproven" ? "bg-[#5c6678]" : "bg-[#2fc273]"}`}
+                      style={{ width: `${Math.max(4, pct)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-[10px] font-semibold text-[#7d889c]">
+                    {t.status === "unproven"
+                      ? `unproven - ${t.ok} right / ${t.no} wrong so far, keep answering`
+                      : `${t.ok} right / ${t.no} wrong - ${t.status}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* War room: coach's next moves - the deterministic engine decides */}
+      {state.nextBest && state.nextBest.length > 0 && (
+        <Card>
+          <div className="mb-1 flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#9dc0ff]/[0.12] text-[#9dc0ff]">
+              <Compass className="h-4 w-4" />
+            </div>
+            <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Coach&apos;s next moves</span>
+          </div>
+          <div className="mb-3 text-xs font-medium text-[#7d889c]">
+            Chosen by your data, not the AI&apos;s mood. One tap hands it to the coach.
+          </div>
+          <div className="flex flex-col gap-2">
+            {state.nextBest.map((a, i) => (
+              <div key={`${a.action}-${a.target}-${i}`} className="flex items-center justify-between gap-3 rounded-2xl bg-[#171c28] px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Chip tone={a.action === "review" ? "cyan" : a.action === "drill" ? "rose" : a.action === "test" ? "amber" : "emerald"}>{a.action}</Chip>
+                    <span className="truncate text-sm font-bold text-[#e7ecf5]">{a.target}</span>
+                  </div>
+                  <div className="mt-1 truncate text-xs text-[#7d889c]">{a.reason}</div>
+                </div>
+                <Btn onClick={() => handCoach(a.command)} className="shrink-0">
+                  Do it
+                </Btn>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* War room: accuracy timeline */}
       <Card>

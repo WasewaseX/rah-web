@@ -71,6 +71,14 @@ export interface AppState {
   quests: QuestView[];
   league?: LeagueView;
   chain?: { chain: number; mult: number; label: string };
+  mastery?: {
+    tags: { tag: string; samples: number; ok: number; no: number; raw: number; ewma: number; wilson: number; trend: string; status: string }[];
+    danger: string[];
+    fragile: string[];
+    solid: string[];
+    summary: string;
+  };
+  nextBest?: { action: string; target: string; reason: string; urgency: number; command: string }[];
 }
 
 export const VIEWS = [

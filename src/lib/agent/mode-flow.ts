@@ -10,6 +10,7 @@ import { getLearner } from "@/lib/server";
 import { aiJson, profileBlock } from "@/lib/ai";
 import { gradeAnswer } from "./fuzzy";
 import { noteExamAnswer } from "@/lib/mistakes";
+import { noteTagOutcome } from "@/lib/mastery";
 import type { CoachEnvelope, SkillId, StepTrace } from "./types";
 import type { ProfileJson } from "@/lib/ai";
 
@@ -226,7 +227,10 @@ async function dailyTurn(
   }
   emit("Grading your answer", item.tag ? `hunting: ${item.tag}` : "");
   const correct = gradeAnswer({ given: text, type: item.type ?? "short", a: item.a, accept: item.accept, choices: item.choices });
-  if (item.tag) await noteExamAnswer(item.tag, text, item.a, correct);
+  if (item.tag) {
+    await noteExamAnswer(item.tag, text, item.a, correct);
+    await noteTagOutcome(item.tag, correct);
+  }
   await clearMode(correct ? "daily beaten" : "daily missed");
   return envelope(
     "daily-challenge",
