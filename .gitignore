@@ -72,3 +72,12 @@ db/custom.db
 /rah-run/
 /tool-results/
 scripts/*.json
+# Duolingo RE data artifacts (re-downloadable; see DUOLINGO-RE.md §1)
+scripts/duolingo-reference/traces.csv.gz
+scripts/duolingo-reference/traces.part
+scripts/duolingo-reference/sample.csv
+scripts/duolingo-reference/chunk.bin
+scripts/duolingo-reference/parity_fixture.json
+scripts/duolingo-reference/parity_ref_out.json
+scripts/duolingo-reference/dl.log
+scripts/duolingo-reference/dl2.log

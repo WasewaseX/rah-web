@@ -4,17 +4,20 @@ import { DECK, cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
 import { derivedExamCard } from "@/lib/exam-cards";
+import { bankTiles } from "@/lib/bank";
 
 export const dynamic = "force-dynamic";
 
 // Retrieval directions per card kind. Rotating through these is the
 // multi-direction retrieval loop: same item, different recall road.
+// `bank` is the word-bank translate pass (DUOLINGO-RE.md D2): build the
+// English sentence from tiles instead of typing it.
 export function directionsFor(kind: string): string[] {
   switch (kind) {
     case "cloze":
-      return ["cloze", "reverse", "fa2en", "audio"];
+      return ["cloze", "reverse", "fa2en", "audio", "bank"];
     case "sent":
-      return ["cloze", "audio"];
+      return ["cloze", "audio", "bank"];
     case "ef":
       return ["mcq_fa", "fae", "audio"];
     case "fae":
@@ -87,7 +90,7 @@ export async function GET() {
     const st = byId.get(c.id);
     const state = st ?? defaultState();
     const dir = nextDir(c, st?.dir ?? "");
-    return { card: c, state, dir };
+    return { card: c, state, dir, tiles: dir === "bank" ? bankTiles(c, today) : [] };
   });
 
   return NextResponse.json({

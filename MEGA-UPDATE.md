@@ -148,3 +148,33 @@ real rows and marks unproven bands honestly.
 Each wave: implement → drive-prove live → regression battery → tsc/eslint clean →
 commit → push → beacon check on localhost AND preview (`/api/version` same SHA,
 dirty:0) → worklog entry.
+
+---
+
+## D-wave: "Reverse Engineer Duolingo" (DUOLINGO-RE.md) — D1, D2 shipped
+
+**Gap (verified).** The Task-26 reverse-engineering doctrine (differential
+gates against reference implementations) had covered our FSRS port and the
+writing rule engine, but never the industry reference itself. Duolingo
+publishes the HLR reference implementation (MIT) and the 13M-trace dataset
+behind the ACL-16 paper — source-level differential testing applies.
+
+**D1 — parity + duel + cross-exam `[x]` gate `scripts/test-duolingo-hlr.ts`.**
+`src/lib/hlr.ts` ports their engine 1:1; Part A proves machine-epsilon parity
+against their Python (max |Δw| = 1.11e-16, pinned order); Part B retrains all
+four of their models on 300k of THEIR OWN traces (HLR beats Leitner and
+Pimsleur on mae + cor(h); lexeme pooling confirmed); Part C replays their
+traces through OUR FSRS-5 — best absolute recall error of every engine in the
+fight (mae(p) 0.0988, vs their full HLR 0.1226), honest information-asymmetry
+note where their lexeme pooling wins on half-life correlation.
+
+**D2 — word-bank translate `[x]` gate `scripts/test-bank.ts` 18/18.** Their
+signature exercise, rebuilt on our engine: `bank` review direction (cloze +
+sent), `src/lib/bank.ts` deterministic tile trays per (card, day) — answer
+always buildable, distractors deck-fed, tray capped, day-seeded reshuffle.
+Queue attaches tiles; the client builds by tapping; grading is the shared
+join-and-normalize; the grade route persists dir=bank into FSRS + ReviewLog.
+Full state restore in finally.
+
+**D3 — match-pairs sprint `[ ]`** — spec only (DUOLINGO-RE.md §8): Duolingo's
+tap-the-pairs speed drill over due cards, deterministic pair set, engine-graded.

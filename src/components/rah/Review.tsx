@@ -28,6 +28,7 @@ interface QueueCard {
   };
   state: FsrsState;
   dir: string;
+  tiles?: string[];
 }
 
 const DIR_LABEL: Record<string, string> = {
@@ -37,6 +38,7 @@ const DIR_LABEL: Record<string, string> = {
   mcq_fa: "Meaning check",
   fae: "Produce the English",
   audio: "Listening recall",
+  bank: "Build the sentence",
 };
 
 function normalize(s: string): string {
@@ -79,6 +81,14 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
       <div className="text-center">
         <div className="text-[26px] font-extrabold leading-snug tracking-tight text-[#f2f5fa]">{card.en}</div>
         {revealed && <div className="mt-4 text-sm text-[#8b96a9]">{card.note}</div>}
+      </div>
+    );
+  }
+  if (dir === "bank") {
+    return (
+      <div className="text-center">
+        <FA className="text-[26px] font-bold leading-snug text-[#f2f5fa]">{card.fa}</FA>
+        <div className="mt-3 text-sm text-[#8b96a9]">Build the English sentence from the tiles below.</div>
       </div>
     );
   }
@@ -150,6 +160,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const [idx, setIdx] = useState(0);
   const [input, setInput] = useState("");
   const [choice, setChoice] = useState<string | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [wasRight, setWasRight] = useState(false);
   const [session, setSession] = useState({ done: 0, again: 0 });
@@ -175,6 +186,8 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const q = queue[idx] as QueueCard | undefined;
   const dir = q?.dir ?? "cloze";
   const needsTyping = ["cloze", "reverse", "fa2en", "fae", "audio"].includes(dir) && !(dir === "audio" && (q?.card.kind === "ef" || q?.card.kind === "fae"));
+  const isBank = dir === "bank";
+  const tiles = isBank && q?.tiles ? q.tiles : [];
   const choices = useMemo(() => (q && (dir === "mcq_fa" || (dir === "audio" && (q.card.kind === "ef" || q.card.kind === "fae"))) ? mcqChoices(q.card) : []), [q, dir]);
 
   const current = q ? q.state : defaultState();
@@ -187,6 +200,11 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
 
   const check = () => {
     if (!q) return;
+    if (isBank) {
+      if (picked.length === 0) return;
+      reveal(acceptable(q.card, picked.map((i) => tiles[i]).join(" "), "fa2en"));
+      return;
+    }
     if (dir === "mcq_fa" || (dir === "audio" && (q.card.kind === "ef" || q.card.kind === "fae"))) {
       if (!choice) return;
       reveal(choice === q.card.fa);
@@ -207,6 +225,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     setBusy(false);
     setInput("");
     setChoice(null);
+    setPicked([]);
     setRevealed(false);
     setIdx((i) => i + 1);
     onChange();
@@ -327,6 +346,62 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           </div>
         )}
 
+        {/* word-bank tiles: tap to build, tap a built word to return it */}
+        {isBank && !revealed && (
+          <div className="mt-8">
+            <div className="min-h-14 rounded-2xl border-2 border-dashed border-[#2a3242] bg-[#10141d] p-2.5">
+              {picked.length === 0 ? (
+                <div className="py-1.5 text-center text-sm text-[#5c6678]">Tap the words in order…</div>
+              ) : (
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {picked.map((i) => (
+                    <button
+                      key={`${i}-built`}
+                      onClick={() => setPicked((p) => p.filter((x) => x !== i))}
+                      className="rah-3d rounded-xl bg-[var(--rah-primary)] px-3 py-2 text-sm font-bold text-white [--rah-edge:var(--rah-primary-deep)] transition-transform active:scale-95"
+                    >
+                      {tiles[i]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {tiles.map((t, i) =>
+                picked.includes(i) ? null : (
+                  <button
+                    key={`${i}-tile`}
+                    onClick={() => setPicked((p) => [...p, i])}
+                    className="rah-3d rounded-xl bg-[#232b3a] px-3 py-2 text-sm font-bold text-[#dbe3f0] [--rah-edge:#171d29] transition-transform hover:bg-[#2a3242] active:scale-95"
+                  >
+                    {t}
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="mt-4 flex justify-center">
+              <Btn variant="go" disabled={picked.length === 0} onClick={check}>
+                Check
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        {isBank && revealed && (
+          <div className="rah-pop mt-7">
+            <div className={`flex items-center justify-center gap-2 text-sm font-bold ${wasRight ? "text-[#2fc273]" : "text-[#ff8ba0]"}`}>
+              {wasRight ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+              {wasRight ? "Correct." : "The sentence builds as:"}
+            </div>
+            {!wasRight && (
+              <div className="mt-3 rounded-2xl border border-white/[0.06] bg-[#141924] p-4 text-sm leading-relaxed">
+                <div className="font-bold text-[#7fe0ac]">{q.card.en}</div>
+                {q.card.note && <div className="mt-1 text-[#8b96a9]">{q.card.note}</div>}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* typed input */}
         {needsTyping && !revealed && (
           <form
@@ -400,7 +475,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           </div>
         )}
 
-        {!revealed && choices.length > 0 && (
+        {!revealed && (choices.length > 0 || isBank) && (
           <div className="mt-5 text-center">
             <Btn variant="soft" onClick={() => reveal(false)}>
               I do not know
