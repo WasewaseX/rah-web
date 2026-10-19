@@ -20,7 +20,8 @@ export async function ensureWorkspace(): Promise<string> {
 
 // Resolve a user-supplied relative path inside the root. Returns null on any
 // attempt to escape (absolute paths, .., symlink tricks resolve outside).
-function safePath(rel: string): string | null {
+// Exported so the workspace download routes enforce the SAME sandbox.
+export function safePath(rel: string): string | null {
   if (!rel || typeof rel !== "string") return null;
   const p = isAbsolute(rel) ? null : resolve(WORKSPACE_ROOT, rel);
   if (!p) return null;
@@ -210,6 +211,44 @@ async function coachSkill(args: ToolArgs): Promise<ToolResult> {
   };
 }
 
+// ---------- make_pdf: real PDF deliverables ----------
+
+async function makePdf(args: ToolArgs): Promise<ToolResult> {
+  const out = String(args.out ?? args.path ?? "").trim();
+  const p = safePath(out);
+  if (!p || !out) return { ok: false, summary: "make_pdf needs an output path inside the workspace (e.g. report.pdf)" };
+  if (!/\.pdf$/i.test(out)) return { ok: false, summary: "make_pdf writes .pdf files only (out must end in .pdf)" };
+
+  let md = "";
+  const src = String(args.source_md ?? "").trim();
+  if (src) {
+    const sp = safePath(src);
+    if (!sp || !existsSync(sp) || !(await stat(sp)).isFile()) {
+      return { ok: false, summary: `source_md not found: ${src} - write it first with write_file` };
+    }
+    md = await readFile(sp, "utf8");
+  } else if (typeof args.markdown === "string" && args.markdown.trim().length > 0) {
+    md = args.markdown;
+  } else {
+    return { ok: false, summary: "make_pdf needs source_md (a workspace .md file) or inline markdown" };
+  }
+
+  try {
+    const { markdownToPdf } = await import("./pdf");
+    const { bytes, pages } = await markdownToPdf(md);
+    await mkdir(dirname(p), { recursive: true });
+    await writeFile(p, bytes);
+    const kb = (bytes.length / 1024).toFixed(1);
+    return {
+      ok: true,
+      summary: `PDF created: ${out} (${pages} page${pages > 1 ? "s" : ""}, ${kb} KB)`,
+      detail: `data/coach-workspace/${out}\nThe learner can open/download it from the Workspace panel in this sidebar. Mention the file by name in your final reply.`,
+    };
+  } catch (e) {
+    return { ok: false, summary: `make_pdf failed: ${(e as Error).message}` };
+  }
+}
+
 // ---------- registry ----------
 
 export interface ToolDef {
@@ -240,9 +279,15 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "write_file",
-    desc: "Create or overwrite a file in the workspace sandbox (text files: .md, .txt, .ts, .js, .json, .csv). Multi-step plans, study schedules, generated drills, scripts.",
+    desc: "Create or overwrite a file in the workspace sandbox (text files: .md, .txt, .ts, .js, .json, .csv). Multi-step plans, study schedules, generated drills, scripts. Files appear in the learner's Workspace panel.",
     args: '{"path": "plan.md", "content": "# Plan\\n..."}',
     run: writeFileTool,
+  },
+  {
+    name: "make_pdf",
+    desc: "Render a REAL PDF the learner can download. Give source_md (path of a workspace .md file, e.g. a report you just wrote) OR inline markdown; out is the .pdf filename. Use for every '.pdf' request - never claim PDFs are impossible.",
+    args: '{"source_md": "progress-report.md", "out": "progress-report.pdf"}',
+    run: makePdf,
   },
   {
     name: "run_js",

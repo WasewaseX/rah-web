@@ -17,9 +17,21 @@ export async function POST(req: Request) {
   const user = await getSessionUserWithRequest(req);
   if (!user) return NextResponse.json({ error: "Sign in to talk to your coach." }, { status: 401 });
 
-  const { message, view } = await req.json().catch(() => ({ message: "" }));
+  const { message, view, activity } = await req.json().catch(() => ({ message: "" }));
   const text = String(message ?? "").trim();
   if (!text) return NextResponse.json({ error: "message required" }, { status: 400 });
+
+  // The learner's current screen (review question etc.) - sanity-capped so a
+  // hostile or bloated client payload cannot blow up the prompt.
+  let activitySafe: Record<string, unknown> | null = null;
+  if (activity && typeof activity === "object" && !Array.isArray(activity)) {
+    activitySafe = activity as Record<string, unknown>;
+    try {
+      if (JSON.stringify(activitySafe).length > 4000) activitySafe = null;
+    } catch {
+      activitySafe = null;
+    }
+  }
 
   const profile = await buildProfile();
   const history = await db.chatMsg.findMany({ orderBy: { id: "desc" }, take: 10 });
@@ -43,7 +55,7 @@ export async function POST(req: Request) {
 
       let turn: Awaited<ReturnType<typeof runAgent>>;
       try {
-        turn = await runAgent(text, flat, profile, send, String(view ?? ""));
+        turn = await runAgent(text, flat, profile, send, String(view ?? ""), activitySafe);
       } catch (e) {
         send({ type: "error", label: "Agent crashed", detail: (e as Error).message });
         turn = {

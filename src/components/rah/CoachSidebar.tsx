@@ -8,9 +8,10 @@
 // This is the "access anything, show anything on all tabs" surface.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut } from "lucide-react";
+import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut, FolderOpen, FileDown } from "lucide-react";
 import { Chip, Btn } from "./ui";
 import { clearRahToken } from "@/lib/rah-fetch";
+import { getCoachActivity } from "@/lib/activity-store";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
 
@@ -38,10 +39,23 @@ interface LiveStep {
   ok?: boolean;
 }
 
+interface WorkspaceFile {
+  path: string;
+  size: number;
+  mtime: number;
+  pdf: boolean;
+}
+
+function fmtSize(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
 const SUGGESTIONS = [
   "Read my state and decide what I should do right now",
+  "Make me a progress report as a PDF",
   "Find my weakest tags and write a 7-day drill plan file",
-  "Run a computation: how many reviews until my streak week?",
   "Search the web for B2 listening resources and save the best to a file",
 ];
 
@@ -84,8 +98,46 @@ export default function CoachSidebar({
   const [running, setRunning] = useState(false);
   const [finalArrived, setFinalArrived] = useState(false);
   const [input, setInput] = useState("");
+  const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [wsOpen, setWsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+
+  const loadWorkspace = useCallback(async () => {
+    try {
+      const r = await fetch("/api/workspace", { cache: "no-store" });
+      if (!r.ok) return;
+      const j = (await r.json()) as { files?: WorkspaceFile[] };
+      setFiles(j.files ?? []);
+    } catch {
+      // workspace list is a nicety
+    }
+  }, []);
+
+  // Open/download a workspace file through fetch (NOT an <a href>): the fetch
+  // wrapper attaches x-rah-token, so this works even where cookies are dropped
+  // (preview iframes) - a plain link navigation would 401 there.
+  const openFile = useCallback(async (f: WorkspaceFile, download: boolean) => {
+    try {
+      const r = await fetch(`/api/workspace/file?path=${encodeURIComponent(f.path)}${download ? "&dl=1" : ""}`);
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      if (download) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = f.path.split("/").pop() ?? "file";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        window.open(url, "_blank");
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      // download is a nicety; the panel stays usable
+    }
+  }, []);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -117,8 +169,9 @@ export default function CoachSidebar({
     if (open && !startedRef.current) {
       startedRef.current = true;
       void loadHistory();
+      void loadWorkspace();
     }
-  }, [open, loadHistory]);
+  }, [open, loadHistory, loadWorkspace]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -156,7 +209,7 @@ export default function CoachSidebar({
         const r = await fetch("/api/coach-agent", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message, view }),
+          body: JSON.stringify({ message, view, activity: getCoachActivity() }),
         });
         if (!r.ok || !r.body) {
           const err = (await r.json().catch(() => ({ error: "Coach unreachable" }))) as { error?: string };
@@ -198,6 +251,7 @@ export default function CoachSidebar({
           (final.commands ?? []).forEach(executeCommand);
           setFinalArrived(true);
           void refresh();
+          void loadWorkspace(); // the run may have written files
         } else {
           // A run that ends without a final answer must still SAY something.
           setMessages((m) => [
@@ -217,7 +271,7 @@ export default function CoachSidebar({
         setRunning(false);
       }
     },
-    [running, executeCommand, refresh],
+    [running, executeCommand, refresh, loadWorkspace],
   );
 
   const stepIcon = (kind: LiveStep["kind"]) =>
@@ -293,7 +347,7 @@ export default function CoachSidebar({
                 <GraduationCap className="h-3.5 w-3.5" /> An agent, not a chatbot
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-[#8b96a9]">
-                I can read your live state, write files, run code, search the web, and act across every tab. Ask for a plan, a drill file, or a decision - I will show my steps as I work.
+                I can read your live state, write files, render PDFs, run code, search the web, and act across every tab. Ask for a plan, a report, a drill file - I will show my steps as I work.
               </p>
             </div>
           )}
@@ -373,6 +427,64 @@ export default function CoachSidebar({
             <div className="flex items-center gap-2 text-[11px] font-semibold text-[#7d889c]">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
               agent running…
+            </div>
+          )}
+        </div>
+
+        {/* Workspace: the agent's deliverables, downloadable */}
+        <div className="border-t border-white/[0.06] px-4 py-2">
+          <button
+            onClick={() => {
+              setWsOpen((v) => !v);
+              void loadWorkspace();
+            }}
+            className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
+            aria-expanded={wsOpen}
+          >
+            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#7d889c]">
+              <FolderOpen className="h-3 w-3" /> workspace
+              {files.length > 0 && (
+                <span className="rounded-full bg-[var(--rah-primary)]/[0.18] px-1.5 py-0.5 text-[9px] font-bold text-[#9dc0ff]">{files.length}</span>
+              )}
+            </span>
+            <span className="text-[10px] font-bold text-[#5d6879]">{wsOpen ? "hide" : "show"}</span>
+          </button>
+          {wsOpen && (
+            <div className="mt-1 max-h-40 space-y-1 overflow-y-auto pb-1">
+              {files.length === 0 && (
+                <div className="px-1 py-1.5 text-[11px] text-[#5d6879]">
+                  Nothing yet - ask me to write a plan or make a PDF and it lands here.
+                </div>
+              )}
+              {files.map((f) => (
+                <div key={f.path} className="flex items-center justify-between gap-2 rounded-lg bg-[#101726] px-2.5 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FileText className={`h-3.5 w-3.5 shrink-0 ${f.pdf ? "text-[#ff8ba0]" : "text-[#7d889c]"}`} />
+                    <span className="truncate text-[12px] font-semibold text-[#dbe3f0]" title={`data/coach-workspace/${f.path}`}>
+                      {f.path}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-[#5d6879]">{fmtSize(f.size)}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {!f.pdf && (
+                      <button
+                        onClick={() => void openFile(f, false)}
+                        title="Preview"
+                        className="rounded-md p-1.5 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => void openFile(f, true)}
+                      title="Download"
+                      className="rounded-md p-1.5 text-[#9dc0ff] transition-colors hover:bg-[var(--rah-primary)]/[0.15]"
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -5,12 +5,14 @@
 // schedules what comes back and when.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles, Zap, RotateCcw as RotateCcwIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles, Zap, Grid2x2Check, RotateCcw as RotateCcwIcon } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "./ui";
 import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
+import { setCoachActivity } from "@/lib/activity-store";
 import BlitzDeck from "./games/BlitzDeck";
+import PairsGame from "./games/PairsGame";
 
 interface QueueCard {
   card: {
@@ -153,7 +155,7 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
 }
 
 export default function ReviewView({ state, onChange }: { state: AppState; onChange: () => void }) {
-  const [mode, setMode] = useState<"classic" | "blitz">("classic");
+  const [mode, setMode] = useState<"classic" | "blitz" | "pairs">("classic");
   const [queue, setQueue] = useState<QueueCard[]>([]);
   const [counts, setCounts] = useState<{ due: number; newLeft: number; reviewedToday: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,6 +194,39 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
 
   const current = q ? q.state : defaultState();
   const previews = fsrsPreview(current, dayIndex(), state.learner.retention ?? 0.9);
+
+  // The coach reads this store when the learner asks about "this question":
+  // the exact prompt, the answer for the current direction, and what the
+  // learner has already typed/picked. Cleared on unmount so it can go stale.
+  useEffect(() => {
+    if (!q) {
+      setCoachActivity(null);
+      return;
+    }
+    const c = q.card;
+    const answerFor =
+      dir === "fa2en" || dir === "bank"
+        ? c.en
+        : dir === "mcq_fa" || (dir === "audio" && (c.kind === "ef" || c.kind === "fae"))
+          ? c.fa
+          : c.answer;
+    setCoachActivity({
+      surface: "review",
+      dir,
+      prompt: dir === "cloze" ? c.prompt : dir === "mcq_fa" ? c.en : c.fa,
+      answer: answerFor,
+      en: c.en,
+      fa: c.fa,
+      note: c.note,
+      choices: choices.length ? choices : undefined,
+      tiles: tiles.length ? tiles : undefined,
+      typed: isBank
+        ? picked.map((i) => tiles[i]).join(" ")
+        : choice ?? input,
+      revealed,
+    });
+    return () => setCoachActivity(null);
+  }, [q, dir, choices, tiles, picked, choice, input, revealed, isBank]);
 
   const reveal = (right: boolean) => {
     setWasRight(right);
@@ -234,6 +269,17 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   if (mode === "blitz") {
     return <BlitzDeck state={state} onChange={onChange} onExit={() => setMode("classic")} />;
   }
+  if (mode === "pairs") {
+    return (
+      <div className="flex flex-col gap-4">
+        <PairsGame onExit={() => {
+          setMode("classic");
+          onChange();
+          void load();
+        }} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -269,12 +315,13 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Mode toggle: classic FSRS flow vs the swipe blitz */}
+      {/* Mode toggle: classic FSRS flow vs the swipe blitz vs the pairs sprint */}
       <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/[0.06] bg-[#141924] p-1.5">
         {(
           [
             ["classic", "Classic", RotateCcwIcon],
             ["blitz", "Blitz", Zap],
+            ["pairs", "Pairs", Grid2x2Check],
           ] as const
         ).map(([id, label, Icon]) => (
           <button

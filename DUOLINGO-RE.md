@@ -188,6 +188,15 @@ Grep-level evidence against `src/`, the same standard as MEGA-UPDATE:
   wire, grade route persists dir=bank + FSRS advance + ReviewLog, correct
   tap sequence builds the target, extra tile breaks the match. Full state
   restore in finally.
-- **D3 candidate (next wave, spec only)**: match-pairs sprint — Duolingo's
-  tap-the-pairs speed drill over due cards, deterministic pair set, engine-
-  graded. Not started; specced here so it cannot be forgotten.
+- **D3 match-pairs sprint — SHIPPED (Task 37)**: tap-the-pairs speed drill,
+  `src/lib/pairs.ts` board + `src/components/rah/games/PairsGame.tsx` +
+  `src/app/api/arcade/pairs`. The board is DETERMINISTIC per (due set, day)
+  (mulberry32, same doctrine as bank.ts): five due cards, most at-risk first,
+  new cards top up, deduped by Farsi so no two pairs share a tile. Each
+  successful match grades the card Good through the normal
+  `/api/review/grade` path (dir "pairs") - FSRS, ReviewLog, XP, quests, and
+  the streak see the retrieval exactly once; the sprint POST only clamps the
+  aggregate and pays the capped speed bonus (2 XP/pair + 10 clean-board).
+  Gate: battery section 6 (board shape, id-set equality, determinism across
+  GETs, clean-bonus math, hostile-id filtering) + browser E2E (board played
+  to completion: 5 cards graded, misstep shaken, sprint bonus paid).

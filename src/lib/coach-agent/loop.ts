@@ -56,6 +56,7 @@ RULES:
 1. Multi-step is expected: read_state before data-dependent advice; write_file + run_js for anything computational; web_search/page_reader for current facts. Chain tools across steps; one tool per turn.
    MANDATORY: any question about the learner's level, streak, XP, gems, reviews, mistakes, progress, or "what should I do" REQUIRES read_state (and, when acting on it, a follow-up tool) BEFORE your final answer. Answering such questions without a tool call is a protocol violation - the [live context] hint is NOT enough.
    EXCEPT "which tab am I / where am I": the [live context] line carries current_view - the tab the learner is on RIGHT NOW. Answer that from current_view directly (final, no tools). NEVER call page_reader or web_search for anything about the app itself - they are for the outside web only.
+   [current screen]: when the [live context] carries a current_screen JSON block, it is the EXACT exercise the learner is looking at (prompt, correct answer, what they typed). Questions like "what is the answer", "why can't I answer", "explain this one" are answered from that block - NEVER ask the learner to paste the question. If they have not answered yet (revealed=false), first push retrieval with one hint or a guiding question, then give the answer and the why; if it is already revealed, explain the why directly.
 2. If a tool fails, fix the inputs and retry (different args, different approach). Do not give up after one failure.
 3. Workspace file paths are RELATIVE (e.g. "plan.md", "drills/week1.csv"). The sandbox rejects anything outside it.
 4. commands (client actions) you may include in the final object:
@@ -63,9 +64,10 @@ RULES:
    {"type":"refresh"}  {"type":"start_review"}  {"type":"open_placement"}
    {"type":"toast","title":"...","desc":"..."}
    Use them when the answer is an ACTION the learner should take (e.g. navigate to review when reviews are due).
-5. reply is spoken to the learner: warm, direct, no meta-talk about tools or JSON. Mention artifacts you created by name ("I wrote week-1-plan.md").
-6. The learner's app language is English; they are learning English at ${"their"} measured level. Stay on mission: measurable progress to C1.
-7. Never invent tool results. Never fake file contents. If you did not run it, you do not know it.`;
+5. Deliverables: anything you write with write_file or make_pdf instantly appears in the learner's Workspace panel in this sidebar - name the file in your final reply so they know it is there. Requests for a PDF use make_pdf (a real renderer); NEVER say you cannot produce PDFs.
+6. reply is spoken to the learner: warm, direct, no meta-talk about tools or JSON. Mention artifacts you created by name ("I wrote week-1-plan.md").
+7. The learner's app language is English; they are learning English at their measured level. Stay on mission: measurable progress to C1.
+8. Never invent tool results. Never fake file contents. If you did not run it, you do not know it.`;
 }
 
 interface TurnDecision {
@@ -170,6 +172,28 @@ export function extractTurn(raw: string): { turn: TurnDecision; kind: "json" | "
   return { turn: {}, kind: looksLikeJson(body) ? "junk" : "prose" };
 }
 
+// The [live context] line appended to every learner message. Pure so the
+// battery can pin it: the coach must NEVER have to ask the learner what is
+// already on their screen.
+export function buildLiveContext(
+  p: { level: unknown; streak: unknown; due: unknown; focus: unknown; recentTraps: string[] },
+  currentView?: string,
+  activity?: Record<string, unknown> | null,
+): string {
+  let line = `[live context] level=${p.level} streak=${p.streak} due=${p.due} focus=${p.focus} traps=${p.recentTraps.join(",") || "none"}`;
+  if (currentView) line += ` current_view=${currentView}`;
+  if (activity && typeof activity === "object") {
+    const slim: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(activity)) {
+      if (v === undefined || v === null || v === "") continue;
+      if (Array.isArray(v)) slim[k] = v.slice(0, 8);
+      else if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") slim[k] = typeof v === "string" ? v.slice(0, 300) : v;
+    }
+    if (Object.keys(slim).length > 0) line += `\n[current screen] ${JSON.stringify(slim)}`;
+  }
+  return line;
+}
+
 // Last line of defense: a final reply must never BE a turn object.
 export function sanitizeReply(reply: string, fallback: string): string {
   const r = reply.trim();
@@ -214,6 +238,7 @@ export async function runAgent(
   profile?: ProfileJson,
   emit?: (e: AgentEvent) => void,
   currentView?: string,
+  activity?: Record<string, unknown> | null,
 ): Promise<AgentTurn> {
   const p = profile ?? (await (await import("@/lib/server")).buildProfile());
   const steps: { label: string; detail?: string; ok?: boolean }[] = [];
@@ -227,7 +252,7 @@ export async function runAgent(
     ...history.slice(-8),
     {
       role: "user",
-      content: `${message}\n\n[live context] level=${p.level} streak=${p.streak} due=${p.due} focus=${p.focus} traps=${p.recentTraps.join(",") || "none"}${currentView ? ` current_view=${currentView}` : ""}`,
+      content: `${message}\n\n${buildLiveContext(p, currentView, activity)}`,
     },
   ];
 

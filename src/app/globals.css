@@ -214,3 +214,15 @@
   box-shadow: none;
   filter: saturate(0.5) brightness(0.75);
 }
+
+/* Match-pairs misstep shake (DUOLINGO-RE D3). */
+@keyframes rah-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.rah-shake {
+  animation: rah-shake 0.4s ease-in-out;
+}
