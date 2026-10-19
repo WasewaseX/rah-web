@@ -92,6 +92,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/shop", methods: ["GET", "POST"] },
   { path: "/api/speak", methods: ["GET", "POST"] },
   { path: "/api/speak/analytics", methods: ["GET"] },
+  { path: "/api/speak/conversation", methods: ["GET", "POST"] },
   { path: "/api/state", methods: ["GET"] },
   { path: "/api/theme", methods: ["GET", "POST"] },
   { path: "/api/version", methods: ["GET"] },
@@ -403,6 +404,22 @@ try {
   await pr3.contentFlag.deleteMany({ where: { OR: [{ cardId: "battery-flag-card" }, { note: { startsWith: "battery-hostile-" } }] } });
   await pr3.$disconnect();
   console.log("flag seeds removed");
+
+  // ================= 6d. TALK: SPOKEN CONVERSATION (SPEAK RE part 2) =================
+  console.log("\n--- talk: spoken conversation ---");
+  const cvAnon = await noCookie("/api/speak/conversation");
+  check(cvAnon.status === 401 || cvAnon.status === 200, "conversation GET never 500 to anonymous", `status=${cvAnon.status}`);
+  const cv1 = await api("/api/speak/conversation");
+  check(cv1.status === 200 && Array.isArray(cv1.body?.scenarios) && cv1.body?.scenarios?.length === 6 && cv1.body?.maxTurns === 6, "scenario bank shape (6 scenes, 6-turn cap)", JSON.stringify(cv1.body).slice(0, 120));
+  const cv2 = await api("/api/speak/conversation");
+  check(JSON.stringify(cv1.body?.scenarios) === JSON.stringify(cv2.body?.scenarios), "scenario order is deterministic per day", "order moved between GETs");
+  check(cv1.body?.scenarios?.every?.((s: { id: string; opening: string; scene: string }) => s.id && s.opening && s.scene), "every scenario carries scene + opening", JSON.stringify(cv1.body?.scenarios?.[0]));
+  const cvBad = await api("/api/speak/conversation", { method: "POST", body: JSON.stringify({ scenarioId: "<script>", turns: [] }) });
+  check(cvBad.status === 400, "unknown scenario is 400, never 500", `status=${cvBad.status}`);
+  const cvEmpty = await api("/api/speak/conversation", { method: "POST", body: JSON.stringify({ scenarioId: "complain", turns: [{ you: "   ", coach: "" }] }) });
+  check(cvEmpty.status === 400, "empty transcript is 400 with a speakable error", JSON.stringify(cvEmpty.body));
+  const cvOver = await api("/api/speak/conversation", { method: "POST", body: JSON.stringify({ scenarioId: "complain", turns: Array.from({ length: 20 }, (_, i) => ({ you: "line " + i, coach: "ok" })) }) });
+  check(cvOver.status === 400 || cvOver.status === 502, "oversized history is clamped/400, never 500", `status=${cvOver.status}`);
 
   // ================= 7. RESTORE =================
   console.log("\n--- restore ---");

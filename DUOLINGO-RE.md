@@ -234,3 +234,21 @@ tsc clean, eslint clean, browser E2E: the user's exact message
 cloze "You have ? progress this month." now answers 'made' with the why and
 the Farsi L1 diagnosis (e2e screenshots in download/), Improvement ledger and
 Effectiveness ledger both render (e2e-speak-ledger.png, e2e-effectiveness-ledger.png).
+
+### 9.1 SPEAK RE part 2 - Talk: free spoken conversation (Task 41)
+
+The review's #1 feature ("real-time voice conversations with the AI coach").
+VoiceArena was the fixed shadowing gauntlet; Talk is the freeconversation
+sibling: six deterministic-per-day scenarios (mulberry32, weakness-biased -
+the scene whose skill matches the learner's hottest active mistake family
+opens first), browser ASR in, speechSynthesis out (the VoiceArena zero-config
+convention; the line is always visible and replayable), up to 6 turns with
+in-scene trap-tagged corrections feeding the SAME mistake memory as the pen,
+then a deterministic scene report. The scores are computed from what actually
+happened (corrections tally, words-per-turn, vocabulary variety) - never the
+AI's opinion of itself - and the session lands in the Improvement ledger via
+the normal SpeakSession row, so the analytics from 9 read it with zero extra
+machinery. Oversized histories are rejected (400), never clamped into a live
+model call. Gate: battery section 6d (bank shape, per-day determinism,
+400-on-garbage), live browser E2E (scene run: in-character replies, corrections,
+report, ledger row; screenshot e2e-talk-conversation.png).
