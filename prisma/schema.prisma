@@ -270,3 +270,17 @@ model TagMastery {
   lastNo    DateTime?
   updatedAt DateTime  @updatedAt
 }
+
+// Review feature #17 (the 7.4/10 wave): the learner can flag content they
+// believe is wrong - a question, an explanation, a Farsi note. Flags are a
+// queue the coach can see (read_state) and the learner can trust: a flagged
+// item is never silently ignored. kind is one of wrong_answer,
+// bad_explanation, bad_farsi, typo, other (clamped server-side).
+model ContentFlag {
+  id     Int      @id @default(autoincrement())
+  cardId String   @default("")
+  kind   String   @default("other")
+  note   String   @default("")
+  status String   @default("open") // open | fixed | wontfix
+  at     DateTime @default(now())
+}

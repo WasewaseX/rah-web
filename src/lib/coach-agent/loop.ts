@@ -38,6 +38,18 @@ export interface AgentTurn {
   commands: AgentCommand[];
   steps: { label: string; detail?: string; ok?: boolean }[];
   toolsUsed: string[];
+  stopped?: boolean;
+}
+
+// Review feature #15: the graceful close when the learner stops a run. Pure
+// (exported for the battery): the reply always names what WAS done and never
+// pretends the task completed.
+export function stoppedReply(steps: { label: string; ok?: boolean }[]): string {
+  const done = steps.map((s) => s.label).filter((l) => l && !l.startsWith("Mode:") && !l.startsWith("Unknown"));
+  if (done.length === 0) {
+    return "Stopped before I got going - nothing was done yet. Send another message whenever you want me back on it.";
+  }
+  return `Stopped, as you asked. Completed before the stop: ${done.join(", ")}. Nothing beyond that ran; your message stands whenever you want the rest done.`;
 }
 
 function systemPrompt(): string {
@@ -237,6 +249,16 @@ async function callModel(
   return null;
 }
 
+// Review feature C (the 7.4/10 wave, agent dependability): prompt rules
+// alone could not stop the model from answering state questions straight
+// from [live context]. The LOOP now enforces the rule deterministically: a
+// final answer with zero tool calls on a state-shaped question gets ONE
+// server-side nudge that demands read_state, then the run continues. Pure
+// and exported for the battery.
+export function isStateQuestion(message: string): boolean {
+  return /\b(streak|due\b|due count|my level|my xp|gems?\b|review\b.*due|my mistakes|my progress|what should i (do|practice)|how am i doing|read_state)\b/i.test(message);
+}
+
 export async function runAgent(
   message: string,
   history: { role: string; content: string }[],
@@ -244,6 +266,7 @@ export async function runAgent(
   emit?: (e: AgentEvent) => void,
   currentView?: string,
   activity?: Record<string, unknown> | null,
+  signal?: AbortSignal,
 ): Promise<AgentTurn> {
   const p = profile ?? (await (await import("@/lib/server")).buildProfile());
   const steps: { label: string; detail?: string; ok?: boolean }[] = [];
@@ -265,8 +288,17 @@ export async function runAgent(
 
   const UNREACHABLE = "The model is unreachable right now (quota or network). Your message stands; try again in a moment.";
   let nudges = 0; // thought-only / junk turns: feed the model back on track instead of dead-ending
+  let stateEnforced = 0; // read_state enforcement: one deterministic retry per run
 
   for (let step = 0; step < MAX_STEPS; step++) {
+    // Review feature #15 (the 7.4/10 wave): the learner can STOP a long run.
+    // The check sits between steps - the current model call finishes (it is
+    // already in flight), then the loop exits and closes gracefully from
+    // whatever work was actually done. The turn still persists.
+    if (signal?.aborted) {
+      push({ type: "error", label: "Stopped by learner" });
+      return { reply: stoppedReply(steps), corrections: [], commands: [], steps, toolsUsed, stopped: true };
+    }
     const raw = await callModel(zai, messages, push);
     if (raw === null) {
       return { reply: UNREACHABLE, corrections: [], commands: [], steps, toolsUsed };
@@ -295,6 +327,20 @@ export async function runAgent(
     }
 
     if (turn.final || !turn.tool) {
+      // The MANDATORY read_state rule, enforced in code: a state-shaped
+      // question answered with zero tool calls gets one nudge, then the run
+      // continues and the model re-answers from real data.
+      if (turn.final && toolsUsed.length === 0 && stateEnforced < 1 && step < MAX_STEPS - 2 && isStateQuestion(message)) {
+        stateEnforced = 1;
+        push({ type: "error", label: "State question needs read_state - enforcing", ok: false });
+        messages.push({ role: "assistant", content: raw });
+        messages.push({
+          role: "user",
+          content:
+            'That was a state question and you answered it WITHOUT calling read_state - a protocol violation. First call read_state now: {"thought":"...","tool":"read_state","args":{}}. Then, with its result, emit your final object.',
+        });
+        continue;
+      }
       const reply = sanitizeReply(String(turn.reply ?? ""), "I ran out of useful moves; rephrase and I will take another run at it.");
       push({ type: "final", reply, commands: turn.commands ?? [] });
       return {

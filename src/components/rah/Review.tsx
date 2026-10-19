@@ -5,7 +5,7 @@
 // schedules what comes back and when.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles, Zap, Grid2x2Check, RotateCcw as RotateCcwIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Volume2, Undo2, Sparkles, Zap, Grid2x2Check, RotateCcw as RotateCcwIcon, Flag } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "./ui";
 import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
@@ -233,6 +233,42 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     setRevealed(true);
   };
 
+  // Review feature #17 (the 7.4/10 wave): flag this item for human review.
+  // The flag lands in a queue the coach sees in read_state - never a black hole.
+  const [flagOpen, setFlagOpen] = useState(false);
+  const [flagKind, setFlagKind] = useState("wrong_answer");
+  const [flagNote, setFlagNote] = useState("");
+  const [flagMsg, setFlagMsg] = useState("");
+  useEffect(() => {
+    setFlagOpen(false);
+    setFlagMsg("");
+    setFlagNote("");
+  }, [idx]);
+  const FLAG_KINDS = [
+    { k: "wrong_answer", label: "Wrong answer" },
+    { k: "bad_explanation", label: "Bad explanation" },
+    { k: "bad_farsi", label: "Wrong Farsi" },
+    { k: "typo", label: "Typo" },
+    { k: "other", label: "Other" },
+  ];
+  const submitFlag = async () => {
+    setFlagMsg("");
+    try {
+      const r = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: q?.card.id ?? "", kind: flagKind, note: flagNote }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Could not send the flag.");
+      setFlagMsg(j.duplicate ? "Already in the queue - thanks for the double check." : "Flagged. The coach sees it on the next state read and it goes to the review queue.");
+      setFlagOpen(false);
+      setFlagNote("");
+    } catch (e) {
+      setFlagMsg((e as Error).message);
+    }
+  };
+
   const check = () => {
     if (!q) return;
     if (isBank) {
@@ -345,8 +381,47 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           <Chip tone="blue">{DIR_LABEL[dir] ?? dir}</Chip>
           <Chip tone="emerald">{q.card.level}</Chip>
           <Chip>{q.card.skill}</Chip>
+          <button
+            onClick={() => setFlagOpen((o) => !o)}
+            className={`rounded-full border p-1.5 transition-colors ${
+              flagOpen ? "border-[#ff6b81]/50 bg-[#ff6b81]/[0.12] text-[#ff8ba0]" : "border-[#2a3242] text-[#7d889c] hover:border-[#3f4c63] hover:text-[#b7c1d3]"
+            }`}
+            aria-label="Report a problem with this item"
+          >
+            <Flag className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
+      {flagOpen && (
+        <div className="rounded-2xl border border-[#ff6b81]/25 bg-[#ff6b81]/[0.05] p-3.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-[#ff8ba0]">Report this item</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {FLAG_KINDS.map((f) => (
+              <button
+                key={f.k}
+                onClick={() => setFlagKind(f.k)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                  flagKind === f.k ? "border-[#ff6b81]/60 bg-[#ff6b81]/[0.12] text-[#ff8ba0]" : "border-[#2a3242] text-[#8b96a9] hover:text-[#dbe3f0]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <input
+            value={flagNote}
+            onChange={(e) => setFlagNote(e.target.value)}
+            placeholder="What is wrong? (optional)"
+            className="mt-2.5 w-full rounded-xl border border-[#2a3242] bg-[#141924] px-3 py-2 text-[13px] text-[#e7ecf5] outline-none placeholder:text-[#5c6678] focus:border-[#ff6b81]/50"
+          />
+          <div className="mt-2.5 flex items-center justify-between">
+            <span className="text-xs text-[#a9b4c6]">{flagMsg}</span>
+            <Btn variant="danger" onClick={() => void submitFlag()} className="!py-1.5 !text-xs">
+              Send flag
+            </Btn>
+          </div>
+        </div>
+      )}
       <div className="h-2 w-full overflow-hidden rounded-full bg-[#232b3a]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[var(--rah-primary)] to-[var(--rah-accent)] transition-all duration-500"

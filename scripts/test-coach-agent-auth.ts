@@ -213,6 +213,48 @@ try {
   const coachRow = chatRows.find((c) => c.role === "coach");
   check(Boolean(coachRow) && String(coachRow?.content).includes("agent"), "agent turn persists to sidebar memory", String(coachRow?.content).slice(0, 60));
 
+  // ================= 4c. STOP THE AGENT (review feature #15) =================
+  // A guaranteed multi-step request; abort after the first tool event, then
+  // the SERVER must persist a graceful stopped turn (the loop closes between
+  // steps on req.signal). Never a silent 500, never a lost turn.
+  try {
+    const ctrl = new AbortController();
+    const stopReq = await fetch(`${BASE}/api/coach-agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        message:
+          "Call read_state, then write a file named drive-stop-scratch.md containing one line, then call read_state again before your final answer.",
+      }),
+      signal: ctrl.signal,
+    });
+    check(stopReq.ok, "stop-run stream opens", `status=${stopReq.status}`);
+    const reader = stopReq.body!.getReader();
+    const decoder = new TextDecoder();
+    let sawTool = false;
+    while (!sawTool) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const line of decoder.decode(value, { stream: true }).split("\n\n")) {
+        if (line.startsWith("data: ") && String(line).includes('"tool"')) sawTool = true;
+      }
+    }
+    ctrl.abort();
+    check(sawTool, "aborted mid-run (after a real tool event)", `sawTool=${sawTool}`);
+    // The server closes between steps; give it a moment, then inspect memory.
+    let stoppedRow = "";
+    for (let i = 0; i < 10 && !/stopped/i.test(stoppedRow); i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const rows = await prisma.chatMsg.findMany({ orderBy: { id: "desc" }, take: 2 });
+      stoppedRow = rows.find((c) => c.role === "coach")?.content ?? "";
+    }
+    check(/stopped/i.test(stoppedRow), "stopped run persists a graceful stopped turn", stoppedRow.slice(0, 140));
+    await prisma.chatMsg.deleteMany({ where: { content: { contains: "drive-stop-scratch" } } });
+    await import("fs").then((fs) => fs.rmSync("/home/z/my-project/data/coach-workspace/drive-stop-scratch.md", { force: true }));
+  } catch (e) {
+    check(false, "stop-the-agent drive", String((e as Error).message ?? e).slice(0, 120));
+  }
+
   // ================= 5. SIGN OUT =================
   const out = await api("/api/auth/session", { method: "DELETE" });
   const afterOut = await api("/api/auth/session");

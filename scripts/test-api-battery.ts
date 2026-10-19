@@ -74,6 +74,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/coach/briefing", methods: ["GET", "POST"] },
   { path: "/api/exam/grade", methods: ["POST"] },
   { path: "/api/exam/replay", methods: ["GET"] },
+  { path: "/api/feedback", methods: ["GET", "POST"] },
   { path: "/api/export", methods: ["GET"] },
   { path: "/api/flow", methods: ["GET", "POST"] },
   { path: "/api/grammar-check", methods: ["POST"] },
@@ -99,7 +100,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/writing", methods: ["GET", "POST"] },
 ];
 
-const GATED = ["/api/coach-agent", "/api/shop"]; // 401 to anonymous by design
+const GATED = ["/api/coach-agent", "/api/shop", "/api/feedback"]; // 401 to anonymous by design
 const AUTH_ROUTES = ["/api/auth/request-code", "/api/auth/verify", "/api/auth/session", "/api/auth/google/start", "/api/auth/google/callback"];
 
 try {
@@ -372,6 +373,36 @@ try {
   await pr2.speakSession.deleteMany({ where: { prompt: "battery-reseed prompt" } });
   await pr2.$disconnect();
   console.log("rea-2 seeds removed");
+
+  // ================= 6c. AGENT CONTROL + CONTENT FLAGS (7.4 wave C) =================
+  console.log("\n--- stop-the-agent + content flags ---");
+  const { stoppedReply } = await import("@/lib/coach-agent/loop");
+  const sr0 = stoppedReply([]);
+  check(sr0.startsWith("Stopped before I got going"), "stopped reply with zero steps is honest", sr0);
+  const sr2 = stoppedReply([{ label: "read_state" }, { label: "write_file" }, { label: "Mode: roleplay" }, { label: "Unknown tool: x" }]);
+  check(sr2.includes("read_state, write_file") && !sr2.includes("Mode: roleplay") && !sr2.includes("Unknown tool"), "stopped reply names the real work, drops noise", sr2);
+  const { isStateQuestion } = await import("@/lib/coach-agent/loop");
+  check(isStateQuestion("what is my streak and due count?") && isStateQuestion("What should I do right now") && isStateQuestion("how am i doing"), "state-question detector catches the real asks", "missed a state question");
+  check(!isStateQuestion("what is the answer of this question") && !isStateQuestion("make me a PDF of collocations"), "screen/work questions do NOT trigger the read_state enforcement", "false positive");
+
+  const fbAnon = await noCookie("/api/feedback", { method: "POST", body: JSON.stringify({ kind: "typo", note: "anon" }) });
+  check(fbAnon.status === 401, "feedback POST is 401 to anonymous", `status=${fbAnon.status}`);
+  const fbGetAnon = await noCookie("/api/feedback");
+  check(fbGetAnon.status === 401, "feedback GET is 401 to anonymous", `status=${fbGetAnon.status}`);
+  const fbHostile = await api("/api/feedback", { method: "POST", body: JSON.stringify({ kind: "<script>inject", note: "battery-hostile-" + Date.now() + "x".repeat(400), cardId: "c-" + "y".repeat(500) }) });
+  check(fbHostile.status === 200 && fbHostile.body?.kind === "other", "hostile kind clamps to other", JSON.stringify(fbHostile.body));
+  const fbOk = await api("/api/feedback", { method: "POST", body: JSON.stringify({ cardId: "battery-flag-card", kind: "wrong_answer", note: "battery flag note" }) });
+  check(fbOk.status === 200 && fbOk.body?.ok === true, "feedback POST lands", JSON.stringify(fbOk.body));
+  const fbDup = await api("/api/feedback", { method: "POST", body: JSON.stringify({ cardId: "battery-flag-card", kind: "wrong_answer", note: "battery flag note" }) });
+  check(fbDup.status === 200 && fbDup.body?.duplicate === true, "exact duplicate of an open flag is refused honestly", JSON.stringify(fbDup.body));
+  const fbList = await api("/api/feedback");
+  check(fbList.status === 200 && typeof fbList.body?.open === "number" && Array.isArray(fbList.body?.recent), "feedback GET shape", JSON.stringify(fbList.body).slice(0, 120));
+  check((fbList.body?.recent ?? []).some((f: { cardId: string }) => f.cardId === "battery-flag-card"), "flag is in the queue the coach sees", JSON.stringify(fbList.body?.recent)?.slice(0, 150));
+  const { PrismaClient: PC3 } = await import("@prisma/client");
+  const pr3 = new PC3();
+  await pr3.contentFlag.deleteMany({ where: { OR: [{ cardId: "battery-flag-card" }, { note: { startsWith: "battery-hostile-" } }] } });
+  await pr3.$disconnect();
+  console.log("flag seeds removed");
 
   // ================= 7. RESTORE =================
   console.log("\n--- restore ---");

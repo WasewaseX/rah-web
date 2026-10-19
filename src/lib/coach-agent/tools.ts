@@ -54,6 +54,9 @@ async function readState(): Promise<ToolResult> {
   const today = dayIndex();
   const stats = await db.dailyStat.findMany({ orderBy: { day: "desc" }, take: 7 });
   const l = await db.learner.findUnique({ where: { id: "me" } });
+  // Review feature #17: the learner's content flags are part of the truth.
+  const openFlags = await db.contentFlag.count({ where: { status: "open" } });
+  const recentFlags = await db.contentFlag.findMany({ where: { status: "open" }, orderBy: { id: "desc" }, take: 5 });
 
   const payload = {
     learner: l
@@ -70,10 +73,14 @@ async function readState(): Promise<ToolResult> {
     nextBest,
     stats: stats.map((r) => ({ day: r.day, reviews: r.reviews, correct: r.correct, xp: r.xp })),
     today,
+    contentFlags: {
+      open: openFlags,
+      recent: recentFlags.map((f) => ({ cardId: f.cardId, kind: f.kind, note: f.note.slice(0, 80) })),
+    },
   };
   return {
     ok: true,
-    summary: `App state: level ${profile.level}, streak ${profile.streak}, ${profile.due} due, ${mistakes.length} active mistake families`,
+    summary: `App state: level ${profile.level}, streak ${profile.streak}, ${profile.due} due, ${mistakes.length} active mistake families${openFlags ? `, ${openFlags} open content flag(s)` : ""}`,
     detail: JSON.stringify(payload, null, 1).slice(0, 5000),
   };
 }

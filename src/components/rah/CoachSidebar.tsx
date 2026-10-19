@@ -8,7 +8,7 @@
 // This is the "access anything, show anything on all tabs" surface.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut, FolderOpen, FileDown } from "lucide-react";
+import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut, FolderOpen, FileDown, Square } from "lucide-react";
 import { Chip, Btn } from "./ui";
 import { clearRahToken } from "@/lib/rah-fetch";
 import { getCoachActivity } from "@/lib/activity-store";
@@ -102,6 +102,11 @@ export default function CoachSidebar({
   const [wsOpen, setWsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopRun = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -205,11 +210,18 @@ export default function CoachSidebar({
       setFinalArrived(false);
       setMessages((m) => [...m, { id: Date.now(), role: "user", text: message }]);
 
+      // Review feature #15: Stop. The controller aborts the fetch; the server
+      // sees req.signal fire, closes the loop between steps, and the stopped
+      // turn still persists to history.
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
       try {
         const r = await fetch("/api/coach-agent", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ message, view, activity: getCoachActivity() }),
+          signal: ctrl.signal,
         });
         if (!r.ok || !r.body) {
           const err = (await r.json().catch(() => ({ error: "Coach unreachable" }))) as { error?: string };
@@ -265,9 +277,24 @@ export default function CoachSidebar({
             },
           ]);
         }
-      } catch {
-        setSteps((s) => [...s, { kind: "error", label: "Connection dropped mid-run" }]);
+      } catch (e) {
+        if (ctrl.signal.aborted) {
+          setSteps((s) => [...s, { kind: "error", label: "Stopped" }]);
+          setMessages((m) => [
+            ...m,
+            {
+              id: Date.now() + 1,
+              role: "coach",
+              reply: "Stopped. What ran before the stop stays in the trace and in my memory - send another message whenever you want the rest done.",
+            },
+          ]);
+          void refresh();
+          void loadWorkspace();
+        } else {
+          setSteps((s) => [...s, { kind: "error", label: "Connection dropped mid-run" }]);
+        }
       } finally {
+        abortRef.current = null;
         setRunning(false);
       }
     },
@@ -520,6 +547,11 @@ export default function CoachSidebar({
             <Btn type="submit" disabled={running || !input.trim()} className="!min-h-11 !px-3">
               <Send className="h-4 w-4" />
             </Btn>
+            {running && (
+              <Btn onClick={stopRun} variant="danger" className="!min-h-11 !px-3 rah-pulse">
+                <Square className="h-4 w-4" />
+              </Btn>
+            )}
           </form>
         </div>
       </div>

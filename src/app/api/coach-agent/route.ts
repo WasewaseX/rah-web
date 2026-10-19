@@ -55,7 +55,10 @@ export async function POST(req: Request) {
 
       let turn: Awaited<ReturnType<typeof runAgent>>;
       try {
-        turn = await runAgent(text, flat, profile, send, String(view ?? ""), activitySafe);
+        // req.signal aborts when the learner hits Stop (client aborts the
+        // fetch). The loop closes between steps and the stopped turn still
+        // persists below, so history never loses what actually ran.
+        turn = await runAgent(text, flat, profile, send, String(view ?? ""), activitySafe, req.signal);
       } catch (e) {
         send({ type: "error", label: "Agent crashed", detail: (e as Error).message });
         turn = {
