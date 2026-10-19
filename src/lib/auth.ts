@@ -105,6 +105,22 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return resolveToken(token);
 }
 
+// Embedded contexts (preview iframes, third-party-cookie-blocked browsers)
+// drop SameSite cookies entirely: the verify POST succeeds and the dashboard
+// renders from its response body, but no cookie is ever stored, so every
+// later call arrives cookie-less. Those callers send the login token in the
+// x-rah-token header instead - resolve it as a full first-class credential.
+export async function getSessionUserWithRequest(req: Request): Promise<SessionUser | null> {
+  const jar = await cookies();
+  const cookieToken = jar.get(SESSION_COOKIE)?.value;
+  if (cookieToken) {
+    const fromCookie = await resolveToken(cookieToken);
+    if (fromCookie) return fromCookie;
+  }
+  const headerToken = req.headers.get("x-rah-token");
+  return resolveToken(headerToken);
+}
+
 export async function resolveToken(token: string | undefined | null): Promise<SessionUser | null> {
   if (!token) return null;
   const session = await db.session.findUnique({

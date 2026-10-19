@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut } from "lucide-react";
 import { Chip, Btn } from "./ui";
+import { clearRahToken } from "@/lib/rah-fetch";
 import type { ViewId } from "./App";
 import type { AppState } from "./App";
 
@@ -63,6 +64,7 @@ export default function CoachSidebar({
   open,
   onOpenChange,
   state,
+  view,
   go,
   refresh,
   toast,
@@ -71,6 +73,7 @@ export default function CoachSidebar({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   state: AppState | null;
+  view: string;
   go: (v: ViewId) => void;
   refresh: () => void;
   toast: (t: { title: string; desc: string }) => void;
@@ -153,7 +156,7 @@ export default function CoachSidebar({
         const r = await fetch("/api/coach-agent", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message, view }),
         });
         if (!r.ok || !r.body) {
           const err = (await r.json().catch(() => ({ error: "Coach unreachable" }))) as { error?: string };
@@ -262,7 +265,10 @@ export default function CoachSidebar({
             {state && <Chip tone="blue">{state.learner.gems ?? 0} gems</Chip>}
             <button
               onClick={() => {
-                void fetch("/api/auth/session", { method: "DELETE" }).then(onSignOut);
+                void fetch("/api/auth/session", { method: "DELETE" }).then(() => {
+                  clearRahToken();
+                  onSignOut();
+                });
               }}
               title="Sign out"
               className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"

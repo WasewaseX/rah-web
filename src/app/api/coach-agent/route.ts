@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUserWithRequest } from "@/lib/auth";
 import { awardXp } from "@/lib/arcade";
 import { runAgent, type AgentEvent } from "@/lib/coach-agent/loop";
 
@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
 export async function POST(req: Request) {
-  const user = await getSessionUser();
+  const user = await getSessionUserWithRequest(req);
   if (!user) return NextResponse.json({ error: "Sign in to talk to your coach." }, { status: 401 });
 
-  const { message } = await req.json().catch(() => ({ message: "" }));
+  const { message, view } = await req.json().catch(() => ({ message: "" }));
   const text = String(message ?? "").trim();
   if (!text) return NextResponse.json({ error: "message required" }, { status: 400 });
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
       let turn: Awaited<ReturnType<typeof runAgent>>;
       try {
-        turn = await runAgent(text, flat, profile, send);
+        turn = await runAgent(text, flat, profile, send, String(view ?? ""));
       } catch (e) {
         send({ type: "error", label: "Agent crashed", detail: (e as Error).message });
         turn = {

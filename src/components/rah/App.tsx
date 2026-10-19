@@ -4,6 +4,10 @@
 // Midnight shell: navy rail, glass bars, blue signal color.
 
 import { useCallback, useEffect, useState } from "react";
+import { installRahFetch } from "@/lib/rah-fetch";
+// Installs the x-rah-token fetch wrapper BEFORE any effect fires an /api call,
+// so embedded contexts that drop cookies still authenticate every request.
+installRahFetch();
 import {
   Home,
   RotateCcw,
@@ -354,6 +358,7 @@ export default function RahApp() {
         open={coachOpen}
         onOpenChange={setCoachOpen}
         state={state}
+        view={view}
         go={go}
         refresh={refresh}
         toast={pushToast}

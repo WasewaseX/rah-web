@@ -114,11 +114,13 @@ try {
   const devCode = req1.body?.devCode as string | undefined;
   check(req1.status === 200 && /^\d{6}$/.test(devCode ?? ""), "request-code issues a code", JSON.stringify(req1.body));
   let cookie = "";
+  let loginToken = "";
   {
     const api0 = makeApi("");
     const good = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: EMAIL, code: devCode }) });
     check(good.status === 200, "verify mints a session", JSON.stringify(good.body));
     cookie = good.setCookie?.split(";")[0] ?? "";
+    loginToken = String(good.body?.token ?? ""); // body token: the no-cookie fallback credential
   }
   check(cookie.includes("rah_session="), "session cookie captured", cookie.slice(0, 24));
   const api = makeApi(cookie);
@@ -180,6 +182,19 @@ try {
   // coach-agent input validation (cheap, no model call)
   const noMsg = await api("/api/coach-agent", { method: "POST", body: JSON.stringify({}) });
   check(noMsg.status === 400, "coach-agent rejects an empty message with 400", `status=${noMsg.status}`);
+
+  // ================= 4b. HEADER AUTH: the embedded-context fallback =================
+  // Cookies can be dropped entirely (preview iframes, third-party-cookie
+  // blocking): the session must still resolve from the x-rah-token header.
+  console.log("\n--- header auth: no-cookie requests ---");
+  check(loginToken.length >= 32, "verify response carries the body token", `len=${loginToken.length}`);
+  const noCookie = makeApi("");
+  const hdrSession = await noCookie("/api/auth/session", { method: "GET", headers: { "x-rah-token": loginToken } });
+  check(hdrSession.status === 200 && hdrSession.body?.user?.email === EMAIL, "session resolves from the header alone (no cookie)", JSON.stringify(hdrSession.body));
+  const hdrAgent = await noCookie("/api/coach-agent", { method: "POST", headers: { "x-rah-token": loginToken }, body: JSON.stringify({}) });
+  check(hdrAgent.status === 400, "coach-agent accepts header auth (400 on empty msg, NOT 401)", `status=${hdrAgent.status}`);
+  const hdrNone = await noCookie("/api/auth/session", { method: "GET" });
+  check(hdrNone.body?.user === null, "no cookie AND no header still resolves null", JSON.stringify(hdrNone.body));
 
   // ================= 5. LOOP UNITS: the JSON-repair regression wall =================
   console.log("\n--- loop units: extractTurn / sanitizeReply ---");

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { Mail, ShieldCheck, KeyRound, Sparkles, ArrowLeft } from "lucide-react";
 import { Btn } from "./ui";
+import { storeRahToken } from "@/lib/rah-fetch";
 
 interface SessionInfo {
   user: { email: string; name: string } | null;
@@ -70,10 +71,14 @@ export default function Login({ onSignedIn }: { onSignedIn: (user: { email: stri
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: sentTo, code }),
       });
-      const data = (await r.json()) as { error?: string; user?: { email: string; name: string } };
+      const data = (await r.json()) as { error?: string; token?: string; user?: { email: string; name: string } };
       if (!r.ok || !data.user) {
         setError(data.error ?? "Verification failed.");
       } else {
+        // Keep the token for contexts where cookies cannot persist (preview
+        // iframes drop SameSite cookies entirely): the fetch wrapper attaches
+        // it as x-rah-token on every /api call.
+        storeRahToken(data.token);
         onSignedIn(data.user);
       }
     } catch {

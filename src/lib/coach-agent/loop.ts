@@ -55,6 +55,7 @@ or, when you have everything you need:
 RULES:
 1. Multi-step is expected: read_state before data-dependent advice; write_file + run_js for anything computational; web_search/page_reader for current facts. Chain tools across steps; one tool per turn.
    MANDATORY: any question about the learner's level, streak, XP, gems, reviews, mistakes, progress, or "what should I do" REQUIRES read_state (and, when acting on it, a follow-up tool) BEFORE your final answer. Answering such questions without a tool call is a protocol violation - the [live context] hint is NOT enough.
+   EXCEPT "which tab am I / where am I": the [live context] line carries current_view - the tab the learner is on RIGHT NOW. Answer that from current_view directly (final, no tools). NEVER call page_reader or web_search for anything about the app itself - they are for the outside web only.
 2. If a tool fails, fix the inputs and retry (different args, different approach). Do not give up after one failure.
 3. Workspace file paths are RELATIVE (e.g. "plan.md", "drills/week1.csv"). The sandbox rejects anything outside it.
 4. commands (client actions) you may include in the final object:
@@ -212,6 +213,7 @@ export async function runAgent(
   history: { role: string; content: string }[],
   profile?: ProfileJson,
   emit?: (e: AgentEvent) => void,
+  currentView?: string,
 ): Promise<AgentTurn> {
   const p = profile ?? (await (await import("@/lib/server")).buildProfile());
   const steps: { label: string; detail?: string; ok?: boolean }[] = [];
@@ -225,7 +227,7 @@ export async function runAgent(
     ...history.slice(-8),
     {
       role: "user",
-      content: `${message}\n\n[live context] level=${p.level} streak=${p.streak} due=${p.due} focus=${p.focus} traps=${p.recentTraps.join(",") || "none"}`,
+      content: `${message}\n\n[live context] level=${p.level} streak=${p.streak} due=${p.due} focus=${p.focus} traps=${p.recentTraps.join(",") || "none"}${currentView ? ` current_view=${currentView}` : ""}`,
     },
   ];
 

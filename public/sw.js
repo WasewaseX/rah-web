@@ -19,15 +19,24 @@
 const SHELL = "/";
 
 let CACHE = "rah-boot";
+// A dirty tree (or a missing SHA) means the served JS is NOT the committed
+// build: dev and preview recompile continuously while the git SHA stands
+// still, so content is NOT addressed by its URL. Caching /_next/static then
+// freezes the app at the last commit until the next one - the service worker
+// becomes the reason "my fix is not showing up". In that state the worker
+// must stay out of the way of every static chunk.
+let NO_CACHE_STATIC = false;
 
 async function resolveCacheName() {
   if (CACHE !== "rah-boot") return CACHE;
   try {
     const res = await fetch("/api/version", { cache: "no-store" });
     const j = await res.json();
-    CACHE = `rah-${j.version ?? "dev"}`;
+    NO_CACHE_STATIC = !j.version || j.version === "dev" || j.version === "no-git" || Number(j.dirty ?? 0) > 0;
+    CACHE = NO_CACHE_STATIC ? "rah-dev-nocache" : `rah-${j.version}`;
   } catch {
-    CACHE = "rah-dev";
+    NO_CACHE_STATIC = true;
+    CACHE = "rah-dev-nocache";
   }
   return CACHE;
 }
@@ -127,6 +136,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/_next/static") || url.pathname.startsWith("/icons/") || url.pathname === "/logo.svg") {
+    if (NO_CACHE_STATIC) return; // dev/preview: chunks are not URL-addressed, network only
     event.respondWith(cacheFirst(req).catch(() => Response.error()));
   }
 });
