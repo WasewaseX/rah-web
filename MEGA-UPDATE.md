@@ -176,5 +176,4 @@ Queue attaches tiles; the client builds by tapping; grading is the shared
 join-and-normalize; the grade route persists dir=bank into FSRS + ReviewLog.
 Full state restore in finally.
 
-**D3 — match-pairs sprint `[ ]`** — spec only (DUOLINGO-RE.md §8): Duolingo's
-tap-the-pairs speed drill over due cards, deterministic pair set, engine-graded.
+**D3 — match-pairs sprint `[x]` SHIPPED (Task 37)** — `src/lib/pairs.ts` deterministic board (mulberry32, due-first, Farsi-deduped) + `PairsGame.tsx` + `/api/arcade/pairs`; every match grades Good via /api/review/grade dir=pairs so FSRS sees the retrieval once; the sprint POST only clamps the aggregate speed bonus. Gate: battery section 6 + browser E2E (board played to completion).

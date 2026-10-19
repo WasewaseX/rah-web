@@ -76,6 +76,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/exam/replay", methods: ["GET"] },
   { path: "/api/feedback", methods: ["GET", "POST"] },
   { path: "/api/export", methods: ["GET"] },
+  { path: "/api/export/anki", methods: ["GET"] },
   { path: "/api/flow", methods: ["GET", "POST"] },
   { path: "/api/grammar-check", methods: ["POST"] },
   { path: "/api/import", methods: ["POST"] },
@@ -420,6 +421,27 @@ try {
   check(cvEmpty.status === 400, "empty transcript is 400 with a speakable error", JSON.stringify(cvEmpty.body));
   const cvOver = await api("/api/speak/conversation", { method: "POST", body: JSON.stringify({ scenarioId: "complain", turns: Array.from({ length: 20 }, (_, i) => ({ you: "line " + i, coach: "ok" })) }) });
   check(cvOver.status === 400 || cvOver.status === 502, "oversized history is clamped/400, never 500", `status=${cvOver.status}`);
+
+  // ================= 6e. INTEROP + TRIAGE (7.4 wave C follow) =================
+  console.log("\n--- anki tsv export + flag triage tool ---");
+  const anki = await api("/api/export/anki");
+  const ankiLines = anki.text.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+  check(anki.status === 200 && anki.text.startsWith("#separator:tab"), "anki export carries the anki header", anki.text.slice(0, 60));
+  check(ankiLines.length >= 200, "every deck card exports", `${ankiLines.length} rows`);
+  check(ankiLines.every((l) => l.split("\t").length === 3), "every row is exactly front<TAB>back<TAB>tags", ankiLines[0]?.slice(0, 80) ?? "empty");
+  check(ankiLines.every((l) => !l.includes("\n")), "no embedded newlines inside cells (TSV-safe)", "newline in cell");
+  check(anki.text.includes("does NOT round-trip"), "the header says scheduling does not round-trip (honest)", "missing disclaimer");
+  const { toolByName: toolByName2 } = await import("@/lib/coach-agent/tools");
+  const tri = toolByName2("triage_flags");
+  check(Boolean(tri), "triage_flags tool is registered", "missing");
+  if (tri) {
+    const badStatus = await tri.run({ action: "resolve", id: 999999, status: "<script>" });
+    check(badStatus.ok === false && /fixed or wontfix/i.test(badStatus.summary), "resolve rejects a hostile status", badStatus.summary);
+    const badId = await tri.run({ action: "resolve", id: "drop table", status: "fixed" });
+    check(badId.ok === false && /numeric/i.test(badId.summary), "resolve rejects a non-numeric id", badId.summary);
+    const emptyList = await tri.run({ action: "list" });
+    check(emptyList.ok === true, "list works on an empty queue", emptyList.summary);
+  }
 
   // ================= 7. RESTORE =================
   console.log("\n--- restore ---");

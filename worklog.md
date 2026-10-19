@@ -669,3 +669,19 @@ Work Log:
 
 Stage Summary:
 - The review's headline ask - real voice conversation - is now a shipped, gated surface with the house doctrine intact: deterministic scenarios, in-scene coach, corrections that feed the persistent learner model, and scores the engine computes instead of the AI's self-image. Speaking now has three honest modes: shadowing (VoiceArena), monologue + diagnosis + harder repeat (Speak), and free conversation (Talk). Next candidates from the review: #12 Anki/deck interoperability (TSV export/import on top of the rah.v1 bundle), #9 learner-materials ingestion into review cards.
+
+---
+Task ID: 42
+Agent: Super Z (main)
+Task: The 7.4/10 review's follow-ups, wave C: #12's honest export half (Anki TSV), #17's missing loop-closer (coach triage_flags tool), #14 polish (trace copy button), plus the stale MEGA-UPDATE D3 line fixed.
+
+Work Log:
+- /api/export/anki: GET, text/plain TSV in Anki's import dialect (#separator:tab / #html:false headers, front<TAB>back<TAB>tags, one row per deck card - 218 rows). Cell sanitizer strips control chars and flattens tabs/newlines so no cell can break the TSV. HONESTY HEADER: "Rah's FSRS schedule does NOT round-trip into Anki" - rah state travels as a plain informational tag (rah:new|review|mature), no fake scheduling interop. Progress BackupPanel gains the "Export deck (.tsv for Anki)" button. IMPORT half deliberately deferred: the deck is a static content pipeline (deck.json, unit/skill/trap metadata, distractors) - true custom-card ingestion is a schema+pipeline change tracked for the mega-update, not a quick win to rush.
+- triage_flags coach tool (tools.ts, house style: dynamic db import): action=list shows open flags with full notes; action=resolve {id, status: fixed|wontfix} closes one - numeric-id and status-set validation, unknown-id rejection. This closes #17's loop: learner flags -> queue -> read_state surfaces it -> the coach can now RESOLVE it in conversation. Unit-pinned in battery (hostile status rejected, non-numeric id rejected, empty-queue list ok).
+- CoachSidebar trace header gains a copy button (clipboard, appears when the run is not active) - #14's "inspect what the agent did" now leaves the sidebar too.
+- Battery: ROUTES +1 (44 paths); section 6e - anki header, >=200 rows, exactly-3-cells-per-row, TSV-cell safety, disclaimer present, triage units. 261/261.
+- CAUGHT MY OWN PROCESS BUG: the anki route's first Write failed (parent dir missing) and the file never existed - the battery caught it as 404-HTML-instead-of-TSV (4 FAILs). Never assume a staged file exists because the tool call "succeeded"; the battery is the arbiter.
+- tsc clean, eslint clean. MEGA-UPDATE.md D3 line corrected from "spec only" to SHIPPED (Task 37) - it had drifted.
+
+Stage Summary:
+- Wave C closed: the deck leaves the app in a standard format with an honest disclaimer, the flag queue is now a closed loop the coach can triage, and the agent trace is copyable. Remaining review items (#9 ingestion, #7 exam formats, #5 curriculum depth, #2 phoneme feedback, #20 offline sync) are mega-update scale and stay tracked.

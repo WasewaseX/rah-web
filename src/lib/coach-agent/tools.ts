@@ -320,7 +320,38 @@ export const TOOLS: ToolDef[] = [
     args: '{"message": "/quiz present perfect"}',
     run: coachSkill,
   },
+  {
+    name: "triage_flags",
+    desc: "Content-flag triage (review feature #17). action=list shows the open content flags with full notes; action=resolve marks one fixed or wontfix by id. Use when the learner reports something wrong in a question/explanation/Farsi note, or asks what is in the queue.",
+    args: '{"action": "resolve", "id": 3, "status": "fixed"}',
+    run: triageFlags,
+  },
 ];
+
+async function triageFlags(args: ToolArgs): Promise<ToolResult> {
+  const { db } = await import("@/lib/db");
+  const action = String(args.action ?? "list");
+  if (action === "list") {
+    const flags = await db.contentFlag.findMany({ where: { status: "open" }, orderBy: { id: "desc" }, take: 20 });
+    if (flags.length === 0) return { ok: true, summary: "Flag queue is empty - nothing reported.", detail: "no open content flags" };
+    return {
+      ok: true,
+      summary: `${flags.length} open content flag(s).`,
+      detail: flags.map((f) => `#${f.id} [${f.kind}] card=${f.cardId || "(general)"}: ${f.note}`).join("\n").slice(0, 3000),
+    };
+  }
+  if (action === "resolve") {
+    const id = Number(args.id);
+    const status = String(args.status ?? "fixed");
+    if (!Number.isInteger(id) || id <= 0) return { ok: false, summary: "resolve needs a numeric flag id", detail: `got id=${String(args.id)}` };
+    if (status !== "fixed" && status !== "wontfix") return { ok: false, summary: "status must be fixed or wontfix", detail: `got ${status}` };
+    const existing = await db.contentFlag.findUnique({ where: { id } });
+    if (!existing) return { ok: false, summary: `Flag #${id} does not exist`, detail: "unknown id" };
+    await db.contentFlag.update({ where: { id }, data: { status } });
+    return { ok: true, summary: `Flag #${id} marked ${status}.`, detail: `card=${existing.cardId} kind=${existing.kind} note=${existing.note.slice(0, 120)}` };
+  }
+  return { ok: false, summary: "action must be list or resolve", detail: `got ${action}` };
+}
 
 export function toolByName(name: string): ToolDef | undefined {
   return TOOLS.find((t) => t.name === name);

@@ -533,6 +533,14 @@ function BackupPanel() {
         <Btn disabled={busy} onClick={pickFile}>
           {busy ? "Working..." : "Choose a backup to restore"}
         </Btn>
+        <Btn
+          disabled={busy}
+          onClick={() => {
+            window.open("/api/export/anki", "_blank");
+          }}
+        >
+          Export deck (.tsv for Anki)
+        </Btn>
         {pending.current && (
           <Btn variant="primary" disabled={busy} onClick={restore}>
             Restore

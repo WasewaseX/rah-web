@@ -433,8 +433,21 @@ export default function CoachSidebar({
               the conversation shows one clean reply instead of tool noise. */}
           {steps.length > 0 && (running || !finalArrived) && (
             <div className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-[#101726] p-3">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#7d889c]">
-                <FileText className="h-3 w-3" /> agent trace
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-[#7d889c]">
+                <span className="flex items-center gap-1.5">
+                  <FileText className="h-3 w-3" /> agent trace
+                </span>
+                {!running && (
+                  <button
+                    onClick={() => {
+                      const text = steps.map((s) => `[${s.kind}] ${s.label}${s.detail ? ` — ${s.detail}` : ""}`).join("\n");
+                      void navigator.clipboard?.writeText(text).catch(() => undefined);
+                    }}
+                    className="normal-case tracking-normal text-[#9dc0ff] hover:text-[#f2f5fa]"
+                  >
+                    copy
+                  </button>
+                )}
               </div>
               {steps.map((s, i) => (
                 <div key={i} className="flex items-start gap-2 text-[11px] leading-snug">
