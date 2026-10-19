@@ -56,6 +56,18 @@ export function tagLabel(raw: string): string {
 
 function labelFor(tag: string, kind: string): string {
   if (TAG_LABELS[tag]) return TAG_LABELS[tag];
+  // Sound Lab contrasts (Task 43): sound_w_v, sound_th, sound_vowel_i_ee, ...
+  // render as "Sound: w vs v" instead of the generic recurring-family line.
+  if (tag.startsWith("sound_")) {
+    const raw = tag.slice("sound_".length).replace(/_/g, " ").trim();
+    if (raw === "th") return "Sound: th (tink vs think)";
+    if (raw === "ng") return "Sound: final -ng drops to -n";
+    if (raw === "clusters") return "Sound: final clusters reduce";
+    if (raw.startsWith("vowel ")) return `Sound: vowels (${raw.slice(6)}) collapse`;
+    const tokens = raw.split(/\s+/);
+    if (tokens.length === 2) return `Sound: ${tokens[0]} vs ${tokens[1]}`;
+    return `Sound: ${raw} contrast`;
+  }
   const pretty = tag.replace(/_/g, " ");
   return `${pretty.charAt(0).toUpperCase()}${pretty.slice(1)} recurring in ${kind}`;
 }

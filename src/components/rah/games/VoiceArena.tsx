@@ -8,6 +8,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Play, Square, Volume2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "../ui";
 
+interface SoundContrast {
+  key: string;
+  label: string;
+  tip: string;
+  evidence: { target: string; heard: string }[];
+  drill: { front: string; back: string }[];
+}
+
+interface SoundReport {
+  contrasts: SoundContrast[];
+  other: { target: string; heard: string }[];
+  note: string;
+}
+
 interface Drill {
   id: string;
   en: string;
@@ -26,6 +40,7 @@ interface Score {
 
 interface RepResult {
   score: Score;
+  sound?: SoundReport;
   xpGain: number;
 }
 
@@ -134,7 +149,7 @@ export default function VoiceArena({ onChange }: { onChange: () => void }) {
         setBusy(false);
         return;
       }
-      const repResult: RepResult = { score: j.score, xpGain: j.xpGain };
+      const repResult: RepResult = { score: j.score, sound: j.sound, xpGain: j.xpGain };
       setLast(repResult);
       setResults((rs) => [...rs, repResult]);
       onChange();
@@ -173,10 +188,10 @@ export default function VoiceArena({ onChange }: { onChange: () => void }) {
             </p>
             {!hasSpeech && (
               <p className="mx-auto mt-3 max-w-sm text-xs font-semibold text-[#ffa3b1]">
-                This browser has no speech recognition. Chrome or Edge will run the arena.
+                No speech recognition here - you can still train by typing what you said after each line.
               </p>
             )}
-            <Btn variant="go" onClick={startSession} className="mt-6" disabled={!hasSpeech}>
+            <Btn variant="go" onClick={startSession} className="mt-6">
               <Mic className="h-4 w-4" /> Enter the arena
             </Btn>
           </>
@@ -249,12 +264,15 @@ export default function VoiceArena({ onChange }: { onChange: () => void }) {
                 <Mic className="h-4 w-4" /> {transcript ? "Re-record" : "Say it back"}
               </Btn>
             )}
-            {transcript && !listening && (
-              <div className="mt-4 rounded-2xl border border-white/[0.06] bg-[#141924] p-4 text-left">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">Heard</div>
-                <div className="mt-1 text-sm leading-relaxed text-[#dbe3f0]">{transcript}</div>
-              </div>
-            )}
+            <div className="mt-4">
+              <input
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                placeholder={hasSpeech ? "Heard nothing? Fix what the mic caught, or type what you said" : "No mic - type what you said, the scorer takes it as the transcript"}
+                className="w-full rounded-xl border border-white/[0.08] bg-[#141924] px-4 py-3 text-sm text-[#dbe3f0] outline-none placeholder:text-[#5d6880] focus:border-[#5f8fe8]/60"
+                aria-label="Transcript (editable)"
+              />
+            </div>
             <Btn variant="primary" onClick={submit} disabled={busy || !transcript.trim() || listening} className="mt-4">
               {busy ? "Scoring…" : "Score this rep"}
             </Btn>
@@ -280,6 +298,8 @@ export default function VoiceArena({ onChange }: { onChange: () => void }) {
                 </div>
               </div>
             )}
+
+            {last.sound && <SoundPanel sound={last.sound} />}
             <div className="mt-5 text-center">
               <Btn variant="go" onClick={next}>
                 <Play className="h-4 w-4" /> {rep + 1 >= Math.min(REPS, drills.length) ? "Finish session" : "Next rep"}
@@ -290,6 +310,60 @@ export default function VoiceArena({ onChange }: { onChange: () => void }) {
 
         {error && <div className="mt-4 text-center text-sm font-bold text-[#ffa3b1]">{error}</div>}
       </Card>
+    </div>
+  );
+}
+
+// Extracted so TS narrowing survives the .map callbacks, and so the Sound
+// Lab block stays readable inside an already long component.
+function SoundPanel({ sound }: { sound: SoundReport }) {
+  if (sound.contrasts.length === 0 && sound.other.length === 0) return null;
+  return (
+    <div className="mt-5 rounded-2xl border border-white/[0.06] bg-[#141924] p-4 text-left">
+      <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#9de6fb]">Sound lab</div>
+      {sound.contrasts.map((c) => (
+        <div key={c.key} className="mt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip tone="amber">{c.label}</Chip>
+            {c.evidence.map((ev, i) => (
+              <span key={i} className="text-xs text-[#a9b4c6]">
+                you aimed at <b className="text-[#e7ecf5]">{ev.target}</b>, the mic heard <b className="text-[#ffa3b1]">{ev.heard}</b>
+              </span>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-[#a9b4c6]">{c.tip}</p>
+          {c.drill.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {c.drill.map((d, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    speak(d.front);
+                    setTimeout(() => speak(d.back), 900);
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#1b2230] px-2.5 py-1.5 text-xs font-semibold text-[#dbe3f0] hover:border-[#5f8fe8]/60"
+                  title="Play the pair"
+                >
+                  <Volume2 className="h-3.5 w-3.5 text-[#9de6fb]" />
+                  {d.front} / {d.back}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      {sound.other.length > 0 && (
+        <div className="mt-3 text-xs leading-relaxed text-[#7d889c]">
+          Also different (no known pattern):{" "}
+          {sound.other.map((o, i) => (
+            <span key={i}>
+              {o.target} → {o.heard}
+              {i < sound.other.length - 1 ? ", " : ""}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-3 border-t border-white/[0.06] pt-2 text-[11px] italic leading-relaxed text-[#5d6880]">{sound.note}</p>
     </div>
   );
 }

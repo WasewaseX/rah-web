@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { DECK } from "@/lib/content";
-import { topMistakes } from "@/lib/mistakes";
+import { topMistakes, recordMistakes } from "@/lib/mistakes";
 import { scoreShadow } from "@/lib/arena-score";
+import { diagnoseSounds } from "@/lib/phonemes";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
@@ -40,11 +41,28 @@ export async function POST(req: Request) {
   if (!g) return NextResponse.json({ error: "transcript required" }, { status: 400 });
 
   const s = scoreShadow(t, g);
+  const sound = diagnoseSounds(t, g);
   const xpGain = s.accuracy >= 90 ? 30 : s.accuracy >= 70 ? 20 : 10;
   const xp = await awardXp(xpGain, { chainHit: s.accuracy >= 70 });
   await bumpDaily("spoken");
   await touchStreak();
   await progressQuest("arena_5", 1);
+
+  // Sound Lab: a detected contrast on a weak rep is a MOUTH mistake - it feeds
+  // the same persistent memory as the pen (kind=speak, tag sound_*), so the
+  // coach, the ledger and future drill bias all see the recurring sounds.
+  // Only on reps that actually leaked (accuracy < 85): clean reps do not
+  // pollute the memory.
+  if (s.accuracy < 85 && sound.contrasts.length > 0) {
+    await recordMistakes(
+      sound.contrasts.slice(0, 2).map((c) => ({
+        kind: "speak" as const,
+        tag: `sound_${c.key.replace(/-/g, "_").replace(/:/g, "_")}`,
+        wrong: c.evidence[0]?.heard ?? "",
+        right: c.evidence[0]?.target ?? "",
+      })),
+    ).catch(() => undefined); // memory write must never block the rep
+  }
 
   await db.speakSession.create({
     data: { prompt: `arena:${t.slice(0, 180)}`, transcript: g.slice(0, 500), round: 0, result: JSON.stringify({ arena: s, xpGain }) },
@@ -52,6 +70,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     score: s,
+    sound,
     xpGain,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
