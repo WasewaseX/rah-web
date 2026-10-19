@@ -31,6 +31,19 @@ interface QueueCard {
   state: FsrsState;
   dir: string;
   tiles?: string[];
+  ahead?: boolean;
+}
+
+interface QueueCounts {
+  due: number;
+  newLeft: number;
+  reviewedToday: number;
+  seen: number;
+  unseen: number;
+  nextDue: number | null;
+  dueTomorrow: number;
+  due3days: number;
+  newPerDay: number;
 }
 
 const DIR_LABEL: Record<string, string> = {
@@ -157,8 +170,11 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
 export default function ReviewView({ state, onChange }: { state: AppState; onChange: () => void }) {
   const [mode, setMode] = useState<"classic" | "blitz" | "pairs">("classic");
   const [queue, setQueue] = useState<QueueCard[]>([]);
-  const [counts, setCounts] = useState<{ due: number; newLeft: number; reviewedToday: number } | null>(null);
+  const [counts, setCounts] = useState<QueueCounts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refilling, setRefilling] = useState(false);
+  const [aheadMode, setAheadMode] = useState(false);
+  const [aheadEmpty, setAheadEmpty] = useState(false);
   const [idx, setIdx] = useState(0);
   const [input, setInput] = useState("");
   const [choice, setChoice] = useState<string | null>(null);
@@ -175,9 +191,35 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     const j = await r.json();
     setQueue(j.batch ?? []);
     setCounts(j.counts ?? null);
+    setAheadMode(false);
+    setAheadEmpty(false);
     setIdx(0);
     setSession({ done: 0, again: 0 });
     setLoading(false);
+  }, []);
+
+  // Pull the next round without tearing down the session stats. Used by the
+  // auto-continue after the last card (Again cards come straight back) and by
+  // Keep practicing (extra rounds on cards scheduled for later days).
+  const nextRound = useCallback(async (ahead: boolean) => {
+    setRefilling(true);
+    try {
+      const r = await fetch(`/api/review/queue${ahead ? "?ahead=1" : ""}`, { cache: "no-store" });
+      const j = await r.json();
+      setCounts(j.counts ?? null);
+      if ((j.batch ?? []).length > 0) {
+        setQueue(j.batch);
+        setAheadMode(ahead && j.mode === "ahead");
+        setAheadEmpty(false);
+        setIdx(0);
+      } else {
+        setQueue([]);
+        setAheadMode(false);
+        if (ahead) setAheadEmpty(true);
+      }
+    } finally {
+      setRefilling(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -298,7 +340,12 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     setChoice(null);
     setPicked([]);
     setRevealed(false);
+    const wasLast = idx + 1 >= queue.length;
     setIdx((i) => i + 1);
+    // Auto-continue: when the round runs dry, silently pull the next one (same
+    // mode). Today's Again cards roll straight back in; if the day's honest
+    // budget is spent, the finished screen takes over with a schedule outlook.
+    if (wasLast) void nextRound(aheadMode);
     onChange();
   };
 
@@ -326,7 +373,24 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   }
 
   if (!q) {
+    if (refilling) {
+      return (
+        <Card>
+          <Spinner label="Checking for more…" />
+        </Card>
+      );
+    }
     const empty = (counts?.due ?? 0) === 0;
+    const forecast: string[] = [];
+    if (counts?.nextDue != null) {
+      const gap = counts.nextDue - dayIndex();
+      forecast.push(gap <= 0 ? "next card back today" : gap === 1 ? "next card back tomorrow" : `next card back in ${gap} days`);
+    }
+    if ((counts?.dueTomorrow ?? 0) > 0) forecast.push(`${counts!.dueTomorrow} due tomorrow`);
+    if ((counts?.newLeft ?? 0) > 0) forecast.push(`${counts!.newLeft} new left today`);
+    const budgetSpent =
+      (counts?.newLeft ?? 0) === 0 && (counts?.reviewedToday ?? 0) >= (counts?.newPerDay ?? 10) && (counts?.unseen ?? 0) > 0;
+    const canPracticeAhead = (counts?.seen ?? 0) > 0;
     return (
       <Card className="rah-pop py-14 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#2fc273]/[0.14]">
@@ -340,11 +404,47 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
             {session.done} reviewed, {session.again} missed. Missed cards come back today; the rest drift outward.
           </p>
         )}
-        <div className="mt-7 flex justify-center gap-3">
-          <Btn variant="soft" onClick={load}>
-            <Undo2 className="h-4 w-4" /> Load another round
-          </Btn>
-        </div>
+        {forecast.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+            {forecast.map((f) => (
+              <Chip key={f} tone="blue">
+                {f}
+              </Chip>
+            ))}
+          </div>
+        )}
+        {budgetSpent && (
+          <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-[#7d889c]">
+            You met today's {counts!.newPerDay} new cards - that pace is what keeps future reviews small. Fresh items open tomorrow.
+          </p>
+        )}
+        {aheadEmpty && (
+          <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-[#7d889c]">
+            Every card you know is already in today's round - nothing to pull forward.
+          </p>
+        )}
+        {canPracticeAhead && (
+          <>
+            <div className="mt-7 flex justify-center gap-3">
+              <Btn
+                variant="go"
+                onClick={() => void nextRound(true)}
+              >
+                <Zap className="h-4 w-4" /> Keep practicing
+              </Btn>
+            </div>
+            <p className="mx-auto mt-2.5 max-w-xs text-[11px] leading-relaxed text-[#5c6678]">
+              Pulls cards scheduled for later days. Early practice is safe - Rah folds it into your schedule.
+            </p>
+          </>
+        )}
+        {!canPracticeAhead && (
+          <div className="mt-7 flex justify-center gap-3">
+            <Btn variant="soft" onClick={load}>
+              <Undo2 className="h-4 w-4" /> Refresh
+            </Btn>
+          </div>
+        )}
       </Card>
     );
   }
@@ -381,6 +481,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           <Chip tone="blue">{DIR_LABEL[dir] ?? dir}</Chip>
           <Chip tone="emerald">{q.card.level}</Chip>
           <Chip>{q.card.skill}</Chip>
+          {q.ahead && <Chip tone="amber">Extra practice</Chip>}
           <button
             onClick={() => setFlagOpen((o) => !o)}
             className={`rounded-full border p-1.5 transition-colors ${
@@ -428,6 +529,16 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           style={{ width: `${(idx / queue.length) * 100}%` }}
         />
       </div>
+
+      {/* FSRS visibility: what the scheduler knows about this exact card. */}
+      {q.state.reps > 0 ? (
+        <div className="text-center text-[11px] font-medium text-[#5c6678]">
+          {dayIndex() - q.state.last <= 0 ? "Reviewed today" : `Last seen ${dayIndex() - q.state.last}d ago`} · {q.state.reps} review{q.state.reps === 1 ? "" : "s"} ·{" "}
+          {q.state.lastivl > 0 ? `normally returns every ${fmtIvl(q.state.lastivl)}` : "relearning - comes back within today's round"}
+        </div>
+      ) : (
+        <div className="text-center text-[11px] font-medium text-[#5c6678]">First meeting. Rah schedules it from here.</div>
+      )}
 
       <Card key={idx} className="rah-pop min-h-72">
         <PromptBody q={q} dir={dir} revealed={revealed} correct={wasRight} />

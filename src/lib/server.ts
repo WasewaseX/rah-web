@@ -45,13 +45,50 @@ export async function touchStreak() {
   return db.learner.update({ where: { id: "me" }, data: { streak, lastActiveDay: today, freezes } });
 }
 
-export async function dueCount(): Promise<number> {
+// ONE source of truth for "what can I review right now". The old code had
+// two: this file counted the daily new budget without subtracting what was
+// already introduced today, while /api/review/queue subtracted it - so Home
+// advertised "Review 10 due" over a queue that returned an empty batch.
+// Everything (badge, coach read_state, next-best, the queue itself) now reads
+// this, plus the schedule forecast the finished screen shows.
+export interface QueueCounts {
+  due: number;
+  newLeft: number;
+  reviewedToday: number;
+  newPerDay: number;
+  seen: number;
+  unseen: number;
+  nextDue: number | null;
+  dueTomorrow: number;
+  due3days: number;
+}
+
+export async function queueCounts(): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
-  const due = await db.cardState.count({ where: { state: { not: "new" }, due: { lte: today }, suspended: false } });
-  const seen = await db.cardState.count();
-  const newBudget = Math.max(0, Math.min(l.newPerDay, DECK.length - seen));
-  return due + newBudget;
+  const all = await db.cardState.findMany();
+  const due = all.filter((s) => !s.suspended && s.state !== "new" && s.due <= today).length;
+  const introducedToday = all.filter((s) => s.last === today && s.reps === 1).length;
+  const known = all.filter((s) => s.state !== "new").length;
+  const newLeft = Math.max(0, Math.min(l.newPerDay - introducedToday, DECK.length - known));
+  const future = all.filter((s) => !s.suspended && s.state !== "new" && s.due > today).map((s) => s.due);
+  return {
+    due,
+    newLeft,
+    reviewedToday: introducedToday,
+    newPerDay: l.newPerDay,
+    seen: all.length,
+    unseen: Math.max(0, DECK.length - all.length),
+    nextDue: future.length ? Math.min(...future) : null,
+    dueTomorrow: future.filter((d) => d <= today + 1).length,
+    due3days: future.filter((d) => d <= today + 3).length,
+  };
+}
+
+export async function dueCount(): Promise<number> {
+  const c = await queueCounts();
+  // The badge promises what one round actually delivers (capped like the queue).
+  return c.due + c.newLeft;
 }
 
 // Live learner profile handed to every AI job.

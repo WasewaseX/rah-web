@@ -126,10 +126,10 @@ function ShopStrip({
           <Chip tone="cyan">
             <Snowflake className="h-3 w-3" /> {freezes} banked
           </Chip>
-          <Btn onClick={() => void buy("streak_freeze")} disabled={busy !== ""} className="!min-h-9 !px-3 text-xs">
+          <Btn onClick={() => void buy("streak_freeze")} disabled={busy !== ""} className="!min-h-9 !px-3 text-xs" title="Streak Freeze: automatically protects your streak for one missed day">
             {busy === "streak_freeze" ? "…" : "Freeze · 100"}
           </Btn>
-          <Btn onClick={() => void buy("xp_boost")} disabled={busy !== "" || boostActive} className="!min-h-9 !px-3 text-xs">
+          <Btn onClick={() => void buy("xp_boost")} disabled={busy !== "" || boostActive} className="!min-h-9 !px-3 text-xs" title="XP Boost: every action earns double XP while active">
             {busy === "xp_boost" ? "…" : "Boost 2x · 150"}
           </Btn>
         </div>
@@ -285,8 +285,10 @@ export default function HomeView({
                 <>
                   <div className="mb-1.5 flex items-center justify-between text-xs font-black">
                     <span className={winning ? "text-[#7fe0ac]" : "text-[#b7c1d3]"}>YOU · {state.rival.you} XP</span>
-                    <span className={!winning ? "text-[#ffa3b1]" : "text-[#b7c1d3]"}>
-                      {state.rival.name} · {state.rival.weekXp} XP
+                    <span className={`inline-flex items-center gap-1.5 ${!winning ? "text-[#ffa3b1]" : "text-[#b7c1d3]"}`}>
+                      {state.rival.name}
+                      <span className="rounded-full border border-[#a78bfa]/40 bg-[#a78bfa]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#cfc3fc]">practice bot</span>
+                      · {state.rival.weekXp} XP
                     </span>
                   </div>
                   <div className="flex h-3 overflow-hidden rounded-full bg-[#232b3a]">

@@ -13,6 +13,7 @@ export function Btn({
   disabled,
   className = "",
   type = "button",
+  title,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -20,6 +21,7 @@ export function Btn({
   disabled?: boolean;
   className?: string;
   type?: "button" | "submit";
+  title?: string;
 }) {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold tracking-wide transition-all active:scale-[.99] disabled:pointer-events-none min-h-12 select-none";
@@ -35,7 +37,7 @@ export function Btn({
     warm: "rah-3d bg-[#ffb02e] text-[#221400] hover:bg-[#ffc055] [--rah-edge:#b87715]",
   } as const;
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} title={title} className={`${base} ${styles[variant]} ${className}`}>
       {children}
     </button>
   );
