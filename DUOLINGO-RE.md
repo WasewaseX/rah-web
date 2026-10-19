@@ -200,3 +200,37 @@ Grep-level evidence against `src/`, the same standard as MEGA-UPDATE:
   Gate: battery section 6 (board shape, id-set equality, determinism across
   GETs, clean-bonus math, hostile-id filtering) + browser E2E (board played
   to completion: 5 cards graded, misstep shaken, sprint bonus paid).
+
+## 9. REA wave 2 - the 7.4/10 external review (three apps)
+
+The user brought an external product review (overall 7.4/10; "proven learning
+effectiveness" scored 4.5/10, the lowest row). Its section 3 names three
+product-design benchmarks to reverse-engineer. This wave shipped one honest
+adoption from each - the house rule again: study the workflow, reproduce the
+idea, never fake the numbers.
+
+| Their app | What we took | What shipped | What we already had / rejected |
+|---|---|---|---|
+| ChatGPT Study Mode | "diagnose the misunderstanding, stepwise, understanding check - guide instead of merely producing an answer" | Coach rule 9 STUDY MODE (loop.ts): three-beat protocol - DIAGNOSE from what the learner actually typed (the [current screen] block), STEPWISE 2-4 numbered steps, end with ONE check question that proves understanding. Explicit subordination: study mode never waives the read_state mandate (two drive runs proved the dilution failure mode before the fix). | retrieval-first on unanswered exercises was already shipped (Task 37); Study Mode adds the teach-back shape |
+| Speak | "immediate retry + measure improvement between attempts" | /api/speak/analytics: per-dimension trend (last 12 graded sessions), round1->round2 same-prompt deltas, recurring spoken-trap families (MistakeFamily kind=speak), honest totals. Speak tab gains the Improvement ledger - zero AI in the panel, every number a stored row. | the round-2 constraint loop existed; what was missing was the MEASUREMENT of the retry |
+| Duolingo Max (Video Call/Roleplay) | "roleplay ends with conversation feedback and transcripts" | Scene accounting (mode-flow.ts): roleplayTurn persists turns + trap tally + one example per trap family into ModeData; exit produces the SCENE REPORT - turns, corrections/turn, recurring traps with the exact wrong->right evidence, next-scene focus. Deterministic; the AI adds nothing. | roleplay/debate/socratic modes existed since the agent wave; the exit was a generic 2-sentence wrap with no data behind it |
+
+Also shipped from the same review (its build-order item 4, "validate
+educational outcomes" - the 4.5/10 row): /api/progress/outcomes + the
+Effectiveness ledger on the Progress tab. First-attempt retention per day
+(ReviewLog grades), median scheduled interval per day (FSRS stability proxy),
+mature-memory share (s >= 21d), and mistake-family retirement rate. The panel
+says "measured, not claimed" because that is the entire point: engineering
+test pass-rates never measured learning; these numbers do.
+
+Gates: API BATTERY 221/221 (13 new: speak analytics shape + exact seeded
+delta math r1=5 -> r2=6.3 on 1dp engine rounding, outcomes shape + isolated
+day retention 2/3 = 66.7% + median ivl [10,6,0] = 6 - the day is wiped of
+ambient logs first so the assertion can never lean on restored learner data),
+COACH-AGENT+AUTH DRIVE 29/29 (after re-proving that a long rule-1 insertion
+dilutes the mandatory-tool compliance - STUDY MODE moved to its own rule 9),
+tsc clean, eslint clean, browser E2E: the user's exact message
+"what is the answer of this question and why cant i aanswer it" on the live
+cloze "You have ? progress this month." now answers 'made' with the why and
+the Farsi L1 diagnosis (e2e screenshots in download/), Improvement ledger and
+Effectiveness ledger both render (e2e-speak-ledger.png, e2e-effectiveness-ledger.png).

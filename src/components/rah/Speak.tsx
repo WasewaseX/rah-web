@@ -27,6 +27,98 @@ interface SpeechRecognitionLike {
   stop: () => void;
 }
 
+// SPEAK RE: measured improvement between attempts, straight from the engine's
+// own rows. No AI in this panel - every number is a stored fact.
+interface Analytics {
+  trend: { at: string; round: number; accuracy: number; fluency: number; range: number; delivery: number }[];
+  deltas: { prompt: string; r1: number; r2: number; overallDelta: number; accuracyDelta: number }[];
+  traps: { tag: string; label: string; count: number; evidence: string; resolved: boolean }[];
+  totals: { sessions: number; avgAccuracy: number; bestAccuracy: number; retried: number; improved: number };
+}
+
+function ImprovementPanel({ tick }: { tick: number }) {
+  const [a, setA] = useState<Analytics | null>(null);
+  useEffect(() => {
+    fetch("/api/speak/analytics", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setA(j.trend ? j : null))
+      .catch(() => setA(null));
+  }, [tick]);
+  if (!a || a.totals.sessions === 0) return null;
+  return (
+    <div className="rah-rise">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Improvement ledger</div>
+          <Chip tone="cyan">every number is a stored session</Chip>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {[
+            { k: "Sessions", v: a.totals.sessions },
+            { k: "Avg accuracy", v: a.totals.avgAccuracy },
+            { k: "Best", v: a.totals.bestAccuracy },
+            { k: "Retries beaten", v: `${a.totals.improved}/${a.totals.retried}` },
+          ].map((s) => (
+            <div key={s.k} className="rounded-2xl border border-[#2a3242] bg-[#141924] p-3">
+              <div className="text-lg font-black tabular-nums text-[#f2f5fa]">{s.v}</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">{s.k}</div>
+            </div>
+          ))}
+        </div>
+        {a.trend.length >= 2 && (
+          <div className="mt-5">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">Accuracy per session</div>
+            <div className="mt-2 flex h-16 items-end gap-1.5">
+              {a.trend.map((t, i) => (
+                <div
+                  key={i}
+                  title={`R${t.round}: accuracy ${t.accuracy}`}
+                  style={{ height: `${Math.max(6, (t.accuracy / 10) * 100)}%` }}
+                  className={`min-w-[10px] flex-1 rounded-t-md ${t.round === 2 ? "bg-[#ffb02e]/70" : "bg-[#7fe0ac]/60"}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {a.deltas.length > 0 && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {a.deltas.slice(0, 4).map((d, i) => (
+              <span
+                key={i}
+                className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                  d.overallDelta > 0
+                    ? "border-[#7fe0ac]/30 bg-[#7fe0ac]/[0.08] text-[#7fe0ac]"
+                    : "border-[#2a3242] text-[#8b96a9]"
+                }`}
+              >
+                round 1 &rarr; 2: {d.overallDelta > 0 ? "+" : ""}
+                {d.overallDelta} overall
+              </span>
+            ))}
+          </div>
+        )}
+        {a.traps.filter((t) => !t.resolved).length > 0 && (
+          <div className="mt-5">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">Recurring spoken traps</div>
+            <div className="mt-2 flex flex-col gap-2">
+              {a.traps
+                .filter((t) => !t.resolved)
+                .slice(0, 3)
+                .map((t) => (
+                  <div key={t.tag} className="rounded-xl border border-[#2a3242] bg-[#141924] p-2.5 text-xs text-[#a9b4c6]">
+                    <span className="font-bold text-[#f2f5fa]">{t.label}</span>
+                    <span className="text-[#7d889c]"> ({t.count}x)</span>
+                    {t.evidence ? <span className="block truncate text-[#7d889c]">{t.evidence}</span> : null}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default function SpeakView({ state, onChange }: { state: AppState; onChange: () => void }) {
   const [prompts, setPrompts] = useState<string[]>([]);
   const [prompt, setPrompt] = useState(0);
@@ -38,6 +130,7 @@ export default function SpeakView({ state, onChange }: { state: AppState; onChan
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ledgerTick, setLedgerTick] = useState(0);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasSpeech = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
@@ -127,6 +220,7 @@ export default function SpeakView({ state, onChange }: { state: AppState; onChan
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Diagnosis failed.");
       setResult(j);
+      setLedgerTick((t) => t + 1);
       onChange();
     } catch (e) {
       setError((e as Error).message);
@@ -267,6 +361,8 @@ export default function SpeakView({ state, onChange }: { state: AppState; onChan
           </div>
         </>
       )}
+
+      <ImprovementPanel tick={ledgerTick} />
     </div>
   );
 }

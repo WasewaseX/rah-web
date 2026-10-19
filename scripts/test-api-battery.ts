@@ -83,12 +83,14 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/mistakes", methods: ["GET", "DELETE"] },
   { path: "/api/placement", methods: ["GET", "POST"] },
   { path: "/api/progress", methods: ["GET"] },
+  { path: "/api/progress/outcomes", methods: ["GET"] },
   { path: "/api/quiz", methods: ["POST"] },
   { path: "/api/review/grade", methods: ["POST"] },
   { path: "/api/review/queue", methods: ["GET"] },
   { path: "/api/review/undo", methods: ["POST"] },
   { path: "/api/shop", methods: ["GET", "POST"] },
   { path: "/api/speak", methods: ["GET", "POST"] },
+  { path: "/api/speak/analytics", methods: ["GET"] },
   { path: "/api/state", methods: ["GET"] },
   { path: "/api/theme", methods: ["GET", "POST"] },
   { path: "/api/version", methods: ["GET"] },
@@ -323,6 +325,53 @@ try {
   check(pairsPost.body?.xpGain === 12, "clean single-pair bonus = 2 + 10", String(pairsPost.body?.xpGain));
   const pairsHostile = await api("/api/arcade/pairs", { method: "POST", body: JSON.stringify({ matched: ["../../etc/passwd", "<script>", "c-" + "x".repeat(500)], missteps: -5, ms: 1e9 }) });
   check(pairsHostile.status === 200 && pairsHostile.body?.graded === 0, "hostile pair ids are filtered, not stored", JSON.stringify(pairsHostile.body));
+
+  // ================= 6b. REA WAVE 2 (the 7.4/10 review routes) =================
+  console.log("\n--- REA wave 2: speak analytics + outcomes ---");
+  const { dayIndex } = await import("@/lib/fsrs");
+  const { PrismaClient: PC2 } = await import("@prisma/client");
+  const pr2 = new PC2();
+  const speakDel = await pr2.speakSession.deleteMany({ where: { prompt: "battery-reseed prompt" } });
+  void speakDel;
+  await pr2.speakSession.createMany({
+    data: [
+      { prompt: "battery-reseed prompt", transcript: "battery seed round one", round: 1, result: JSON.stringify({ scores: { fluency: 5, range: 5, accuracy: 4, delivery: 6 }, errors: [] }) },
+      { prompt: "battery-reseed prompt", transcript: "battery seed round two", round: 2, result: JSON.stringify({ scores: { fluency: 6, range: 6, accuracy: 7, delivery: 6 }, errors: [{ trap: "articles", bad: "a advice", good: "advice" }] }) },
+    ],
+  });
+  const spAnon = await noCookie("/api/speak/analytics");
+  check(spAnon.status === 401 || spAnon.status === 200, "speak analytics never 500 to anonymous", `status=${spAnon.status}`);
+  const spA = await api("/api/speak/analytics");
+  check(spA.status === 200 && Array.isArray(spA.body?.trend) && Array.isArray(spA.body?.deltas) && Array.isArray(spA.body?.traps) && spA.body?.totals, "speak analytics shape", JSON.stringify(spA.body).slice(0, 150));
+  const spDelta = (spA.body?.deltas ?? []).find((d: { prompt: string }) => d.prompt === "battery-reseed prompt");
+  check(spDelta && spDelta.r1 === 5 && spDelta.r2 === 6.3 && spDelta.overallDelta === 1.3, "round1->round2 delta math is exact (1dp engine rounding)", JSON.stringify(spDelta));
+  check(spDelta && spDelta.accuracyDelta === 3, "accuracy delta = 7 - 4 = 3", String(spDelta?.accuracyDelta));
+
+  const today2 = dayIndex();
+  // Isolate the day: remove whatever logs the restored snapshot holds for it
+  // (the final commitImport restore puts every row back), then seed exact
+  // math. The assertion must never depend on ambient learner data.
+  await pr2.reviewLog.deleteMany({ where: { day: today2 } });
+  await pr2.reviewLog.createMany({
+    data: [
+      { cardId: "battery-outcome-1", grade: 5, ivl: 10, day: today2, source: "review" },
+      { cardId: "battery-outcome-2", grade: 4, ivl: 6, day: today2, source: "review" },
+      { cardId: "battery-outcome-3", grade: 1, ivl: 0, day: today2, source: "review" },
+    ],
+  });
+  const ocAnon = await noCookie("/api/progress/outcomes");
+  check(ocAnon.status === 401 || ocAnon.status === 200, "outcomes never 500 to anonymous", `status=${ocAnon.status}`);
+  const oc = await api("/api/progress/outcomes");
+  check(oc.status === 200 && Array.isArray(oc.body?.retention) && Array.isArray(oc.body?.stability) && oc.body?.memory && oc.body?.families && oc.body?.summary, "outcomes shape", JSON.stringify(oc.body).slice(0, 150));
+  const ocToday = (oc.body?.retention ?? []).find((r: { day: number }) => r.day === today2);
+  check(ocToday && ocToday.reviews === 3 && ocToday.goodRate === 66.7, "retention = 2 good of 3 = 66.7%", JSON.stringify(ocToday));
+  const ocStab = (oc.body?.stability ?? []).find((r: { day: number }) => r.day === today2);
+  check(ocStab && ocStab.medianIvl === 6, "median ivl of [10,6,0] = 6 (the honest middle)", JSON.stringify(ocStab));
+  check(oc.body?.families && typeof oc.body.families.retirementRate === "number", "family retirement rate present", JSON.stringify(oc.body?.families));
+  await pr2.reviewLog.deleteMany({ where: { cardId: { startsWith: "battery-outcome-" } } });
+  await pr2.speakSession.deleteMany({ where: { prompt: "battery-reseed prompt" } });
+  await pr2.$disconnect();
+  console.log("rea-2 seeds removed");
 
   // ================= 7. RESTORE =================
   console.log("\n--- restore ---");

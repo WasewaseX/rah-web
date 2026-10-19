@@ -419,6 +419,9 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {/* Replay theater: watch graded exams back turn by turn */}
       <Replay />
 
+      {/* Effectiveness: the honest outcome read (review wave 7.4/10) */}
+      <EffectivenessPanel />
+
       {/* Writing portfolio: every graded essay + the growth diff */}
       <Portfolio />
 
@@ -542,5 +545,79 @@ function BackupPanel() {
         </div>
       )}
     </Card>
+  );
+}
+
+// Effectiveness ledger (the 7.4/10 review's lowest score: "proven learning
+// effectiveness"). Every number here is read from the engine's own tables -
+// ReviewLog grades, FSRS intervals, mistake-family healing - no AI, no vibes.
+// It answers one question honestly: is the memory actually getting stronger?
+interface Outcomes {
+  retention: { day: number; reviews: number; goodRate: number }[];
+  stability: { day: number; medianIvl: number }[];
+  memory: { started: number; mature: number; matureShare: number; medianStability: number; lapsingCards: number };
+  families: { total: number; active: number; resolved: number; retirementRate: number };
+  summary: { days: number; overallGoodRate: number; last7GoodRate: number; ivlTrend: number };
+}
+
+function EffectivenessPanel() {
+  const [o, setO] = useState<Outcomes | null>(null);
+  useEffect(() => {
+    fetch("/api/progress/outcomes", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => (j.retention ? setO(j) : setO(null)))
+      .catch(() => setO(null));
+  }, []);
+  if (!o || o.summary.days === 0) return null;
+  const maxIvl = Math.max(1, ...o.stability.map((s) => s.medianIvl));
+  return (
+    <div className="rah-rise">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
+            <LineChart className="h-4 w-4 text-[#7fe0ac]" /> Effectiveness ledger
+          </div>
+          <Chip tone="emerald">measured, not claimed</Chip>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {[
+            { k: "First-try recall (7d)", v: `${o.summary.last7GoodRate}%`, hot: o.summary.last7GoodRate > 0 && o.summary.last7GoodRate < 70 },
+            { k: "First-try recall (30d)", v: `${o.summary.overallGoodRate}%`, hot: o.summary.overallGoodRate > 0 && o.summary.overallGoodRate < 70 },
+            { k: "Mature memory", v: `${o.memory.matureShare}%`, hot: false },
+            { k: "Families retired", v: `${o.families.resolved}/${o.families.total}`, hot: false },
+          ].map((s) => (
+            <div key={s.k} className="rounded-2xl border border-[#2a3242] bg-[#141924] p-3">
+              <div className={`text-lg font-black tabular-nums ${s.hot ? "text-[#ff6b81]" : "text-[#f2f5fa]"}`}>{s.v}</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">{s.k}</div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-sm leading-relaxed text-[#a9b4c6]">
+          {o.memory.started > 0
+            ? `${o.memory.mature} of ${o.memory.started} started cards have crossed the 21-day maturity line (median stability ${o.memory.medianStability}d). Scheduled intervals moved ${o.summary.ivlTrend >= 0 ? "+" : ""}${o.summary.ivlTrend}d across the window - FSRS trusting the memory more is what real progress looks like in the numbers.`
+            : "Start reviewing and this panel fills with your real retention curve."}
+        </p>
+        {o.stability.length >= 2 && (
+          <div className="mt-4">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#7d889c]">Median scheduled interval per day</div>
+            <div className="mt-2 flex h-14 items-end gap-1.5">
+              {o.stability.map((s) => (
+                <div
+                  key={s.day}
+                  title={`day ${s.day}: median ${s.medianIvl}d`}
+                  style={{ height: `${Math.max(6, (s.medianIvl / maxIvl) * 100)}%` }}
+                  className="min-w-[10px] flex-1 rounded-t-md bg-[#9dc0ff]/50"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {o.families.total > 0 && (
+          <p className="mt-4 text-sm leading-relaxed text-[#a9b4c6]">
+            Mistake-memory healing: {o.families.active} active famil{o.families.active === 1 ? "y" : "ies"}, {o.families.resolved} retired by two clean exam hits ({o.families.retirementRate}% retirement rate).
+          </p>
+        )}
+      </Card>
+    </div>
   );
 }

@@ -67,7 +67,12 @@ RULES:
 5. Deliverables: anything you write with write_file or make_pdf instantly appears in the learner's Workspace panel in this sidebar - name the file in your final reply so they know it is there. Requests for a PDF use make_pdf (a real renderer); NEVER say you cannot produce PDFs.
 6. reply is spoken to the learner: warm, direct, no meta-talk about tools or JSON. Mention artifacts you created by name ("I wrote week-1-plan.md").
 7. The learner's app language is English; they are learning English at their measured level. Stay on mission: measurable progress to C1.
-8. Never invent tool results. Never fake file contents. If you did not run it, you do not know it.`;
+8. Never invent tool results. Never fake file contents. If you did not run it, you do not know it.
+9. STUDY MODE - how you teach, every explanation (screen-related or not):
+   (1) DIAGNOSE first: quote what the learner typed/picked (current_screen, or their own words) and name the misunderstanding behind it ("You picked X - you are treating the team as many individuals").
+   (2) STEPWISE: 2-4 short numbered steps, one idea each, no walls of text.
+   (3) CHECK: end with ONE question that PROVES understanding (never "does that make sense?" - e.g. "So which verb: 'The committee ___ meet on Fridays'?").
+   Guide toward understanding instead of merely producing an answer. This never waives rule 1: state questions still require read_state FIRST, even if history already holds a similar answer - state changes between asks.`;
 }
 
 interface TurnDecision {

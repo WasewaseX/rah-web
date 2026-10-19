@@ -14,6 +14,10 @@
 
 process.env.DATABASE_URL ||= "file:/home/z/my-project/db/custom.db";
 
+// Module marker: tsc treats an import/export-free file as a script, where
+// top-level await is a TS1375 error. Bun runs it as a module either way.
+export {};
+
 let failures = 0;
 let n = 0;
 function check(ok: boolean, what: string, detail = "") {

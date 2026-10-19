@@ -24,6 +24,12 @@ export interface ModeData {
   item?: { q: string; choices?: string[]; a: string; accept?: string[]; tag?: string; skill?: string; why?: string; type?: string };
   shown?: boolean;
   startedAt?: number;
+  // Roleplay scene accounting (the Max teardown's "conversation feedback and
+  // transcripts"): turns played and every correction the partner issued, so
+  // the exit report is computed from the scene itself, not invented.
+  turns?: number;
+  traps?: Record<string, number>;
+  examples?: Record<string, { wrong: string; right: string }>;
 }
 
 const EXIT = /^(end|stop|exit|quit|finish)( (the )?(scene|debate|mode|roleplay|challenge|this))?$/i;
@@ -86,6 +92,9 @@ async function wrapUp(mode: string, data: ModeData, p: ProfileJson): Promise<str
   if (mode === "daily" && data.item) {
     return `The answer was "${data.item.a}". ${data.item.why ?? ""} Back in coach mode: tell me what to practice, or ask for "generate an exam".`;
   }
+  if (mode === "roleplay") {
+    return sceneReport(data, p);
+  }
   try {
     const out = await aiJson<{ reply?: string }>(
       `You are Rah, an English coach for a Farsi speaker around ${p.level}. A ${mode} session just ended${
@@ -100,6 +109,38 @@ async function wrapUp(mode: string, data: ModeData, p: ProfileJson): Promise<str
   } catch {
     return "Session closed. Back in coach mode: what is next?";
   }
+}
+
+// DUOLINGO MAX RE - Video Call/Roleplay ends with "conversation feedback and
+// transcripts" (their published product material). Our scene report is the
+// honest version: turn count and the trap tally come from the persisted
+// ModeData - what the partner ACTUALLY corrected, turn by turn - and the AI
+// adds nothing. Zero invented stats; deterministic focus ranking.
+function sceneReport(data: ModeData, p: ProfileJson): string {
+  const turns = data.turns ?? 0;
+  const traps = Object.entries(data.traps ?? {}).sort((a, b) => b[1] - a[1]);
+  const totalCorrections = traps.reduce((a, [, n]) => a + n, 0);
+  if (turns === 0) {
+    return "Scene closed without a single turn - we barely started. Back in coach mode: say \"roleplay\" with a scenario and give it a real run this time.";
+  }
+  const lines: string[] = [];
+  lines.push(`SCENE REPORT - ${data.scene ?? "casual conversation"}`);
+  lines.push(`Turns in the scene: ${turns}. Corrections issued: ${totalCorrections} (${(totalCorrections / turns).toFixed(1)}/turn).`);
+  if (traps.length > 0) {
+    const top = traps.slice(0, 3);
+    const focus = top
+      .map(([tag, n]) => {
+        const ex = data.examples?.[tag];
+        return `${tag} (${n}x)${ex ? `: "${ex.wrong}" -> "${ex.right}"` : ""}`;
+      })
+      .join("; ");
+    lines.push(`Recurring traps: ${focus}.`);
+    lines.push(`Next scene should pressure-test: ${top[0][0]} - it cost you the most.`);
+  } else {
+    lines.push(`Zero corrections across ${turns} turns at ${p.level} - the scene was too easy. Next one goes harder or gets a register constraint.`);
+  }
+  lines.push("Back in coach mode: ask for another roleplay, or \"generate an exam\" to drill the trap above.");
+  return lines.join("\n");
 }
 
 type ChatRole = { role: "user" | "assistant"; content: string };
@@ -148,6 +189,18 @@ Rules:
 - Do not break character to teach. The corrections array is the teaching; the reply stays in the scene.
 - No Farsi in the reply field. Never use the em dash character.`;
   const turn = await modeTurn(system, text, history, false);
+  // Scene accounting: persist turns + trap tally so the exit report is real.
+  const traps = { ...(data.traps ?? {}) };
+  const examples: Record<string, { wrong: string; right: string }> = { ...(data.examples ?? {}) };
+  for (const c of turn.corrections ?? []) {
+    if (!c.wrong) continue;
+    traps[c.trap] = (traps[c.trap] ?? 0) + 1;
+    examples[c.trap] = { wrong: c.wrong.slice(0, 60), right: c.right.slice(0, 60) };
+  }
+  await db.learner.update({
+    where: { id: "me" },
+    data: { modeData: JSON.stringify({ ...data, turns: (data.turns ?? 0) + 1, traps, examples } satisfies ModeData) },
+  });
   return envelope("roleplay", turn.reply || "...", steps, turn.corrections);
 }
 
