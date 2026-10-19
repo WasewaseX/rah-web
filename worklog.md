@@ -602,3 +602,17 @@ Work Log:
 
 Stage Summary:
 - The coach can now DELIVER: real PDFs the learner downloads from a workspace panel that works in cookie-less preview iframes; the coach sees the exact exercise on the learner's screen and explains it instead of asking for a paste; the Duolingo RE wave's last spec'd item (match-pairs) is shipped with its gates. The three "still far from perfect" gaps from the user's log are each fixed, unit-pinned, and browser-proven.
+
+---
+Task ID: 38
+Agent: Super Z (main)
+Task: P0-2 closure - the dedicated live retest of the coach's /exam flow (the exact trigger of the user's logged JSON leak: "no output male an exam" -> mangled {"tool":"coach_skill","args":{"message":"/exam vocabulary B2"}}).
+
+Work Log:
+- Found the P0-2 architecture (two-layer answerability gate, Task 16/28) already shipped; what was missing was a LIVE retest of the full chain through runCoach with the wild payload - scripts/test-coach-exam.ts now provides it (22 checks, state-restoring).
+- Chain proven live: (1) the EXACT mangled turn salvages to tool=coach_skill + args.message="/exam vocabulary B2" and NEVER becomes a reply; (2) coach_skill("/exam vocabulary B2") returns a verified envelope - prose reply announcing the exercise, zero protocol keys anywhere; (3) the exam payload: announced count == delivered items, every item passes itemAnswerable, vocabulary focus honored, WIRE payload is KEYLESS by design (mcq keys never leak to the client) while the STORED exam row's keys exist and sit among their choices; (4) plain-English "make an exam" routes to a real skill and stays clean prose.
+- Three initial FAILs were my own assertions, not the app: the reply says "B2 Vocabulary: ... 4 questions" (no literal word "exam"); focused single-skill exams legitimately run 3-5 items; and the mcq key check ran against the keyless wire payload. The key-vs-choices check was moved server-side where the key actually lives.
+- Full gates after: /exam retest 22/22, tsc clean.
+
+Stage Summary:
+- The last open pipeline item (P0-2 retest) is closed: the /exam path that produced the user's leaked-JSON turn now provably routes, generates a gated exam, stores keys server-side, and speaks clean prose end to end. The pipeline (PAT -> P0-1 -> commit/push -> P0-2 -> mega-update spec) has P0-1, P0-2 and the coach sidebar/agentic/login waves all shipped and gated; the mega-update spec remains as the next standing item.
