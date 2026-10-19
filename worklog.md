@@ -685,3 +685,23 @@ Work Log:
 
 Stage Summary:
 - Wave C closed: the deck leaves the app in a standard format with an honest disclaimer, the flag queue is now a closed loop the coach can triage, and the agent trace is copyable. Remaining review items (#9 ingestion, #7 exam formats, #5 curriculum depth, #2 phoneme feedback, #20 offline sync) are mega-update scale and stay tracked.
+
+---
+Task ID: 43
+Agent: Super Z (main)
+Task: The 7.4/10 review's #2 feature - phoneme-level pronunciation feedback - as SPEAK RE part 3: the Sound Lab, a deterministic sound-contrast engine over the ASR diff.
+
+Work Log:
+- src/lib/phonemes.ts (zero AI, zero network, fully deterministic): Needleman-Wunsch word alignment produces PAIRED substitutions (the old LCS split into missed/extra and lost the pairs); letter-pattern detectors then classify each pair against the documented Farsi-speaker confusion set: w<->v (no /w/ in Persian; tolerates the stacked silent-h drop - where->vere), p<->b (unaspirated p reads as b), th->t/s/d/z (think->tink, brother->broder), final -ng->-n (singing->sinin), s<->sh, tense/lax vowel collapse (i/ee/ea, a/e, u/oo, o/u - ship/sheep, bad/bed, full/fool), cluster reduction (asked->ast; run-of-2+ consonants anywhere, deletions + one t/d voicing swap). HONESTY DOCTRINE: pairs matching no pattern stay in `other` ("no known pattern"), a clean rep reports NOTHING - the mic evidence is measured, the sound behind it is an inference, and the note on every panel says exactly that.
+- Each contrast ships: evidence pairs ("you aimed at the, the mic heard te"), an articulation tip (paper-strip test for p/b, tongue-between-teeth for th), and 2-3 playable minimal-pair drills (TTS speaks front then back).
+- /api/arena/voice POST: response now carries the sound report alongside the word score; on weak reps (<85%) the contrasts feed recordMistakes as kind=speak tags sound_* (evidence = heard->target pair) - the MOUTH now leaks into the same persistent memory as the pen, so the coach, the mistake ledger and future weakness-bias all see recurring sounds. Clean reps never pollute the memory. tagLabel renders sound_* readably ("Sound: w vs v", "Sound: vowels (i ee) collapse").
+- VoiceArena.tsx: Sound Lab panel under the score (contrast chips, evidence, tips, play-the-pair buttons, honesty note); always-present editable transcript input (the Task-41 no-mic lesson applied to the arena - headless/no-mic browsers can now train by typing); entry no longer gated on speech recognition (warning chip instead of a wall).
+- Engine gaps FOUND IN LIVE TESTING and fixed: where->vere initially fell to `other` (two stacked changes beat the single-sub detectors) - w-v and th rules now tolerate exactly one co-occurring dropped letter after the signature swap (delOne subsequence check); singing->sinin needed replaceAll(ng->n); asked->ast needed mid-word cluster runs; seat->set needed ea->e.
+- Battery: section 6f - 16 pins: 12 engine cases (want/vant+think/tink, singing, stacked where->vere, brother->broder, asked/seat, clean-rep emptiness, unmatchable-honesty negative, byte-identical determinism, tag labels) + arena response shape (sound.contrasts keys, honesty note, 400 on empty transcript). 277/277.
+- tsc clean, eslint clean (0 errors). CI-relevant: the panel is a plain component (SoundPanel) - TS narrowing survives the callbacks.
+- Browser E2E (agent-browser, live): login -> Arcade -> Voice -> typed "ze honesty of te report" as the shadow -> 40% + Sound Lab panel verified (th chip, BOTH evidence pairs, 3 drill pairs, note) -> screenshot download/e2e-sound-lab.png (full-page). Clean rep (100%) correctly shows NO panel. Also verified the memory loop: speak:sound_th family appeared with count 1 after the weak rep.
+- E2E friction fixed en route: find-by-text clicks raced React's disabled-state (button clicked while still disabled, POST never fired) - click by ref after fill; GET drill sets re-roll per session (Math.random shuffle), so the loop re-rolled sessions until a contrast-rich sentence landed.
+- Residue cleaned: 7 arena SpeakSession rows, 2 sound_* families, XP/gems/streak/chain reset to 0, today's ambient dailyStat row, e2e user + login codes. Verified zero residue after.
+
+Stage Summary:
+- The review's #2 is shipped and gated: pronunciation feedback is now SOUND-level (w-v, th, vowels, clusters) with honest epistemics - measured evidence, inferred label, drills as the point. The arena closes the loop: mouth mistake -> persistent memory -> weakness bias -> future drills. Remaining review items: #9 learner-materials ingestion, #7 exam formats (IELTS/TOEFL), #5 curriculum depth, #20 offline sync - all mega-update scale. PUSHED 577d39a to WasewaseX/rah-web main.
