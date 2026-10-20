@@ -99,3 +99,4 @@ db/backups/
 db/*.stats.json
 db/*.snapshot-*.tmp
 scripts/out/*.db
+db/post-pull-stats.json

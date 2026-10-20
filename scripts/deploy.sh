@@ -23,7 +23,7 @@ LOCAL_VERSION=$(curl -s http://localhost:3000/api/version)
 echo "local  : $LOCAL_VERSION"
 
 echo "== 2. production db pull (data-preservation guard)"
-PULL_OK=1
+PULL_OK=0
 bash scripts/db-pull.sh "$PREVIEW_URL" db/custom.db || PULL_OK=$?
 case "$PULL_OK" in
   0) : ;;
