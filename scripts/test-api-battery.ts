@@ -93,7 +93,9 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/quiz", methods: ["POST"] },
   { path: "/api/review/grade", methods: ["POST"] },
   { path: "/api/review/queue", methods: ["GET"] },
+  { path: "/api/review/suspend", methods: ["POST"] },
   { path: "/api/review/undo", methods: ["POST"] },
+  { path: "/api/settings", methods: ["POST"] },
   { path: "/api/shop", methods: ["GET", "POST"] },
   { path: "/api/speak", methods: ["GET", "POST"] },
   { path: "/api/speak/analytics", methods: ["GET"] },
@@ -781,6 +783,45 @@ try {
       check(del2.status === 200 && del2.body?.removed === 3, "csv: deletion removes all imported cards", JSON.stringify(del2.body));
       const empty = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "csv", text: "# only a header" }) });
       check(empty.status === 400, "csv: header-only import refused honestly", JSON.stringify(empty.body).slice(0, 100));
+    }
+
+    // --- suspend + daily pace (polish #1 completion) ---
+    console.log("\n--- suspend + pace ---");
+    {
+      const { PrismaClient: PC7 } = await import("@prisma/client");
+      const prS = new PC7();
+      const todayS = Math.floor(Date.now() / 86400000);
+      const sid = "col001";
+      await prS.cardState.upsert({
+        where: { cardId: sid },
+        create: { cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
+        update: { suspended: false, due: todayS, state: "review" },
+      });
+      await prS.$disconnect();
+      const qA = await api("/api/review/queue");
+      const inA = (qA.body?.batch ?? []).some((e: { card?: { id?: string } }) => e.card?.id === sid);
+      check(inA, "pace: seeded due card is in the queue", JSON.stringify(qA.body?.batch?.slice(0, 1)?.[0]?.card?.id));
+      const sup = await api("/api/review/suspend", { method: "POST", body: JSON.stringify({ cardId: sid, suspended: true }) });
+      check(sup.status === 200 && sup.body?.suspended === true, "suspend: route accepts", JSON.stringify(sup.body));
+      const qB = await api("/api/review/queue");
+      const inB = (qB.body?.batch ?? []).some((e: { card?: { id?: string } }) => e.card?.id === sid);
+      check(!inB, "suspend: suspended card leaves the queue", String(inB));
+      const uns = await api("/api/review/suspend", { method: "POST", body: JSON.stringify({ cardId: sid, suspended: false }) });
+      check(uns.status === 200 && uns.body?.suspended === false, "unsuspend: route accepts", JSON.stringify(uns.body));
+      const qC = await api("/api/review/queue");
+      const inC = (qC.body?.batch ?? []).some((e: { card?: { id?: string } }) => e.card?.id === sid);
+      check(inC, "unsuspend: card returns with its schedule intact", String(inC));
+      // daily pace clamp + queueCounts inheritance
+      const hi = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: 999 }) });
+      check(hi.status === 200 && hi.body?.newPerDay === 30 && hi.body?.clamped === true, "pace: 999 clamps to 30", JSON.stringify(hi.body));
+      const stHi = await api("/api/review/queue");
+      check(stHi.body?.counts?.newPerDay === 30, "pace: queueCounts reads the new budget", String(stHi.body?.counts?.newPerDay));
+      const lo = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: 0 }) });
+      check(lo.status === 200 && lo.body?.newPerDay === 3 && lo.body?.clamped === true, "pace: 0 clamps to 3", JSON.stringify(lo.body));
+      const bad = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: "banana" }) });
+      check(bad.status === 400, "pace: non-numeric refused", JSON.stringify(bad.body));
+      const mid = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: 10 }) });
+      check(mid.status === 200 && mid.body?.newPerDay === 10 && mid.body?.clamped === false, "pace: 10 stays 10, no clamp flag", JSON.stringify(mid.body));
     }
   }
 

@@ -201,6 +201,12 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   // Pull the next round without tearing down the session stats. Used by the
   // auto-continue after the last card (Again cards come straight back) and by
   // Keep practicing (extra rounds on cards scheduled for later days).
+  const refreshCounts = useCallback(async () => {
+    const r = await fetch("/api/review/queue", { cache: "no-store" });
+    const j = await r.json();
+    setCounts(j.counts ?? null);
+  }, []);
+
   const nextRound = useCallback(async (ahead: boolean) => {
     setRefilling(true);
     try {
@@ -326,6 +332,25 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
     reveal(acceptable(q.card, input, dir));
   };
 
+  // Suspend: the learner's escape hatch from a card that keeps hurting. The
+  // card leaves every queue immediately; FSRS state is kept for unsuspend.
+  const suspendCard = async () => {
+    if (!q || busy) return;
+    setBusy(true);
+    await fetch("/api/review/suspend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: q.card.id, suspended: true }),
+    });
+    setBusy(false);
+    setInput("");
+    setChoice(null);
+    setPicked([]);
+    setRevealed(false);
+    setIdx((i) => i + 1);
+    onChange();
+  };
+
   const grade = async (g: number) => {
     if (!q || busy) return;
     setBusy(true);
@@ -414,9 +439,18 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           </div>
         )}
         {budgetSpent && (
-          <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-[#7d889c]">
-            You met today's {counts!.newPerDay} new cards - that pace is what keeps future reviews small. Fresh items open tomorrow.
-          </p>
+          <div className="mx-auto mt-3 max-w-sm">
+            <p className="text-xs leading-relaxed text-[#7d889c]">
+              You met today's {counts!.newPerDay} new cards - that pace is what keeps future reviews small. Fresh items open tomorrow.
+            </p>
+            <DailyPaceStepper
+              current={counts!.newPerDay}
+              onChanged={() => {
+                void refreshCounts();
+                onChange();
+              }}
+            />
+          </div>
         )}
         {aheadEmpty && (
           <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-[#7d889c]">
@@ -715,6 +749,17 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
             </Btn>
           </div>
         )}
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => void suspendCard()}
+            disabled={busy}
+            title="Stops this card coming back - it keeps its schedule if you change your mind"
+            className="text-[11px] font-semibold text-[#5d6879] transition-colors hover:text-[#ff8ba0] disabled:opacity-50"
+          >
+            Suspend this card
+          </button>
+        </div>
       </Card>
 
       {counts && (
@@ -728,6 +773,56 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// The learner's daily pace, in their hands (audit polish #1: configurable
+// daily limits). One honest stepper: 3..30, persisted via /api/settings, and
+// the badge/queue/forecast all inherit from that single field.
+function DailyPaceStepper({ current, onChanged }: { current: number; onChanged: () => void }) {
+  const [val, setVal] = useState(current);
+  const [saved, setSaved] = useState(current);
+  const [saving, setSaving] = useState(false);
+  // Track the prop without setState-in-effect: re-sync only when the saved
+  // server value actually moves past our optimistic edits.
+  if (current !== saved) {
+    setSaved(current);
+    setVal(current);
+  }
+
+  const set = async (n: number) => {
+    const clamped = Math.min(30, Math.max(3, n));
+    if (clamped === val || saving) return;
+    setVal(clamped);
+    setSaving(true);
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPerDay: clamped }),
+    });
+    setSaving(false);
+    onChanged();
+  };
+
+  return (
+    <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-[#141924] px-3 py-1.5">
+      <span className="text-[11px] font-semibold text-[#7d889c]">new cards / day</span>
+      <button
+        onClick={() => void set(val - 1)}
+        disabled={saving || val <= 3}
+        className="h-6 w-6 rounded-lg bg-[#232b3a] text-sm font-black text-[#c4cddc] transition-colors hover:bg-[#2c3547] disabled:opacity-40"
+      >
+        &minus;
+      </button>
+      <span className="w-6 text-center text-sm font-black text-[#f2f5fa]">{val}</span>
+      <button
+        onClick={() => void set(val + 1)}
+        disabled={saving || val >= 30}
+        className="h-6 w-6 rounded-lg bg-[#232b3a] text-sm font-black text-[#c4cddc] transition-colors hover:bg-[#2c3547] disabled:opacity-40"
+      >
+        +
+      </button>
     </div>
   );
 }

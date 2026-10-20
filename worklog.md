@@ -915,3 +915,17 @@ Work Log:
 
 Stage Summary:
 - Interop v1 is real: an existing Anki-style deck pasted as TSV/CSV becomes live FSRS cards in one paste, sharing the badge/budget/scheduler with everything else. (.apkg binary import stays v2 - it needs unzip + SQLite parsing; CSV/TSV is what Anki itself round-trips best.)
+
+---
+Task ID: 56
+Agent: Super Z (main)
+Task: Polish #1 completion - the learner's hands on the machine: configurable daily new-card limit + suspend/difficult cards.
+
+Work Log:
+- POST /api/review/suspend { cardId, suspended }: suspend/unsuspend with the schedule PRESERVED (no reset) - suspended cards already leave every queue path and count (the filters existed; there was just no way to trigger them).
+- POST /api/settings { newPerDay }: clamped 3..30, honest clamped flag, non-numeric 400. queueCounts/badge/forecast inherit the single field.
+- Review.tsx: "Suspend this card" ghost button on every card (tooltip explains the semantics; skipping to the next card after suspension); DailyPaceStepper on the finished screen's budget-spent block (+/- 3..30, optimistic value, server-truth resync without setState-in-effect).
+- Battery (352/352): seeded due card present -> suspend -> gone from queue -> unsuspend -> back with schedule intact; pace 999->30 clamped + queueCounts reads it, 0->3 clamped, "banana" 400, 10 unclamped. Routes +2. tsc + eslint clean.
+
+Stage Summary:
+- Audit polish #1's remaining asks are closed: configurable daily limits and suspended/difficult cards are learner-operable end to end. Undo already existed (/api/review/undo + UI). The review queue polish item is now DONE rather than partially.
