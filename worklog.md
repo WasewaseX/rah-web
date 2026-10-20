@@ -963,3 +963,21 @@ Work Log:
 
 Stage Summary:
 - Feature #2 is shipped: the learner's road from B2 to C1 is a visible, prerequisite-locked graph whose every claim is a measured number from the same ledger the coach uses. The audit's "mastery gates" ask is operational: the frontier drives a real next-best action. Nothing in the graph can say "done" without Wilson-bound proof.
+
+---
+Task ID: 59
+Agent: Super Z (main)
+Task: Stage 04 lead item - real Anki .apkg package import (feature #4 complete: export TSV + import CSV/TSV + import .apkg).
+
+Work Log:
+- src/lib/apkg.ts (new): zero-dependency .apkg reader - a minimal ZIP central-directory parser (stored + deflate entries via node:zlib inflateRaw) + a runtime-adaptive SQLite reader. RUNTIME LESSON: `next dev` runs the server under NODE (node .../next dev), while package.json's start runs it under BUN - bun:sqlite exists only under bun, node:sqlite only under node. parseApkg tries node:sqlite (DatabaseSync) and falls back to bun:sqlite ONLY on a missing-module error (a corrupt collection surfaces its own error, never a masked double failure).
+- Honest boundaries stated in errors, not guesses: Anki 2.1.50+ compressed collections (collection.anki21b) are refused with the exact Anki re-export instruction ("Support older Anki versions"); 8 MB / 300-card caps; media refs ([sound:], <img>) are COUNTED and reported, never silently dropped; Anki's own FSRS state does NOT import - cards enter Rah's queue as new so Rah's scheduler builds honest intervals.
+- Parsing: first two note fields (Basic), cloze notes become blanked cards ({{c1::answer::hint}} -> "___" + answer, same convention as CSV passthrough), HTML stripped from faces, entities decoded, dedupe by front, 1-field notes skipped. importDeckApkg rides the exact Material/MaterialCard/CardState machinery as CSV/BYO.
+- POST /api/materials mode=apkg ({title, dataB64}): deterministic 400s (garbage bytes, zip without collection, .anki21b-only, missing data) before anything else happens.
+- MaterialsPanel: third mode "Anki package (.apkg)" with a real file picker, cap/honesty note in the form.
+- Battery: buildZip() fixture writer (stored-entry ZIP, crc32) builds a BYTE-TRUE .apkg in-memory (bun:sqlite collection: plain + HTML + sound-ref + cloze + 1-field + dup notes) -> 11 pins (created 4/skipped 2 honest, HTML stripped, cloze blanked, queue reachability, clean deletion, three 400 refusals). Battery 380 -> 391.
+- E2E (scripts/e2e-task59-apkg.mjs, real browser on a throwaway stack, fixture built with node:sqlite): 5/5 - file picker -> import -> honest count message -> apkg source row -> detail answers -> cloze answer -> queue reachability.
+- Hygiene: db/battery-isolated.db untracked + gitignored (it changes on every battery run and dirtied the tree).
+
+Stage Summary:
+- Feature #4 is COMPLETE: Anki interop is now round-trip-honest - export as Anki-dialect TSV (Task 42), import CSV/TSV (Task 55), and import real .apkg packages (this task), all landing in the same FSRS queue with the same badge/budget truth as the built-in deck. The only honest limit left: Anki's new compressed format needs the legacy-export checkbox, and the app says exactly that.

@@ -29,10 +29,12 @@ export function MaterialsPanel() {
   const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<MaterialDetail | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [mode, setMode] = useState<"text" | "csv">("text");
+  const [mode, setMode] = useState<"text" | "csv" | "apkg">("text");
   const [title, setTitle] = useState("");
   const [source, setSource] = useState("");
   const [text, setText] = useState("");
+  const [apkgName, setApkgName] = useState("");
+  const [apkgB64, setApkgB64] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [expanded, setExpanded] = useState(true);
@@ -63,6 +65,17 @@ export function MaterialsPanel() {
     if (r.ok) setDetail(await r.json());
   };
 
+  const pickApkg = (file: File | undefined) => {
+    if (!file) return;
+    setApkgName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      // strip the data: URL prefix - the server wants raw base64
+      setApkgB64(String(reader.result ?? "").split(",")[1] ?? "");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submit = async () => {
     if (busy) return;
     setBusy(true);
@@ -71,7 +84,7 @@ export function MaterialsPanel() {
       const r = await fetch("/api/materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, source, text, mode }),
+        body: JSON.stringify({ title, source, text, mode, dataB64: apkgB64 }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Import failed.");
@@ -82,6 +95,8 @@ export function MaterialsPanel() {
       setTitle("");
       setSource("");
       setText("");
+      setApkgName("");
+      setApkgB64("");
       setFormOpen(false);
       void load();
     } catch (e) {
@@ -111,9 +126,9 @@ export function MaterialsPanel() {
       {expanded && (
         <>
           <Note>
-            Two ways in: paste something you actually need to read (an article, a work email, lecture notes) and Rah pulls
+            Three ways in: paste something you actually need to read (an article, a work email, lecture notes) and Rah pulls
             out the words and word-combinations worth learning - every card keeps its original sentence as context. Or import
-            an existing deck as CSV/TSV rows (Anki-style: front + back per line) and they review on the same schedule as
+            an existing deck: CSV/TSV rows, or a real Anki .apkg package. Imported decks review on the same schedule as
             everything else.
           </Note>
           {formOpen ? (
@@ -131,6 +146,12 @@ export function MaterialsPanel() {
                 >
                   CSV / TSV rows (Anki-style)
                 </button>
+                <button
+                  onClick={() => setMode("apkg")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${mode === "apkg" ? "bg-[var(--rah-primary)]/20 text-[#9dc0ff]" : "text-[#7d889c] hover:text-[#f2f5fa]"}`}
+                >
+                  Anki package (.apkg)
+                </button>
               </div>
               <input
                 value={title}
@@ -146,20 +167,35 @@ export function MaterialsPanel() {
                   className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 text-sm text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
                 />
               )}
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={mode === "csv" ? 7 : 7}
-                placeholder={
-                  mode === "csv"
-                    ? "One card per line: front<TAB>back\n\n# Anki-style header lines are skipped\nthe implementation___to put a plan into action\nheavy rain\tstrong rainfall"
-                    : "Paste the text here (a few paragraphs is ideal)..."
-                }
-                className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 font-mono text-sm leading-relaxed text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
-              />
+              {mode === "apkg" ? (
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-white/[0.14] bg-[#111725] px-3 py-3 text-sm text-[#a9b4c6] hover:border-[var(--rah-primary)]/50">
+                    <input type="file" accept=".apkg" className="hidden" onChange={(e) => pickApkg(e.target.files?.[0])} />
+                    <FilePlus2 className="h-4 w-4" /> {apkgName || "Choose an .apkg file (up to 8 MB)..."}
+                  </label>
+                  <p className="text-[11px] leading-relaxed text-[#5d6879]">
+                    Cards enter Rah as new (Anki's own schedule stays behind - Rah's FSRS rebuilds honest intervals). Audio and images are not imported. New-format exports need "Support older Anki versions" checked in Anki's export dialog.
+                  </p>
+                </div>
+              ) : (
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={7}
+                  placeholder={
+                    mode === "csv"
+                      ? "One card per line: front<TAB>back\n\n# Anki-style header lines are skipped\nthe implementation___to put a plan into action\nheavy rain\tstrong rainfall"
+                      : "Paste the text here (a few paragraphs is ideal)..."
+                  }
+                  className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 font-mono text-sm leading-relaxed text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
+                />
+              )}
               <div className="flex items-center gap-2">
-                <Btn onClick={() => void submit()} disabled={busy || text.trim().length < (mode === "csv" ? 3 : 120)}>
-                  {busy ? "Working..." : mode === "csv" ? "Import rows" : "Extract and add to review"}
+                <Btn
+                  onClick={() => void submit()}
+                  disabled={busy || (mode === "apkg" ? !apkgB64 : text.trim().length < (mode === "csv" ? 3 : 120))}
+                >
+                  {busy ? "Working..." : mode === "apkg" ? "Import the deck" : mode === "csv" ? "Import rows" : "Extract and add to review"}
                 </Btn>
                 <Btn variant="ghost" onClick={() => setFormOpen(false)}>
                   Cancel

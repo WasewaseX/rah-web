@@ -786,6 +786,64 @@ try {
       check(empty.status === 400, "csv: header-only import refused honestly", JSON.stringify(empty.body).slice(0, 100));
     }
 
+    // --- Anki .apkg import (feature #4 v2) ---
+    console.log("\n--- apkg import ---");
+    {
+      // Build a REAL Anki collection in-memory with bun:sqlite, wrap it in a
+      // stored-entry ZIP via the lib's own writer - a byte-true .apkg fixture.
+      const { buildZip } = await import("@/lib/apkg");
+      const { Database } = await import("bun:sqlite");
+      const { mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+      const dir = await mkdtemp(join(tmpdir(), "battery-apkg-"));
+      const dbPath = join(dir, "collection.anki2");
+      const sq = new Database(dbPath);
+      sq.run("CREATE TABLE notes (id INTEGER PRIMARY KEY, flds TEXT)");
+      const ins = sq.query("INSERT INTO notes (flds) VALUES (?)");
+      ins.run("What is the capital of France?\x1fParis");
+      ins.run("to <b>implement</b>\x1fto put a plan into action [sound:na.mp3]");
+      ins.run("{{c1::implement}} the plan\x1f"); // cloze: front blanked, back = the answer
+      ins.run("only one field"); // no back -> skipped
+      ins.run("dup\x1fone"); // valid: the FIRST dup row is a real card
+      ins.run("dup\x1ftwo"); // duplicate front -> skipped
+      sq.close();
+      const coll = new Uint8Array(await readFile(dbPath));
+      const zipBytes = buildZip([
+        { name: "collection.anki2", data: coll },
+        { name: "media", data: new TextEncoder().encode("{}") },
+      ]);
+      const b64 = Buffer.from(zipBytes).toString("base64");
+      const enc = new TextEncoder();
+
+      const imp = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "battery apkg", mode: "apkg", dataB64: b64 }) });
+      check(imp.status === 200 && imp.body?.created === 4, "apkg: import creates 4 cards (plain, html, cloze, first-dup)", JSON.stringify(imp.body).slice(0, 140));
+      check(String(imp.body?.reason ?? "").includes("2 note(s) skipped"), "apkg: skipped count is honest (1-field + duplicate)", JSON.stringify(imp.body?.reason));
+      check(String(imp.body?.reason ?? "").includes("media ref"), "apkg: media refs are counted and reported, not silently dropped", JSON.stringify(imp.body?.reason));
+
+      const detail = await api(`/api/materials?id=${imp.body.materialId}`);
+      const cards = detail.body?.cards ?? [];
+      const plain = cards.find((c: { front: string }) => c.front === "What is the capital of France?");
+      const htmlCard = cards.find((c: { front: string }) => c.front === "to implement");
+      const cloze = cards.find((c: { front: string }) => String(c.front).includes("___"));
+      check(!!plain && plain.answer === "Paris", "apkg: plain front/back survives", JSON.stringify(plain));
+      check(!!htmlCard && htmlCard.answer === "to put a plan into action" && !htmlCard.front.includes("<b>"), "apkg: HTML stripped from the face", JSON.stringify(htmlCard));
+      check(!!cloze && cloze.front === "___ the plan" && cloze.answer === "implement", "apkg: cloze note becomes a blanked card", JSON.stringify(cloze));
+      const qA = await api("/api/review/queue");
+      const apkgEntry = (qA.body?.batch ?? []).find((e: { card?: { unit?: string; prompt?: string } }) => e.card?.unit === "material" && e.card?.prompt === "What is the capital of France?");
+      check(!!apkgEntry, "apkg: imported card is reachable in the review queue");
+      const delA = await api(`/api/materials?id=${imp.body.materialId}`, { method: "DELETE" });
+      check(delA.status === 200 && delA.body?.removed === 4, "apkg: deletion removes all imported cards", JSON.stringify(delA.body));
+
+      const garbage = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg", dataB64: Buffer.from("not a zip at all").toString("base64") }) });
+      check(garbage.status === 400 && String(garbage.body?.error ?? "").includes("not a valid .apkg"), "apkg: garbage bytes refused honestly", JSON.stringify(garbage.body).slice(0, 100));
+      const noColl = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg", dataB64: Buffer.from(buildZip([{ name: "readme.txt", data: enc.encode("hi") }])).toString("base64") }) });
+      check(noColl.status === 400 && String(noColl.body?.error ?? "").includes("No Anki collection"), "apkg: zip without a collection refused honestly", JSON.stringify(noColl.body).slice(0, 100));
+      const missing = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg" }) });
+      check(missing.status === 400, "apkg: missing file data refused", JSON.stringify(missing.body).slice(0, 80));
+      await rm(dir, { recursive: true, force: true });
+    }
+
     // --- suspend + daily pace (polish #1 completion) ---
     console.log("\n--- suspend + pace ---");
     {

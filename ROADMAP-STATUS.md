@@ -27,7 +27,7 @@
 | 1 | Bring-your-own-materials learning | **DONE (v1)** | Task 54 (`33a38ec`): paste text on the Reading tab → one AI extraction call → DETERMINISTIC source validation (answer must appear in its verbatim source sentence; zero valid = honest 502, never fabricated cards) → MaterialCard rows in the SAME FSRS queue (badge truth exact, no-orphan deletion). MaterialsPanel UI with per-card quoted source sentences. Battery 327/327; live extraction 8/8 source-validated; browser E2E 5/5. PDF/EPUB upload = v2. |
 | 2 | Complete CEFR curriculum graph | **DONE** | Task 58: 18-node prerequisite graph B2 → B2+ → C1 (interference core → integration → precision), proven-only mastery gates (Wilson ≥ 0.7 over 8+ attempts per tag, skill bands over 5+ samples), frontier = closest open gate, locked nodes name their blockers. `GET /api/curriculum` + Progress "Curriculum map" card + coach "unlock" action. Battery 362→380; browser E2E 10/10. |
 | 3 | Authentic exam tracks (IELTS/TOEFL/C1A) | **PARTIAL** | Exam generation with answerability + weakness targeting shipped; generic formats only. IELTS/TOEFL task types, timing, rubrics = pending. |
-| 4 | Full Anki/custom-deck import | **PARTIAL → import v1 SHIPPED** | Export: Anki-dialect TSV (Task 42). Import: Task 55 (`038259d`) — CSV/TSV paste (tab/comma auto-detect, `#` headers skipped, quoted cells, dedupe, 300-row cap), smart row mapping (pre-blanked passthrough, auto-blanking, front-back), rides the Task-54 FSRS queue. `.apkg` binary = v2. |
+| 4 | Full Anki/custom-deck import | **DONE** | Round-trip complete: export as Anki-dialect TSV (Task 42); import CSV/TSV paste (Task 55); import real `.apkg` packages (Task 59) — zero-dep ZIP+SQLite reader (runtime-adaptive: node:sqlite on dev, bun:sqlite under the prod start), cloze notes → blanked cards, HTML/media refs handled honestly (counted, not dropped), Anki's own schedule stays behind so FSRS builds real intervals, new compressed format refused with the exact Anki re-export instruction. Battery 380→391; browser E2E 5/5. |
 | 5 | Acoustic pronunciation assessment | **PARTIAL (honest)** | Sound Lab (Task 43) does deterministic phoneme-contrast feedback over the ASR diff — measured evidence, inferred label, honest epistemics. True acoustic assessment (Azure Speech) = pending, API decision below. |
 | 6 | Real offline sync | **PENDING** | Roadmap #20. |
 | 7 | Goal-based weekly planner | **PENDING** | FSRS forecast chips + daily budget explain exist (Task 44); full re-planning scheduler = pending. |
@@ -55,7 +55,7 @@
 | App | Status | Output |
 |-----|--------|--------|
 | Duolingo | **DONE** | `DUOLINGO-RE.md`; word-bank tiles, streak/budget doctrine, practice-bot labeling shipped. |
-| Anki | **PARTIAL** | Review mechanics studied (forecast, ahead mode, budget); export interop shipped; import + custom scheduling settings pending. |
+| Anki | **DONE** | Review mechanics studied (forecast, ahead mode, budget - Tasks 44/56); export interop (Task 42); import interop complete (Tasks 55/59: CSV/TSV + real .apkg packages). Custom per-deck scheduling settings = intentionally not (Rah's FSRS owns scheduling - documented in the import UI). |
 | ELSA Speak | **PARTIAL** | Sound Lab = our honest version of sound-level feedback; acoustic assessment pending. |
 | LingQ | **PENDING** | Feeds feature #1 (BYO materials). |
 
@@ -100,5 +100,6 @@
 | 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 | 57 | this commit | P1-7 honest degraded states everywhere (battery 352→362) + isolated-battery self-sufficiency fix (RAH_OPEN_REGISTRATION now exported by the script, not .env) |
 | 58 | this commit | feature #2 CEFR curriculum graph (battery 362→380; browser E2E 10/10) |
+| 59 | this commit | feature #4 COMPLETE: real .apkg import (battery 380→391; browser E2E 5/5) |
 
-**Gate status:** battery 380/380 (isolated throwaway stack) · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · curriculum E2E 10/10 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 391/391 (isolated throwaway stack) · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · curriculum E2E 10/10 · apkg E2E 5/5 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
