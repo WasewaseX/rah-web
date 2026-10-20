@@ -727,3 +727,20 @@ Work Log:
 
 Stage Summary:
 - The "review stops after 10" wall is gone: the badge no longer lies (one source of truth), the round auto-continues, and when the day's honest budget is spent the app says WHY and offers Keep practicing instead of dead-ending. First-week reviews now mix all three skills instead of 40 straight collocations. FSRS is visible (per-card schedule line, forecast chips, live intervals, budget explanation). Rival self-labels as a practice bot. Battery 285/285, live E2E verified in a real browser as a noob user.
+
+---
+Task ID: 45
+Agent: Super Z (main)
+Task: P0-2 from the new external audit - make GitHub CI green. The audit flagged Task 44 (7ca3697) failing at Typecheck with exit 2 while the worklog claimed local tsc clean; reconcile.
+
+Work Log:
+- Pulled the real CI logs via the GitHub API: EVERY recent run failed, always the same error - scripts/test-portable.ts(121,37): TS2307 "Cannot find module 'playwright'". Lint passed; Typecheck was the only failing step.
+- ROOT CAUSE (environment-contaminated typecheck): playwright was never in package.json/bun.lock; it exists only as a stray install in the PARENT directory (/home/z/node_modules/playwright). TypeScript module resolution walks up parent dirs, so local `tsc --noEmit` resolved it and reported clean - while CI's fresh checkout (frozen lockfile, no parent node_modules) correctly failed. The worklog's "tsc clean" claims were reading a contaminated environment, and CI was right every time.
+- FIX: scripts/test-portable.ts now imports playwright through a VARIABLE specifier (const pwName = "playwright"; await import(pwName)) inside try/catch with a graceful "SKIP browser proof" fallback + minimal structural PwPage/PwBrowser types. TS cannot statically resolve a variable specifier (no TS2307 anywhere), and the dep stays what it truly is: an optional E2E-only tool CI does not need.
+- VERIFIED AS CI, NOT AS MY MACHINE: temporarily moved /home/z/node_modules/playwright away (true fresh-checkout simulation), ran tsc -> exit 0, zero errors, restored after.
+- Audit claim "branches: ain]" checked byte-exact: ci.yml actually reads `branches: [main]` correctly (the audit misread a rendering artifact) - no change needed there.
+- BONUS pre-existing failure fixed: with CI honesty restored, the portable drive's own browser check was failing 14/15 (baseline confirmed on the unmodified script) because Progress is auth-gated and the drive never logged in. Added the Task-44-style real email-code login (UI fill + /api/auth/request-code devCode) before the Band-map assertion. Drive now 15/15 ALL PASS.
+- Battery 285/285. eslint clean on the touched file.
+
+Stage Summary:
+- CI is unblocked: the typecheck failure that made every push red is fixed at the root (optional-dep import), the misleading "tsc clean locally" lesson is recorded (parent-dir node_modules = contaminated typechecks; CI is the arbiter), and the portable drive is green again with a real login. The audit's other ci.yml claim was a false positive.

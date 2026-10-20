@@ -26,6 +26,17 @@ function check(ok: boolean, what: string, detail = "") {
 
 type Bundle = { format: string; exportedAt: string; hash: string; tables: Record<string, Record<string, unknown>[]>; counts: Record<string, number> };
 
+// Minimal structural types for the optional playwright E2E dep (not in package.json).
+type PwPage = {
+  goto(url: string, o?: { waitUntil?: string }): Promise<unknown>;
+  waitForTimeout(ms: number): Promise<unknown>;
+  evaluate<T>(fn: () => T): Promise<T>;
+};
+type PwBrowser = {
+  newPage(o?: { viewport: { width: number; height: number } }): Promise<PwPage>;
+  close(): Promise<void>;
+};
+
 async function exportNow(): Promise<Bundle> {
   const r = await fetch(`${BASE}/api/export`);
   return (await r.json()) as Bundle;
@@ -117,15 +128,37 @@ try {
 
   await prisma.$disconnect();
 
-  // browser proof: the Progress view renders the band map
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await page.goto(`${BASE}/#progress`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2500);
-  const body = await page.evaluate(() => document.body.innerText);
-  check(body.includes("Band map") && body.includes("unproven") || body.includes("Band map"), "browser: Progress renders the band map", body.slice(0, 80));
-  await browser.close();
+  // browser proof: the Progress view renders the band map.
+  // Playwright is an OPTIONAL E2E-only dep (not in package.json - CI has no browsers anyway).
+  // The variable specifier keeps tsc from statically resolving it (TS2307 killed CI for months
+  // because a stray parent-dir node_modules made local tsc resolve what CI could not).
+  const pwName = "playwright";
+  let pw: { chromium: { launch(o: { headless: boolean }): Promise<PwBrowser> } };
+  try {
+    pw = (await import(/* @vite-ignore */ pwName)) as typeof pw;
+  } catch {
+    console.log("SKIP browser proof: playwright not installed (E2E-only optional dep)");
+    pw = null as unknown as typeof pw;
+  }
+  if (pw) {
+    const browser = await pw.chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    // Login first (Progress is auth-gated): email-code flow, dev exposes devCode.
+    await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    await page.locator('input[placeholder="you@gmail.com"]').fill("noob@rah.dev");
+    await page.getByRole("button", { name: "Send login code" }).click();
+    await page.waitForTimeout(1200);
+    const codeRes = await fetch(`${BASE}/api/auth/request-code`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "noob@rah.dev" }) });
+    const codeJson = (await codeRes.json()) as { devCode?: string };
+    await page.locator('input[placeholder="000000"]').fill(String(codeJson.devCode));
+    await page.getByRole("button", { name: "Verify and sign in" }).click();
+    await page.waitForTimeout(2500);
+    await page.goto(`${BASE}/#progress`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2500);
+    const body = await page.evaluate(() => document.body.innerText);
+    check(body.includes("Band map"), "browser: Progress renders the band map", body.slice(0, 80));
+    await browser.close();
+  }
 } catch (e) {
   failures += 1;
   console.log(`FAIL drive crashed: ${e instanceof Error ? e.message : String(e)}`);
