@@ -36,7 +36,7 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Prisma + SQLite · z-
 ```bash
 bun install
 cp .env.example .env
-bun run db:push
+bun run db:deploy
 bun run dev
 ```
 

@@ -763,3 +763,19 @@ Work Log:
 
 Stage Summary:
 - The audit's two auth P0s are closed with the embedded-context constraint respected instead of broken: normal users get a pure httpOnly-cookie login with no JS-readable credential; preview-iframe users get a partitioned-cookie-first, sessionStorage-token-last-resort ladder guarded against CSRF by the custom-header rule; a DB leak yields neither usable codes nor usable sessions. The brute-force window on a 6-digit code is now 5 guesses before self-destruction.
+
+---
+Task ID: 47
+Agent: Super Z (main)
+Task: P0-5 - safe production database and migration process. Kill the dangerous "db:push --accept-data-loss" default, introduce versioned migrations.
+
+Work Log:
+- Baselined versioned migrations without touching the live DB: prisma/migrations/0001_init/migration.sql generated via `prisma migrate diff --from-empty --to-schema-datamodel`, then `prisma migrate resolve --applied 0001_init` marks it applied on the existing database. `prisma migrate status`: up to date.
+- REPRODUCIBILITY PROVEN: `prisma migrate deploy` against a FRESH SQLite file applied 0001_init, and `migrate diff --from-url <fresh> --to-schema-datamodel` reports "No difference detected" - the migration reproduces the schema exactly.
+- package.json: `db:deploy` (migrate deploy) added as the sanctioned path; `db:push` demoted to plain `prisma db push` (asks/fails on data loss instead of silently accepting it); the data-loss variant demoted to an explicit `db:push:force` escape hatch.
+- CI switched from `db:push` to `bun run db:generate && bun run db:deploy` - the throwaway check.db is now built by the same versioned-migration path production would use, so CI also validates the migrations themselves.
+- scripts/export-web.sh run instructions updated to db:deploy.
+- Gates: db:deploy on the live DB reports "No pending migrations"; tsc clean; battery 293/293.
+
+Stage Summary:
+- Schema changes now have a real lifecycle: versioned SQL migrations, deploy-only in CI, and data-loss pushes require the explicit :force script. The audit's "particularly dangerous if accidentally used as a production deployment procedure" is dead: the default path no longer carries --accept-data-loss anywhere.

@@ -17,8 +17,8 @@ jobs:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
-      - name: Prisma generate + push (throwaway db)
-        run: bun run db:push
+      - name: Prisma generate + migrate deploy (throwaway db)
+        run: bun run db:generate && bun run db:deploy
       - name: Lint
         run: bun run lint
       - name: Typecheck
