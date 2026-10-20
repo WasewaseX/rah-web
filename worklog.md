@@ -1025,3 +1025,14 @@ Stage Summary:
 - Root cause proven: only git-tracked files survive updates; the learner DB never was one. All pre-2026-10-20T20:31Z data is unrecoverable (no snapshot existed); honest about that.
 - From now on: every deploy snapshots + commits learner data first; boot restores it if missing; /api/version data.createdAt is the regression tripwire.
 - Next per audit guidance: single-vs-multi-user decision, then validated pronunciation assessment / authentic exam structures / effectiveness measurement - no feature sprawl.
+
+Work Log (Task 61 continuation - merge + gates):
+- Discovered remote already held a Task-60 fix (5156b4b) + db-sync snapshots (18:52/18:57/19:56); this workspace was a stale Task-56-era clone, which is exactly why the 20:28 reprovision wiped the DB again despite the fix being on GitHub.
+- Recovery check (honest): all remote snapshots POST-date wipe #1 (~18:16; the 19:56 snapshot has Learner.createdAt=18:16:57) -> pre-wipe history unrecoverable; snapshot not restored (not richer than live; would kill the learner's fresh session).
+- Merged origin/main (6 conflicts resolved): unified ensure-server (restore-if-missing preferring db/sync/rah-latest.db -> backups/ history -> db-migrate-safe with P3005 baseline; NEVER reset/db-push), merged watchdog (their hourly db-sync + my daily history push), merged deploy (their db-pull/freshness/stats-never-drop flow + my history snapshot at 2.5), docs unified in ROADMAP-AUDIT.md + ROADMAP-STATUS.md (Tasks 60+61).
+- Added scripts/session-start.sh: git sync + ensure-server as the FIRST session action (the stale-reprovision countermeasure).
+- Gates on merged tree: tsc clean, eslint clean, admin route tests 16/16, MERGED restore drill PASS (wipe confirmed -> restore from db/sync -> clean deploy -> byte-identical state, first_words untouched), FULL ISOLATED BATTERY 391/391, real db untouched.
+
+Stage Summary:
+- One coherent data-survival system from two independent fixes: freshness (hourly db/sync/rah-latest.db, scrubbed) + depth (daily backups/ history, keeps 10) + boot restore + deploy pre-pull/post-verify + /api/version data tripwire + session-start sync doctrine.
+- Honest limits: pre-Oct-20 history is gone forever; surprise reprovision can still cost <=1h of progress (PostgreSQL remains the structural fix at multi-user time); db/sync path scrubs sessions so a restore via that path costs one re-login (backups/ path keeps active sessions).
