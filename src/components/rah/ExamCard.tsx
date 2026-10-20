@@ -78,6 +78,9 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
             ))}
           </div>
           <p className="mt-4 text-sm leading-relaxed text-[#c4cddc]">{result.headline}</p>
+          {result.degraded && result.degradedNotice && (
+            <p className="mt-3 rounded-2xl border border-[#e2b93b]/25 bg-[#e2b93b]/[0.08] p-3 text-xs leading-relaxed text-[#e2b93b]">{result.degradedNotice}</p>
+          )}
           <button
             onClick={() => setShowWhy((v) => !v)}
             className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[var(--rah-primary)] hover:underline"
@@ -152,6 +155,7 @@ export function ExamCard({ exam, onDone }: { exam: ExamClient; onDone?: () => vo
             <div className="text-xs font-semibold text-[#8b96a9]">
               {exam.count} questions · about {exam.spec.minutes} min · {exam.spec.targetSkills.length === 1 ? `focus: ${exam.spec.targetSkills[0]}` : `mixed: ${exam.spec.targetSkills.join(", ")}`}
               {exam.spec.weakTags?.length ? <span className="text-[#ffb02e]"> · hunting: {exam.spec.weakTags.join(", ")}</span> : null}
+              {exam.spec.degraded ? <span className="text-[#e2b93b]"> · built with fallback rounds (gates enforced)</span> : null}
             </div>
           </div>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[var(--rah-primary)]/40 text-[11px] font-black text-[#9dc0ff]">

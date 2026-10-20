@@ -80,6 +80,12 @@ const CONTRACT_REMINDER =
 interface CompleteOpts {
   deep?: boolean;
   temperature?: number;
+  // Degraded-result honesty (audit P1-7): called when the AI output could not
+  // be parsed after all retries and the FALLBACK envelope was served instead.
+  // Assessment callers (exams, grading, placement) MUST use this to stamp the
+  // result as degraded - a fallback result is never presented as equivalent
+  // to a fully successful AI assessment.
+  degraded?: (reason: string) => void;
 }
 
 async function completeRaw(
@@ -140,7 +146,10 @@ export async function aiJson<T>(
       await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
   }
-  if (fallback && lastRaw.trim().length > 0) return fallback(lastRaw);
+  if (fallback && lastRaw.trim().length > 0) {
+    opts.degraded?.(`unparseable AI output after 3 attempts (${lastErr instanceof Error ? lastErr.message.slice(0, 120) : "unknown"}) - fallback envelope served`);
+    return fallback(lastRaw);
+  }
   throw lastErr;
 }
 

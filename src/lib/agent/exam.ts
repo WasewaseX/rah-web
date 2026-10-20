@@ -161,7 +161,17 @@ export async function generateExam(
   const fresh = await loadFreshness();
   emit("Rotating topics", fresh.domains.join(", "));
   const genOpts = { deep: true, temperature: 0.9 };
-  const raw = await aiJson<RawExam>(examSystem(p, spec, fresh), [{ role: "user", content: `Generate the ${spec.plannedCount}-item exam now. Cover: ${spec.targetSkills.join(", ")}. Respect every BAN list and freshness rule.` }], () => ({}), genOpts);
+  // Degraded-result honesty (P1-7): every generation round that fell back to
+  // the fallback envelope is counted and surfaced. The exam still ships - the
+  // count promise and the answerability gate are deterministic and stay
+  // enforced - but the spec carries degraded:true so nothing pretends the
+  // build was fully AI-quality.
+  let degradedRounds = 0;
+  const onDegraded = (round: string) => (reason: string) => {
+    degradedRounds += 1;
+    emit("Degraded round", `${round}: ${reason.slice(0, 90)}`);
+  };
+  const raw = await aiJson<RawExam>(examSystem(p, spec, fresh), [{ role: "user", content: `Generate the ${spec.plannedCount}-item exam now. Cover: ${spec.targetSkills.join(", ")}. Respect every BAN list and freshness rule.` }], () => ({}), { ...genOpts, degraded: onDegraded("main batch") });
   emit("Validating answer keys", "every item needs a key and a why");
 
   const seen = new Set<string>();
@@ -231,7 +241,7 @@ export async function generateExam(
       examSystem(p, spec, fresh),
       [{ role: "user", content: `Generate exactly ${need} more items now. The "skill" field of every item MUST be one of: ${spec.targetSkills.join(", ")}. Do not repeat or paraphrase any of these questions: ${JSON.stringify(avoid)}. Output the same JSON object shape with only the new items.` }],
       () => ({}),
-      genOpts,
+      { ...genOpts, degraded: onDegraded("top-up round 2") },
     );
     harvest(raw2.items, items.length);
   }
@@ -271,7 +281,7 @@ export async function generateExam(
       examSystem(p, spec, fresh),
       [{ role: "user", content: `Generate exactly ${need} more items now. The "skill" field of every item MUST be one of: ${spec.targetSkills.join(", ")}. Do not repeat or paraphrase any of these questions: ${JSON.stringify(avoid)}. Output the same JSON object shape with only the new items.` }],
       () => ({}),
-      genOpts,
+      { ...genOpts, degraded: onDegraded("gate top-up round") },
     );
     const before = items.length;
     harvest(raw3.items, items.length);
@@ -301,7 +311,7 @@ export async function generateExam(
         content: `CRITICAL OVERRIDE: this round has ONE job. Generate ${missing.length * 2} items and EVERY single one MUST have its "tag" field set to exactly one of: ${missing.join(", ")}. An item without a "tag" field from that list is a wasted generation and will be discarded. The item must genuinely force that exact weakness into play with a FRESH sentence. Do not repeat or paraphrase: ${JSON.stringify(avoid2)}. Output the same JSON object shape with only the new items.`,
       }],
       () => ({}),
-      genOpts,
+      { ...genOpts, degraded: onDegraded("weakness-quota round") },
     );
     harvest(raw4.items, items.length);
     const freshItems = items.filter((it) => it.tag && missing.includes(it.tag));
@@ -341,6 +351,11 @@ export async function generateExam(
   const finalItems = ordered.slice(0, spec.plannedCount).map((it, idx) => ({ ...it, id: `i${idx + 1}` }));
   spec.plannedCount = finalItems.length;
   spec.minutes = Math.max(4, Math.round(finalItems.length * 1.1));
+
+  if (degradedRounds > 0) {
+    spec.degraded = true;
+    emit("Degraded build", `${degradedRounds} generation round(s) fell back - the count and answerability gates still held`);
+  }
 
   const id = newId();
   const title = String(raw.title ?? "").trim().slice(0, 60) || `${spec.level} checkpoint`;
@@ -388,7 +403,10 @@ export async function gradeExamSubmission(
       const v = verdicts.find((x) => x.itemId === it.id)!;
       return { id: it.id, type: it.type, skill: it.skill, q: it.q, a: it.a, given: v.given, why: it.why };
     });
-  const arb = await arbitrateMisses(misses);
+  let degradedReason: string | undefined;
+  const arb = await arbitrateMisses(misses, (reason) => {
+    degradedReason = reason;
+  });
   for (const [id, v] of arb) {
     const verdict = verdicts.find((x) => x.itemId === id);
     if (!verdict) continue;
@@ -455,7 +473,20 @@ export async function gradeExamSubmission(
         ? `Solid: ${correct}/${total}. ${weakest ? `Your leak is ${weakest.skill}; that is where the next session goes.` : "Consistent B2 performance."}`
         : `${correct}/${total}. The gap is specific, not general: ${weakest ? `${weakest.skill} broke first. Drill it before the next exam.` : "the fundamentals need another pass."}`;
 
-  const result: ExamResult = { total, answered, correct, pct, bySkill, verdicts, headline, scheduled };
+  // Degraded grading honesty (P1-7): if the arbiter was unreachable, the
+  // result is regex-only - meaning-equal answers may sit among the misses.
+  // That travels with the result so nothing presents it as a full assessment.
+  const result: ExamResult = {
+    total,
+    answered,
+    correct,
+    pct,
+    bySkill,
+    verdicts,
+    headline,
+    scheduled,
+    ...(degradedReason ? { degraded: true, degradedNotice: `Graded mechanically: the answer arbiter was unreachable (${degradedReason.slice(0, 90)}). Meaning-equal answers may be marked wrong.` } : {}),
+  };
 
   await db.exam.update({ where: { id: examId }, data: { status: "graded", result: JSON.stringify(result) } });
   // Feed the per-skill level engine with the exam outcome.

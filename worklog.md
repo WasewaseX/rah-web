@@ -854,3 +854,18 @@ Work Log:
 
 Stage Summary:
 - The audit's isolation demand is met at full strength: `bash scripts/test-isolated-battery.sh` gives the entire battery a disposable database and a disposable server - zero contact with learner state, no restore-in-place needed. The classic `bun scripts/test-api-battery.ts` against the dev server still works unchanged.
+
+---
+Task ID: 53
+Agent: Super Z (main)
+Task: P1-7 - make model-provider failures recoverable AND honest: degraded results are labeled, never silently presented as equivalent to a full AI assessment.
+
+Work Log:
+- ai.ts: CompleteOpts gains `degraded?: (reason: string) => void` - fired when all 3 parse attempts fail and the fallback envelope is served, carrying the provider error. Non-breaking: every existing caller unchanged; assessment callers opt in.
+- EXAM BUILD: all 4 generation rounds (main batch, top-up 2, gate top-up, weakness-quota) pass round-labeled degraded callbacks. Any fallback round counts; at the end spec.degraded=true + an honest trace step ("Degraded build: N round(s) fell back - the count and answerability gates still held") travel in the spec JSON that is stored AND served. ExamCard intro shows "built with fallback rounds (gates enforced)" in amber when set.
+- EXAM GRADING: arbitrateMisses accepts onDegraded - both failure modes (fallback envelope, arbiter throw) now report instead of silently returning FALLBACK verdicts. gradeExamSubmission stamps the persisted result with degraded:true + degradedNotice ("Graded mechanically: the answer arbiter was unreachable (...). Meaning-equal answers may be marked wrong."), and ExamCard renders the notice in an amber panel above the item review.
+- PLACEMENT was already honest (writingFallback:true + explicit reasons) - verified, no change needed.
+- Gates: battery 311/311, dedicated /exam retest 22/22, tsc clean, eslint clean on all touched files.
+
+Stage Summary:
+- The audit's rule - never silently present low-confidence fallback results as equivalent to a full assessment - is now enforced at every assessment surface: exam builds carry degraded flags in their spec, graded results carry a degraded notice, and both render honestly to the learner. The last open P1 is closed; Stage 02 of the audit's order is complete.

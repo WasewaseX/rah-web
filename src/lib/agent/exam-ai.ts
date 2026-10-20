@@ -67,7 +67,10 @@ ${misses.map((m) => `id=${m.id} [${m.type}/${m.skill}] question: ${JSON.stringif
 
 // One batched call for the whole exam's misses. On any failure every miss
 // falls back to the deterministic coaching note - grading never stalls.
-export async function arbitrateMisses(misses: MissForArbitration[]): Promise<Map<string, ArbitrationVerdict>> {
+export async function arbitrateMisses(
+  misses: MissForArbitration[],
+  onDegraded?: (reason: string) => void,
+): Promise<Map<string, ArbitrationVerdict>> {
   const out = new Map<string, ArbitrationVerdict>();
   if (misses.length === 0) return out;
   try {
@@ -75,7 +78,16 @@ export async function arbitrateMisses(misses: MissForArbitration[]): Promise<Map
       arbSystem(misses),
       [{ role: "user", content: `Arbitrate all ${misses.length} misses now. Follow the accept rules strictly.` }],
       () => ({}),
-      { deep: false, temperature: 0.2 },
+      {
+        deep: false,
+        temperature: 0.2,
+        degraded: (reason) => {
+          // The fallback envelope means no real verdicts arrived: every miss
+          // below keeps its regex verdict with the FALLBACK note. The caller
+          // must label the graded result as degraded (audit P1-7).
+          onDegraded?.(reason);
+        },
+      },
     );
     for (const m of misses) {
       const v = (raw.verdicts ?? []).find((x) => String(x.id ?? "") === m.id);
@@ -92,7 +104,8 @@ export async function arbitrateMisses(misses: MissForArbitration[]): Promise<Map
         tag,
       });
     }
-  } catch {
+  } catch (e) {
+    onDegraded?.(`arbiter unreachable: ${e instanceof Error ? e.message.slice(0, 120) : "unknown"}`);
     for (const m of misses) out.set(m.id, { ...FALLBACK, rule: m.why || FALLBACK.rule });
   }
   return out;

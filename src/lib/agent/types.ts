@@ -69,6 +69,7 @@ export interface ExamSpec {
   minutes: number;
   title: string;
   weakTags: string[]; // active mistake families this exam was built to hunt
+  degraded?: boolean; // true = some generation rounds fell back; count/answerability gates still enforced (audit P1-7)
 }
 
 // Client-facing exam: items WITHOUT answer keys.
@@ -102,6 +103,10 @@ export interface ExamResult {
   // P1 exam->FSRS unification: the cards this exam's outcomes landed on.
   // Empty when nothing resolved (no deck match, no tag) - never invented.
   scheduled?: { cardId: string; due: number; grade: number; via: "deck" | "family" }[];
+  // Degraded-grading honesty (P1-7): true when the AI answer arbiter was
+  // unreachable and the result is regex-only. Never silently equivalent.
+  degraded?: boolean;
+  degradedNotice?: string;
 }
 
 export interface SkillLevelRow {
