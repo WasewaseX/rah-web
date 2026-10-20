@@ -24,7 +24,7 @@
 
 | # | Feature | Status | Notes |
 |---|---------|--------|-------|
-| 1 | Bring-your-own-materials learning | **PENDING** | The audit's top pick and our tracked mega-update #9: import PDFs/articles → extract vocab/collocations with source context → cards. |
+| 1 | Bring-your-own-materials learning | **DONE (v1)** | Task 54 (`33a38ec`): paste text on the Reading tab → one AI extraction call → DETERMINISTIC source validation (answer must appear in its verbatim source sentence; zero valid = honest 502, never fabricated cards) → MaterialCard rows in the SAME FSRS queue (badge truth exact, no-orphan deletion). MaterialsPanel UI with per-card quoted source sentences. Battery 327/327; live extraction 8/8 source-validated; browser E2E 5/5. PDF/EPUB upload = v2. |
 | 2 | Complete CEFR curriculum graph | **PARTIAL** | 5-band progress map with proven-only flags (Task 39 outcomes work); deck has unit/skill/trap metadata. NOT yet: B2–C1 depth + prerequisite graph + mastery gates. |
 | 3 | Authentic exam tracks (IELTS/TOEFL/C1A) | **PARTIAL** | Exam generation with answerability + weakness targeting shipped; generic formats only. IELTS/TOEFL task types, timing, rubrics = pending. |
 | 4 | Full Anki/custom-deck import | **PARTIAL** | Anki-dialect TSV export shipped with the honesty header (Task 42); CSV/TSV import + `.apkg` = pending (static deck pipeline must open first). |
@@ -81,7 +81,7 @@
 |-------|--------|
 | 01 Stabilize and isolate | **5/5 P0s closed** (Tasks 45–48): CI green, isolation enforced (deployment lock), auth hardened (cookie-only + code hardening), migrations versioned. |
 | 02 Make the learning system trustworthy | **P1 wave 4/5 closed** (Tasks 49–52): real account deletion, AI-endpoint rate limits, tool-permission matrix + injection boundaries, full test isolation. Remaining: degraded-result labeling (#7). |
-| 03 Add the differentiators | PENDING — BYO materials, curriculum graph, acoustic pronunciation. |
+| 03 Add the differentiators | **IN PROGRESS** — BYO materials SHIPPED (Task 54); curriculum graph + acoustic pronunciation pending. |
 | 04 Dependable daily product | PENDING — Anki import, offline sync, reminders, longitudinal evidence. |
 
 ---
@@ -99,4 +99,4 @@
 | 51 | `161d7cb` | P1-8 tool tier matrix + per-run budgets + injection frame (battery 307→311) |
 | 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 
-**Gate status:** battery 311/311 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 327/327 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
