@@ -929,3 +929,22 @@ Work Log:
 
 Stage Summary:
 - Audit polish #1's remaining asks are closed: configurable daily limits and suspended/difficult cards are learner-operable end to end. Undo already existed (/api/review/undo + UI). The review queue polish item is now DONE rather than partially.
+
+---
+Task ID: 60
+Agent: Super Z (main)
+Task: Investigate "first word achievement fired again" report; fix learner-data survival across updates; create ROADMAP-AUDIT.md.
+
+Work Log:
+- Forensics on live DB: Learner.createdAt = 2026-10-20T20:31:51Z; all history tables 0 rows; User re-registered 20:39; first_words re-earned 20:39:48; .env + prisma/migrations all stamped 20:28:42 -> environment rebuilt from git, and the DB was NOT in git (db/custom.db gitignored). Total data loss confirmed; achievement logic itself was idempotent (not the bug).
+- Built the data-survival layer: scripts/db-snapshot-core.ts (hygiene + SQLite VACUUM INTO, safe while server runs), scripts/db-snapshot.sh (content-aware sha256 skip, gzip ~6KB, keeps 10, in tracked backups/), scripts/db-restore.sh (restore-if-missing only), scripts/db-migrate-safe.sh (migrate deploy + P3005 baseline; NEVER reset/push-force), scripts/ensure-watchdog.sh.
+- Wired into ops paths: ensure-server.sh (restore -> migrate-safe -> snapshot -> watchdog self-start), deploy.sh (snapshot + commit before every push), watchdog.sh (daily autosnap + commit + push, loss window <= 1 day), .gitignore (backups state files only).
+- Disaster drill PASSED: snapshot -> deleted db/custom.db -> restore + baseline 0001/0002 (P3005 handled) -> byte-identical data (streak 1, xp 10, 2 reviews, first_words.at unchanged -> no re-fire).
+- GET /api/version now carries data provenance { createdAt, xp, streak, reviews, latestSnapshot } - instant tripwire if data ever resets (failure-isolated).
+- tsc --noEmit clean; eslint clean on touched files; server restarted through the full guard path; watchdog running (pid verified).
+- Created ROADMAP-AUDIT.md (incident record + 40-entry tracker summary + stage order); updated ROADMAP-STATUS.md (item 5 amended, new row 11 P0-11 DONE, velocity log, gate status).
+
+Stage Summary:
+- Root cause proven: only git-tracked files survive updates; the learner DB never was one. All pre-2026-10-20T20:31Z data is unrecoverable (no snapshot existed); honest about that.
+- From now on: every deploy snapshots + commits learner data first; boot restores it if missing; /api/version data.createdAt is the regression tripwire.
+- Next per audit guidance: single-vs-multi-user decision, then validated pronunciation assessment / authentic exam structures / effectiveness measurement - no feature sprawl.

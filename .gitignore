@@ -59,6 +59,12 @@ server.log
 
 # runtime data - not for the public repo
 db/custom.db
+
+# data survival (the 2026-10-20 lesson): backups/ IS tracked - it is the only
+# thing that survives environment rebuilds. Only transient state stays out.
+backups/.last-autosnap
+backups/.vacuum-*
+backups/.tmp-*
 /rah-web-export/
 /rah-repo/
 

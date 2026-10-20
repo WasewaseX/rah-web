@@ -11,6 +11,13 @@ bash scripts/ensure-server.sh || { echo "server not healthy; deploy aborted"; ex
 LOCAL_VERSION=$(curl -s http://localhost:3000/api/version)
 echo "local  : $LOCAL_VERSION"
 
+echo "== 1.5 data snapshot (learner history rides every push)"
+bash scripts/db-snapshot.sh
+if git status --porcelain -- backups 2>/dev/null | grep -q .; then
+  git add backups
+  git commit -q -m "data: learner snapshot before deploy $(date -u +%FT%TZ)" && echo "snapshot committed" || echo "(snapshot commit skipped)"
+fi
+
 echo "== 2. github"
 git push origin HEAD -q || echo "(push skipped: nothing new or remote rejected)"
 SHA=$(git rev-parse --short=12 HEAD)
