@@ -946,3 +946,20 @@ Work Log:
 
 Stage Summary:
 - Audit P1-7 is CLOSED: every surface that can serve non-AI content now says so in the learner's language, at the moment it happens. Stage 02 (trustworthy learning) is 5/5. The outage path no longer bricks the dashboard's first screen - it degrades to the engine's real plan, clearly labeled.
+
+---
+Task ID: 58
+Agent: Super Z (main)
+Task: Stage 03 feature #2 - the CEFR curriculum graph (B2 -> B2+ -> C1) with prerequisites and proven-only mastery gates.
+
+Work Log:
+- src/lib/curriculum.ts (new, PURE - no db import): 18 nodes across three bands. B2 closes the Farsi-interference core (articles, countability/plurals, copula/statives, prepositions, perfect, question order, sentence shape, the five sound fixes); B2+ integrates (collocations, register, hedging, writing/speaking/listening proofs); C1 adds precision (precise verbs, register under pressure, writing/speaking mastery). Prerequisites encode real dependency logic (collocations need word choice, register needs collocations; the summit C1 nodes pull the whole graph).
+- Gates are PROVEN-ONLY, same statistics as the ledger: a tag needs Wilson lower bound >= 0.7 over >= 8 graded attempts (2/2 lucky answers are honestly capped at ~34%); a skill needs score >= 0.7 over >= 5 measured samples. Node states: locked (prereq unproven, names the blocker) / available / in_progress / mastered. Frontier = the closest open gate in band order. Import-time DAG guard: cycles, duplicate ids, and unknown prereq ids throw immediately.
+- GET /api/curriculum: renders the graph from the learner's REAL TagMastery + SkillLevel rows. No AI, fully deterministic.
+- Progress.tsx CurriculumPanel: three band groups, status chips (proven/in progress/open/locked), "next gate" marker on the frontier, honest evidence lines per requirement, locked nodes say exactly which prerequisite holds them.
+- Engine wiring (next-best.ts): new "unlock" action kind - the frontier's weakest requirement surfaces as the lowest-urgency next-best action with its honest evidence as the reason. The map now guides the coach, not just the Progress page.
+- Battery: route registered in the sweep map + 16 deterministic pins - gate honesty (2/2 != mastery, 34% bound; 60% record never passes; 10/10 proves), prerequisite locking + opening, frontier climbing to B2+, skill-gate sample minimum, fresh-learner layout, route shape, unlock kind in state. Battery 362 -> 380. Fixed a stale comment in mastery.ts (2/2 Wilson bound is ~34%, not 58%).
+- E2E (scripts/e2e-task58-curriculum.mjs, real browser on a throwaway stack, RAH_OPEN_REGISTRATION=1 exported by the script itself): 10/10 - login -> Progress -> Curriculum map card renders -> three bands -> next-gate marker -> open/locked chips -> prerequisite names -> honest threshold lines -> summary line.
+
+Stage Summary:
+- Feature #2 is shipped: the learner's road from B2 to C1 is a visible, prerequisite-locked graph whose every claim is a measured number from the same ledger the coach uses. The audit's "mastery gates" ask is operational: the frontier drives a real next-best action. Nothing in the graph can say "done" without Wilson-bound proof.

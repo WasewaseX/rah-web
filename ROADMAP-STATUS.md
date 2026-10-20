@@ -25,7 +25,7 @@
 | # | Feature | Status | Notes |
 |---|---------|--------|-------|
 | 1 | Bring-your-own-materials learning | **DONE (v1)** | Task 54 (`33a38ec`): paste text on the Reading tab → one AI extraction call → DETERMINISTIC source validation (answer must appear in its verbatim source sentence; zero valid = honest 502, never fabricated cards) → MaterialCard rows in the SAME FSRS queue (badge truth exact, no-orphan deletion). MaterialsPanel UI with per-card quoted source sentences. Battery 327/327; live extraction 8/8 source-validated; browser E2E 5/5. PDF/EPUB upload = v2. |
-| 2 | Complete CEFR curriculum graph | **PARTIAL** | 5-band progress map with proven-only flags (Task 39 outcomes work); deck has unit/skill/trap metadata. NOT yet: B2–C1 depth + prerequisite graph + mastery gates. |
+| 2 | Complete CEFR curriculum graph | **DONE** | Task 58: 18-node prerequisite graph B2 → B2+ → C1 (interference core → integration → precision), proven-only mastery gates (Wilson ≥ 0.7 over 8+ attempts per tag, skill bands over 5+ samples), frontier = closest open gate, locked nodes name their blockers. `GET /api/curriculum` + Progress "Curriculum map" card + coach "unlock" action. Battery 362→380; browser E2E 10/10. |
 | 3 | Authentic exam tracks (IELTS/TOEFL/C1A) | **PARTIAL** | Exam generation with answerability + weakness targeting shipped; generic formats only. IELTS/TOEFL task types, timing, rubrics = pending. |
 | 4 | Full Anki/custom-deck import | **PARTIAL → import v1 SHIPPED** | Export: Anki-dialect TSV (Task 42). Import: Task 55 (`038259d`) — CSV/TSV paste (tab/comma auto-detect, `#` headers skipped, quoted cells, dedupe, 300-row cap), smart row mapping (pre-blanked passthrough, auto-blanking, front-back), rides the Task-54 FSRS queue. `.apkg` binary = v2. |
 | 5 | Acoustic pronunciation assessment | **PARTIAL (honest)** | Sound Lab (Task 43) does deterministic phoneme-contrast feedback over the ASR diff — measured evidence, inferred label, honest epistemics. True acoustic assessment (Azure Speech) = pending, API decision below. |
@@ -81,7 +81,7 @@
 |-------|--------|
 | 01 Stabilize and isolate | **5/5 P0s closed** (Tasks 45–48): CI green, isolation enforced (deployment lock), auth hardened (cookie-only + code hardening), migrations versioned. |
 | 02 Make the learning system trustworthy | **5/5 CLOSED** (Tasks 49–52 + 57): real account deletion, AI-endpoint rate limits, tool-permission matrix + injection boundaries, fully isolated battery stack, and honest degraded states on every AI surface (Task 57). |
-| 03 Add the differentiators | **IN PROGRESS** — BYO materials SHIPPED (Task 54); curriculum graph + acoustic pronunciation pending. |
+| 03 Add the differentiators | **IN PROGRESS** — BYO materials SHIPPED (Task 54); CEFR curriculum graph SHIPPED (Task 58); acoustic pronunciation + authentic exam tracks pending. |
 | 04 Dependable daily product | PENDING — Anki import, offline sync, reminders, longitudinal evidence. |
 
 ---
@@ -99,5 +99,6 @@
 | 51 | `161d7cb` | P1-8 tool tier matrix + per-run budgets + injection frame (battery 307→311) |
 | 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 | 57 | this commit | P1-7 honest degraded states everywhere (battery 352→362) + isolated-battery self-sufficiency fix (RAH_OPEN_REGISTRATION now exported by the script, not .env) |
+| 58 | this commit | feature #2 CEFR curriculum graph (battery 362→380; browser E2E 10/10) |
 
-**Gate status:** battery 362/362 (isolated throwaway stack) · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 380/380 (isolated throwaway stack) · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · curriculum E2E 10/10 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).

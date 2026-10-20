@@ -72,6 +72,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/auth/request-code", methods: ["POST"] },
   { path: "/api/auth/session", methods: ["GET", "DELETE"] },
   { path: "/api/auth/verify", methods: ["POST"] },
+  { path: "/api/curriculum", methods: ["GET"] },
   { path: "/api/chat", methods: ["GET", "POST", "DELETE"] },
   { path: "/api/coach-agent", methods: ["POST"] },
   { path: "/api/coach/briefing", methods: ["GET", "POST"] },
@@ -851,6 +852,65 @@ try {
       if (br.body?.degraded === true) {
         check(typeof br.body.brief.degradedNotice === "string" && br.body.brief.degradedNotice.length > 20, "degraded: cached degraded brief carries its notice into the response", JSON.stringify(br.body?.brief?.degradedNotice ?? "").slice(0, 100));
       }
+    }
+
+    // --- CEFR curriculum graph (feature #2) ---
+    console.log("\n--- curriculum ---");
+    {
+      const { computeCurriculum, CURRICULUM } = await import("@/lib/curriculum");
+      check(CURRICULUM.length >= 16 && CURRICULUM.some((n: { band: string }) => n.band === "B2") && CURRICULUM.some((n: { band: string }) => n.band === "B2+") && CURRICULUM.some((n: { band: string }) => n.band === "C1"), "curriculum: graph spans B2/B2+/C1 with a real node count", String(CURRICULUM.length));
+
+      // Gate honesty: 2/2 lucky answers are NOT mastery (Wilson bound).
+      const lucky = computeCurriculum([{ tag: "articles", ok: 2, no: 0, ewma: 1 }], []);
+      const luckyNode = lucky.nodes.find((n) => n.node.id === "b2_articles")!;
+      check(luckyNode.status === "in_progress" && luckyNode.gateMet === false, "curriculum: 2/2 correct is NOT mastery (in_progress, gate unmet)", JSON.stringify(luckyNode.status));
+      check(luckyNode.evidence[0].detail.includes("34%"), "curriculum: Wilson bound honestly caps 2/2 at ~34%", luckyNode.evidence[0].detail);
+
+      // Proven gate: 10/10 crosses Wilson 0.7 over 8+ samples.
+      const proven = computeCurriculum([{ tag: "articles", ok: 10, no: 0, ewma: 1 }], []);
+      const provenNode = proven.nodes.find((n) => n.node.id === "b2_articles")!;
+      check(provenNode.status === "mastered" && provenNode.evidence[0].proven === true, "curriculum: 10/10 proves the articles gate", JSON.stringify(provenNode.status));
+
+      // Weak record never proves: 6/4 over 10 samples = 60% raw, Wilson < 0.7.
+      const shaky = computeCurriculum([{ tag: "articles", ok: 6, no: 4, ewma: 0.6 }], []);
+      check(shaky.nodes.find((n) => n.node.id === "b2_articles")!.status !== "mastered", "curriculum: a 60% record never passes the 70% proven gate", "ok=6 no=4");
+
+      // Prerequisites: collocations requires sentence_shape (adjectives+word_choice).
+      const mid = computeCurriculum([{ tag: "word_choice", ok: 9, no: 1, ewma: 0.9 }, { tag: "adjectives", ok: 9, no: 1, ewma: 0.9 }], []);
+      const colloc = mid.nodes.find((n) => n.node.id === "b2p_collocations")!;
+      check(colloc.status === "locked" && colloc.blockers.includes("Sentence shape"), "curriculum: unproven prerequisite locks the downstream node", JSON.stringify(colloc.blockers));
+      const full = computeCurriculum(
+        ["articles", "countability", "plurals", "copula", "statives", "prepositions", "perfect", "question_order", "that_omission", "adjectives", "word_choice", "th_sounds", "w_v", "clusters", "ng", "stress"].map((tag) => ({ tag, ok: 10, no: 0, ewma: 1 })),
+        [],
+      );
+      const collocOpen = full.nodes.find((n) => n.node.id === "b2p_collocations")!;
+      check(collocOpen.status !== "locked", "curriculum: proven prerequisites open the B2+ node", JSON.stringify(collocOpen.status));
+      // The frontier moved into B2+ once the whole B2 row is proven.
+      check(full.summary.frontier?.node.band === "B2+", "curriculum: frontier climbs to B2+ when B2 gates prove", String(full.summary.frontier?.node.band));
+      // Skill gate: 0.8 over 5 samples proves; 0.8 over 2 does not.
+      const withSkill = computeCurriculum(
+        ["articles", "countability", "plurals", "copula", "statives", "prepositions", "perfect", "question_order", "that_omission", "adjectives", "word_choice", "register"].map((tag) => ({ tag, ok: 10, no: 0, ewma: 1 })),
+        [{ skill: "writing", score: 0.8, samples: 2 }],
+      );
+      const reg = withSkill.nodes.find((n) => n.node.id === "b2p_register")!;
+      check(reg.status !== "mastered" && reg.evidence.some((e) => e.detail.includes("2 sample")), "curriculum: skill gate needs 5+ measured samples, 2 is not proof", JSON.stringify(reg.evidence.map((e) => e.detail)));
+
+      // Empty ledger: B2 nodes open, C1 locked, frontier = the first B2 node.
+      const fresh = computeCurriculum([], []);
+      check(fresh.nodes.filter((n) => n.node.band === "B2").every((n) => n.status === "available"), "curriculum: fresh learner sees open B2 gates", JSON.stringify(fresh.nodes.filter((n) => n.node.band === "B2").map((n) => n.status)));
+      check(fresh.nodes.filter((n) => n.node.band === "C1").every((n) => n.status === "locked"), "curriculum: C1 is locked for a fresh learner", "C1 locked");
+      check(fresh.summary.frontier?.node.id === "b2_articles" && fresh.summary.line.includes("Next gate"), "curriculum: frontier starts at the first B2 node with an honest line", fresh.summary.line);
+
+      // Route: the live graph answers from the real ledger.
+      const cur = await api("/api/curriculum");
+      check(cur.status === 200 && Array.isArray(cur.body?.nodes) && cur.body.nodes.length === CURRICULUM.length, "curriculum: route serves the full graph", `nodes=${cur.body?.nodes?.length}`);
+      const valid = ["locked", "available", "in_progress", "mastered"];
+      check(cur.body?.nodes?.every((n: { status: string }) => valid.includes(n.status)), "curriculum: every node status is valid", JSON.stringify([...new Set((cur.body?.nodes ?? []).map((n: { status: string }) => n.status))]));
+      check(typeof cur.body?.summary?.mastered === "number" && typeof cur.body?.summary?.line === "string", "curriculum: summary counts + line present", JSON.stringify(cur.body?.summary?.line ?? "").slice(0, 80));
+      // The unlock action rides the state the coach reads.
+      const st = await api("/api/state");
+      const hasShape = (st.body?.nextBest ?? []).every((a: { action: string }) => ["review", "drill", "test", "teach", "unlock"].includes(a.action));
+      check(st.status === 200 && hasShape, "curriculum: state nextBest actions carry the unlock kind when present", JSON.stringify((st.body?.nextBest ?? []).map((a: { action: string }) => a.action)));
     }
   }
 
