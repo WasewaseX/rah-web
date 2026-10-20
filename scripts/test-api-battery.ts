@@ -15,7 +15,9 @@
 // Full state restore in finally via the app's own portability machinery.
 
 process.env.DATABASE_URL ||= "file:/home/z/my-project/db/custom.db";
-const BASE = "http://localhost:3000";
+// Isolated runs (scripts/test-isolated-battery.sh) point both at the throwaway
+// stack; the default remains the local dev server.
+const BASE = process.env.BATTERY_BASE ?? "http://localhost:3000";
 export {};
 
 const EMAIL = `battery-${Date.now()}@rah.test`;

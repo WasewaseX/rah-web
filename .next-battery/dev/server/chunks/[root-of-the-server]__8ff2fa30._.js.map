@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///home/z/my-project/src/app/api/review/undo/route.ts"],"sourcesContent":["import { NextResponse } from \"next/server\";\n\n// kept for compatibility, undo lives client-side in the session queue\nexport async function POST() {\n  return NextResponse.json({ ok: true });\n}\n"],"names":[],"mappings":";;;;AAAA;;AAGO,eAAe;IACpB,OAAO,gJAAY,CAAC,IAAI,CAAC;QAAE,IAAI;IAAK;AACtC"}}]
+}
