@@ -29,6 +29,7 @@ export function MaterialsPanel() {
   const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<MaterialDetail | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [mode, setMode] = useState<"text" | "csv">("text");
   const [title, setTitle] = useState("");
   const [source, setSource] = useState("");
   const [text, setText] = useState("");
@@ -70,13 +71,13 @@ export function MaterialsPanel() {
       const r = await fetch("/api/materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, source, text }),
+        body: JSON.stringify({ title, source, text, mode }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Import failed.");
       setMsg({
         ok: true,
-        text: `${j.created} card${j.created === 1 ? "" : "s"} created from your text${j.degraded ? " (extraction ran in fallback mode)" : ""}. They enter your normal review queue.`,
+        text: `${j.created} card${j.created === 1 ? "" : "s"} created${j.degraded ? " (extraction ran in fallback mode)" : ""}${j.reason ? ` — ${j.reason}` : ""}. They enter your normal review queue.`,
       });
       setTitle("");
       setSource("");
@@ -110,34 +111,55 @@ export function MaterialsPanel() {
       {expanded && (
         <>
           <Note>
-            Paste something you actually need to read - an article, a work email, lecture notes. Rah pulls out the words and
-            word-combinations worth learning, every card keeps its original sentence as context, and they review on the same
-            schedule as everything else.
+            Two ways in: paste something you actually need to read (an article, a work email, lecture notes) and Rah pulls
+            out the words and word-combinations worth learning - every card keeps its original sentence as context. Or import
+            an existing deck as CSV/TSV rows (Anki-style: front + back per line) and they review on the same schedule as
+            everything else.
           </Note>
           {formOpen ? (
             <Card className="flex flex-col gap-2 p-4">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setMode("text")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${mode === "text" ? "bg-[var(--rah-primary)]/20 text-[#9dc0ff]" : "text-[#7d889c] hover:text-[#f2f5fa]"}`}
+                >
+                  Free text (AI extraction)
+                </button>
+                <button
+                  onClick={() => setMode("csv")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${mode === "csv" ? "bg-[var(--rah-primary)]/20 text-[#9dc0ff]" : "text-[#7d889c] hover:text-[#f2f5fa]"}`}
+                >
+                  CSV / TSV rows (Anki-style)
+                </button>
+              </div>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Title (e.g. That work email about the deadline)"
                 className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 text-sm text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
               />
-              <input
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder="Where it is from (optional - URL, book, course...)"
-                className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 text-sm text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
-              />
+              {mode === "text" && (
+                <input
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="Where it is from (optional - URL, book, course...)"
+                  className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 text-sm text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
+                />
+              )}
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                rows={7}
-                placeholder="Paste the text here (a few paragraphs is ideal)..."
-                className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 text-sm leading-relaxed text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
+                rows={mode === "csv" ? 7 : 7}
+                placeholder={
+                  mode === "csv"
+                    ? "One card per line: front<TAB>back\n\n# Anki-style header lines are skipped\nthe implementation___to put a plan into action\nheavy rain\tstrong rainfall"
+                    : "Paste the text here (a few paragraphs is ideal)..."
+                }
+                className="rounded-xl border border-white/[0.08] bg-[#111725] px-3 py-2 font-mono text-sm leading-relaxed text-[#f2f5fa] outline-none placeholder:text-[#5d6879] focus:border-[var(--rah-primary)]/50"
               />
               <div className="flex items-center gap-2">
-                <Btn onClick={() => void submit()} disabled={busy || text.trim().length < 120}>
-                  {busy ? "Extracting..." : "Extract and add to review"}
+                <Btn onClick={() => void submit()} disabled={busy || text.trim().length < (mode === "csv" ? 3 : 120)}>
+                  {busy ? "Working..." : mode === "csv" ? "Import rows" : "Extract and add to review"}
                 </Btn>
                 <Btn variant="ghost" onClick={() => setFormOpen(false)}>
                   Cancel
@@ -191,9 +213,11 @@ export function MaterialsPanel() {
                           <div key={c.id} className="rounded-xl border border-white/[0.06] bg-[#141924] p-2.5 text-xs">
                             <div className="font-bold text-[#e7ecf5]">{c.answer}</div>
                             {c.note ? <div className="mt-0.5 text-[#a9b4c6]">{c.note}</div> : null}
-                            <div className="mt-1.5 italic leading-relaxed text-[#8b96a9]">
-                              {"\u201C"}{c.context}{"\u201D"}
-                            </div>
+                            {c.context ? (
+                              <div className="mt-1.5 italic leading-relaxed text-[#8b96a9]">
+                                {"\u201C"}{c.context}{"\u201D"}
+                              </div>
+                            ) : null}
                           </div>
                         ))}
                         <details className="text-xs text-[#7d889c]">

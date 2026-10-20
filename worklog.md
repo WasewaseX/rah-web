@@ -900,3 +900,18 @@ Work Log:
 
 Stage Summary:
 - The Task-47 migration lifecycle holds under its first real schema change: versioned SQL, baseline-resolved live DB, deploy-reproducible chain, CI's db:deploy stays correct.
+
+---
+Task ID: 55
+Agent: Super Z (main)
+Task: Stage 03 feature #4 v1 - full CSV/TSV (Anki-style) deck import, riding the Task-54 dynamic-card pipeline.
+
+Work Log:
+- src/lib/csv-cards.ts: deterministic parser - tab/comma auto-detect, Anki # header lines skipped, quoted comma cells ("" escapes) survive, dedupe by front, 300-row cap, cell clamp. Row mapping: pre-blanked front passes through; front containing the back (>=3 chars) gets blanked deterministically; otherwise plain front-back (renders naturally in the cloze UI: prompt + blank + typed answer).
+- importDeckCsv() in materials.ts: same Material/MaterialCard/CardState machinery as text extraction - source "Imported deck (CSV/TSV)", no context promise (honest), skipped-row count surfaces in the success message.
+- /api/materials POST mode=csv: 400 on empty/header-only (BEFORE anything), deterministic, no AI call, no rate-limit burn needed (still capped by the limiter for fairness).
+- MaterialsPanel: mode toggle in the form - "Free text (AI extraction)" vs "CSV / TSV rows (Anki-style)" with a tab-separated example placeholder; success message carries the skipped-row count; empty-context cards no longer render empty quotes.
+- Battery (336/336): parser pins (3 rows from mixed TSV with headers/empty/dup/incomplete skipped, quoted-comma survival, pre-blanked passthrough), route pins (import -> front-back card reachable in the queue -> clean deletion -> header-only 400). tsc + eslint clean.
+
+Stage Summary:
+- Interop v1 is real: an existing Anki-style deck pasted as TSV/CSV becomes live FSRS cards in one paste, sharing the badge/budget/scheduler with everything else. (.apkg binary import stays v2 - it needs unzip + SQLite parsing; CSV/TSV is what Anki itself round-trips best.)

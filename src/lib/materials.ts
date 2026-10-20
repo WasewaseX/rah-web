@@ -179,3 +179,33 @@ export async function materialCardById(cardId: string): Promise<Card | null> {
   const row = await db.materialCard.findUnique({ where: { id: cardId } });
   return row ? materialToCard(row) : null;
 }
+
+// CSV/TSV deck import (feature #4): deterministic parse, MaterialCard rows in
+// the same queue. No AI, no context promise (these cards have no source
+// sentence) - the note says where they came from.
+export async function importDeckCsv(title: string, csv: string): Promise<ExtractionResult> {
+  const { parseDeckCsv } = await import("@/lib/csv-cards");
+  const parsed = parseDeckCsv(csv.slice(0, MAX_MATERIAL_CHARS));
+  if (parsed.cards.length === 0) {
+    throw new Error("No usable rows found. Expected lines like: front<TAB>back (Anki-style). # header lines and empty rows are skipped.");
+  }
+  const materialId = `m_${newId()}`;
+  const today = dayIndex();
+  await db.material.create({
+    data: {
+      id: materialId,
+      title: title.trim().slice(0, 80) || "Imported deck",
+      source: "Imported deck (CSV/TSV)",
+      text: csv.slice(0, MAX_MATERIAL_CHARS),
+      words: parsed.cards.length,
+    },
+  });
+  for (const c of parsed.cards) {
+    const cardId = `mat:${newId()}`;
+    await db.materialCard.create({
+      data: { id: cardId, materialId, front: c.front, answer: c.answer, context: "", note: c.note },
+    });
+    await db.cardState.create({ data: { cardId, ...defaultState(), due: today } });
+  }
+  return { materialId, created: parsed.cards.length, degraded: false, reason: parsed.skipped ? `${parsed.skipped} row(s) skipped (empty, duplicate, or over the ${300}-row cap)` : undefined };
+}

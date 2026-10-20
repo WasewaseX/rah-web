@@ -758,6 +758,30 @@ try {
     const orphanStates = await dbM.cardState.count({ where: { cardId: { in: [c1, c2] } } });
     check(orphanStates === 0, "materials: no orphan CardState rows after deletion", String(orphanStates));
     await dbM.$disconnect();
+
+    // --- CSV/TSV deck import (feature #4) ---
+    console.log("\n--- csv import ---");
+    {
+      const { parseDeckCsv } = await import("@/lib/csv-cards");
+      const tsv = "#separator:tab\n#html:false\ndog\tperro\nthe implementation___\tto put a plan into action\nheavy rain\tstrong rainfall\n\ndog\tperro again\norphan-row";
+      const pr = parseDeckCsv(tsv);
+      check(pr.cards.length === 3 && pr.skipped === 2, "csv: parses 3 rows, skips header+empty+dup+incomplete", JSON.stringify(pr.cards.length));
+      check(pr.cards[0].front === "dog" && pr.cards[0].answer === "perro", "csv: plain front-back row", JSON.stringify(pr.cards[0]));
+      check(pr.cards[1].front.includes("___") && pr.cards[1].answer === "to put a plan into action", "csv: pre-blanked cloze row passes through", JSON.stringify(pr.cards[1]));
+      check(pr.cards[2].front === "heavy rain" && pr.cards[2].answer === "strong rainfall", "csv: tab separation", JSON.stringify(pr.cards[2]));
+      const comma = parseDeckCsv('a b c,"x, y"\n"say ""hi""","greet"');
+      check(comma.separator === "comma" && comma.cards.length === 2 && comma.cards[0].answer === "x, y" && comma.cards[1].front === 'say "hi"', "csv: quoted comma cells survive", JSON.stringify(comma.cards));
+      // route: import -> queue has an fb card -> delete clean
+      const imp = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "battery csv", mode: "csv", text: tsv }) });
+      check(imp.status === 200 && imp.body?.created === 3, "csv: import route creates 3 cards", JSON.stringify(imp.body).slice(0, 120));
+      const q2 = await api("/api/review/queue");
+      const fbEntry = (q2.body?.batch ?? []).find((e: { card?: { unit?: string; prompt?: string } }) => e.card?.unit === "material" && e.card?.prompt === "heavy rain");
+      check(!!fbEntry, "csv: front-back card reachable in the queue", JSON.stringify((q2.body?.batch ?? []).slice(0, 1)).slice(0, 100));
+      const del2 = await api(`/api/materials?id=${imp.body.materialId}`, { method: "DELETE" });
+      check(del2.status === 200 && del2.body?.removed === 3, "csv: deletion removes all imported cards", JSON.stringify(del2.body));
+      const empty = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "csv", text: "# only a header" }) });
+      check(empty.status === 400, "csv: header-only import refused honestly", JSON.stringify(empty.body).slice(0, 100));
+    }
   }
 
   // ================= 7. RESTORE =================

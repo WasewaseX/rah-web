@@ -56,6 +56,20 @@ export async function POST(req: Request) {
   const title = String(body.title ?? "");
   const text = String(body.text ?? "");
   const source = String(body.source ?? "");
+  const mode = String(body.mode ?? "text");
+  // CSV/TSV deck import: deterministic, no model call, no context promise.
+  if (mode === "csv") {
+    if (text.trim().length < 3) {
+      return NextResponse.json({ error: "Paste at least one row: front<TAB>back." }, { status: 400 });
+    }
+    try {
+      const { importDeckCsv } = await import("@/lib/materials");
+      const out = await importDeckCsv(title, text);
+      return NextResponse.json({ ok: true, ...out });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Import failed." }, { status: 400 });
+    }
+  }
   // Honest client-side refusal BEFORE any model call (400: the request itself
   // is wrong). Provider failures later return 502.
   if (text.trim().length < 120) {
