@@ -744,3 +744,22 @@ Work Log:
 
 Stage Summary:
 - CI is unblocked: the typecheck failure that made every push red is fixed at the root (optional-dep import), the misleading "tsc clean locally" lesson is recorded (parent-dir node_modules = contaminated typechecks; CI is the arbiter), and the portable drive is green again with a real login. The audit's other ci.yml claim was a false positive.
+
+---
+Task ID: 46
+Agent: Super Z (main)
+Task: P0-3 + P0-4 from the new external audit - remove the browser-readable localStorage token and harden email-code authentication (hash at rest, atomic consume, brute-force + per-IP limits, resend invalidation, no code logging in prod).
+
+Work Log:
+- LoginCode schema + attempts column (db push): failed verify guesses are counted per code; 5 strikes invalidate the code, so the 1,000,000-combination space cannot be walked inside the 10-minute TTL.
+- auth.ts rewrite of the code path: codes are stored as sha256 HASHES (plaintext lives only in memory between issuance and the email - a DB leak no longer yields usable codes); issueLoginCode invalidates all previous unused codes on resend (newest code is the only valid one); verifyLoginCode looks up the newest unused unexpired row, counts wrong guesses, then consumes ATOMICALLY via updateMany guarded on usedAt: null (two racing verifies cannot both win - exactly one gets count === 1).
+- Per-IP issuance throttle (in-memory, 10/15min) layered on the existing per-email DB limit (5/15min). OPERATIONAL BUG FOUND AND FIXED: loopback IPs are exempt - everything-local traffic (dev, battery, E2E) shares 127.0.0.1 and the limit hard-locked the whole toolchain within one session; abuse protection on loopback is meaningless anyway. Found because the E2E itself got "Too many codes requested from this network".
+- request-code route: mails the in-memory plaintext from issueLoginCode (the old route re-read the DB row - impossible once codes are hashed); devCode returned ONLY when SMTP is unconfigured AND NODE_ENV !== production (belt and braces over the mailer's own dev gate).
+- TOKEN LADDER (P0-3): verify returns the raw login token in the body ONLY for embedded callers that declare x-rah-embed: 1; normal logins receive NO browser-readable credential at all. Server additionally sets rah_session_embed (httpOnly, SameSite=None, Secure, Partitioned/CHIPS) for embedded callers in production; the embed cookie is only honored by getSessionUserWithRequest when the request carries the custom x-rah-embed header (cross-site forms cannot forge custom headers => CSRF guard for the looser cookie). Resolution order: rah_session cookie -> embed cookie (with header) -> x-rah-token header.
+- rah-fetch.ts: token storage moved localStorage -> sessionStorage (dies with the tab); any legacy localStorage token is scrubbed on load; x-rah-embed: 1 added to same-origin /api calls when window.self !== window.top; header fallback only engaged in embedded contexts.
+- Battery: login section rebuilt - verify with embed marker (token + cookie), consumed-code replay refused, NORMAL verify leaks NO body token + still sets the httpOnly cookie, code stored as 64-hex sha256 (DB read pin), resend invalidates the previous code (old one 400s, fresh one 200s), 5 wrong guesses kill the code (even the correct code then 400s). 293/293.
+- E2E (scripts/e2e-task46-auth.mjs) 8/8 in a real browser: A) top-level login renders the dashboard with ZERO JS-readable tokens (localStorage AND sessionStorage empty of rah_token) and the session resolves from the httpOnly cookie alone; B) same-origin iframe login: embed detection active, token in sessionStorage only, NEVER in localStorage, dashboard renders, session resolves through the ladder. Playwright lessons: wrapper page via setContent (app hydration detached injected iframes), frameLocator everywhere (cached contentFrame handles go stale after re-render).
+- tsc clean; portable drive 15/15 still green.
+
+Stage Summary:
+- The audit's two auth P0s are closed with the embedded-context constraint respected instead of broken: normal users get a pure httpOnly-cookie login with no JS-readable credential; preview-iframe users get a partitioned-cookie-first, sessionStorage-token-last-resort ladder guarded against CSRF by the custom-header rule; a DB leak yields neither usable codes nor usable sessions. The brute-force window on a 6-digit code is now 5 guesses before self-destruction.

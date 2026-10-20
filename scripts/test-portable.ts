@@ -27,10 +27,16 @@ function check(ok: boolean, what: string, detail = "") {
 type Bundle = { format: string; exportedAt: string; hash: string; tables: Record<string, Record<string, unknown>[]>; counts: Record<string, number> };
 
 // Minimal structural types for the optional playwright E2E dep (not in package.json).
+type PwLocator = {
+  fill(value: string): Promise<unknown>;
+  click(): Promise<unknown>;
+};
 type PwPage = {
   goto(url: string, o?: { waitUntil?: string }): Promise<unknown>;
   waitForTimeout(ms: number): Promise<unknown>;
   evaluate<T>(fn: () => T): Promise<T>;
+  locator(sel: string): { first(): PwLocator; count(): Promise<number> } & PwLocator;
+  getByRole(role: string, o?: { name?: string | RegExp }): PwLocator & { count(): Promise<number> };
 };
 type PwBrowser = {
   newPage(o?: { viewport: { width: number; height: number } }): Promise<PwPage>;

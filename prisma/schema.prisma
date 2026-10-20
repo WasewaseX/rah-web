@@ -48,9 +48,10 @@ model User {
 model LoginCode {
   id        Int      @id @default(autoincrement())
   email     String
-  code      String
+  code      String // sha256 hash of the 6-digit code - plaintext NEVER touches the DB
   expiresAt DateTime
   usedAt    DateTime?
+  attempts  Int      @default(0) // failed verify guesses against this code; 5 => invalidated
   createdAt DateTime @default(now())
 
   @@index([email, createdAt])

@@ -7,24 +7,23 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const { email } = await req.json().catch(() => ({ email: "" }));
-  const issued = await issueLoginCode(String(email ?? ""));
+  // Per-IP throttle on top of the per-email DB limit (proxy-aware best effort).
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim()
+    || (req.headers.get("x-real-ip") ?? "");
+  const issued = await issueLoginCode(String(email ?? ""), ip);
   if (!issued.ok) return NextResponse.json({ error: issued.error }, { status: 400 });
 
-  const normalized = String(email).trim().toLowerCase();
-  const row = await db.loginCode.findFirst({
-    where: { email: normalized, usedAt: null },
-    orderBy: { id: "desc" },
-  });
-  if (!row) return NextResponse.json({ error: "Code issue failed; try again." }, { status: 500 });
-
-  const mail = await sendLoginCode(row.email, row.code);
+  // The plaintext code came back from issueLoginCode's memory; the DB only
+  // ever saw its sha256 hash. Mail it immediately and let it go.
+  const mail = await sendLoginCode(String(email).trim().toLowerCase(), issued.code!);
   return NextResponse.json({
     ok: true,
-    email: row.email,
+    email: String(email).trim().toLowerCase(),
     via: mail.via,
     smtpConfigured: smtpConfigured(),
-    // Dev delivery: no SMTP configured, so the code is returned and the login
-    // screen shows it in a clearly-marked dev inbox. With SMTP set, this stays undefined.
-    devCode: mail.devCode,
+    // Dev delivery only (no SMTP configured AND not production): the code is
+    // returned so the login screen can show it in the clearly-marked dev
+    // inbox. With SMTP set, or in production, this stays undefined.
+    devCode: mail.devCode && process.env.NODE_ENV !== "production" ? mail.devCode : undefined,
   });
 }

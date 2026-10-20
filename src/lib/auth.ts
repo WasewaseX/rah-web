@@ -10,10 +10,42 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 
 export const SESSION_COOKIE = "rah_session";
+export const EMBED_COOKIE = "rah_session_embed";
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_CODES_PER_WINDOW = 5;
 const CODE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_CODES_PER_IP_WINDOW = 10; // per-IP throttle on top of per-email
+const MAX_CODE_ATTEMPTS = 5; // failed guesses before a code self-invalidates
+
+// Login codes are stored HASHED (a DB leak must not leak usable codes); the
+// plaintext lives only in memory between issuance and the email. Verify is
+// ATOMIC (updateMany guard) and a code dies after 5 failed guesses, so the
+// 6-digit space cannot be brute-forced inside its 10-minute TTL.
+export function hashCode(code: string): string {
+  return createHash("sha256").update(String(code)).digest("hex");
+}
+
+// In-memory per-IP throttle for code issuance (single-node deployment; codes
+// are also per-email limited in the DB). Best-effort: a restart clears it.
+// Loopback IPs are EXEMPT: in dev/everything-local all traffic shares 127.0.0.1
+// and the limit would lock out the battery and E2E runs; abuse protection on
+// localhost is meaningless anyway. Production proxies pass real client IPs.
+const ipCodeRequests = new Map<string, number[]>();
+export function ipRateLimited(ip: string, max = MAX_CODES_PER_IP_WINDOW, windowMs = CODE_WINDOW_MS): boolean {
+  if (!ip || ip === "::1" || ip === "::ffff:127.0.0.1" || ip.startsWith("127.") || ip.startsWith("::ffff:127.")) return false;
+  const now = Date.now();
+  const hits = (ipCodeRequests.get(ip) ?? []).filter((t) => now - t < windowMs);
+  hits.push(now);
+  ipCodeRequests.set(ip, hits);
+  if (ipCodeRequests.size > 5000) {
+    // opportunistic GC so the map cannot grow unbounded
+    for (const [k, v] of ipCodeRequests) {
+      if (v.every((t) => now - t >= windowMs)) ipCodeRequests.delete(k);
+    }
+  }
+  return hits.length > max;
+}
 
 export function normalizeEmail(email: string): string {
   return String(email ?? "").trim().toLowerCase();
@@ -30,24 +62,33 @@ export function newCode(): string {
 export interface RequestCodeResult {
   ok: boolean;
   error?: string;
+  code?: string; // plaintext, in-memory only - the route emails it, the DB stores the hash
 }
 
-export async function issueLoginCode(rawEmail: string): Promise<RequestCodeResult> {
+export async function issueLoginCode(rawEmail: string, ip = ""): Promise<RequestCodeResult> {
   const email = normalizeEmail(rawEmail);
   if (!validEmail(email)) return { ok: false, error: "That does not look like an email address." };
 
-  // Rate limit: 5 codes per email per 15 minutes. Honest limit, no lockout games.
+  // Rate limit: 5 codes per email per 15 minutes (DB), 10 per IP per 15 minutes
+  // (memory). Honest limits, no lockout games.
   const windowStart = new Date(Date.now() - CODE_WINDOW_MS);
   const recent = await db.loginCode.count({ where: { email, createdAt: { gte: windowStart } } });
   if (recent >= MAX_CODES_PER_WINDOW) {
     return { ok: false, error: "Too many codes requested. Wait a few minutes and try again." };
   }
+  if (ipRateLimited(ip)) {
+    return { ok: false, error: "Too many codes requested from this network. Wait a few minutes." };
+  }
+
+  // Resend invalidates: any earlier unused code for this email is dead the
+  // moment a fresh one is issued.
+  await db.loginCode.updateMany({ where: { email, usedAt: null }, data: { usedAt: new Date() } });
 
   const code = newCode();
   await db.loginCode.create({
-    data: { email, code, expiresAt: new Date(Date.now() + CODE_TTL_MS) },
+    data: { email, code: hashCode(code), expiresAt: new Date(Date.now() + CODE_TTL_MS) },
   });
-  return { ok: true };
+  return { ok: true, code };
 }
 
 export interface VerifyResult {
@@ -62,13 +103,35 @@ export async function verifyLoginCode(rawEmail: string, rawCode: string): Promis
   const code = String(rawCode ?? "").trim();
   if (!email || !/^\d{6}$/.test(code)) return { ok: false, error: "Enter the 6-digit code from your email." };
 
+  // The newest unused, unexpired code for this email is the only valid one
+  // (resend invalidates older rows). We look it up first so failed guesses
+  // can be counted against it.
   const row = await db.loginCode.findFirst({
-    where: { email, code, usedAt: null, expiresAt: { gte: new Date() } },
+    where: { email, usedAt: null, expiresAt: { gte: new Date() } },
     orderBy: { id: "desc" },
   });
   if (!row) return { ok: false, error: "That code is wrong, used, or expired. Request a fresh one." };
 
-  await db.loginCode.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+  if (row.code !== hashCode(code)) {
+    // Wrong guess: count it. MAX_CODE_ATTEMPTS strikes and the code dies, so
+    // the 1,000,000-combination space cannot be walked inside 10 minutes.
+    const attempts = row.attempts + 1;
+    await db.loginCode.update({
+      where: { id: row.id },
+      data: { attempts, usedAt: attempts >= MAX_CODE_ATTEMPTS ? new Date() : null },
+    });
+    return { ok: false, error: "That code is wrong, used, or expired. Request a fresh one." };
+  }
+
+  // ATOMIC single-use consume: updateMany guards on usedAt: null, so two
+  // racing verifies cannot both win - exactly one gets count === 1.
+  const consumed = await db.loginCode.updateMany({
+    where: { id: row.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  if (consumed.count !== 1) {
+    return { ok: false, error: "That code is wrong, used, or expired. Request a fresh one." };
+  }
 
   let user = await db.user.findUnique({ where: { email } });
   const isNew = !user;
@@ -108,14 +171,28 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 // Embedded contexts (preview iframes, third-party-cookie-blocked browsers)
 // drop SameSite cookies entirely: the verify POST succeeds and the dashboard
 // renders from its response body, but no cookie is ever stored, so every
-// later call arrives cookie-less. Those callers send the login token in the
-// x-rah-token header instead - resolve it as a full first-class credential.
+// later call arrives cookie-less. Defense-in-depth ladder, resolved in order:
+//   1. rah_session (httpOnly, SameSite=Lax) - the normal path.
+//   2. rah_session_embed (SameSite=None+Partitioned in prod) - ONLY honored
+//      when the request carries our custom x-rah-embed header, which cross-
+//      site forms cannot forge (CSRF guard for the looser cookie).
+//   3. x-rah-token header - last resort for browsers that drop even
+//      partitioned cookies; the client keeps the token in sessionStorage
+//      (dies with the tab) ONLY when the server confirms cookie loss.
 export async function getSessionUserWithRequest(req: Request): Promise<SessionUser | null> {
   const jar = await cookies();
   const cookieToken = jar.get(SESSION_COOKIE)?.value;
   if (cookieToken) {
     const fromCookie = await resolveToken(cookieToken);
     if (fromCookie) return fromCookie;
+  }
+  const wantsEmbed = req.headers.get("x-rah-embed") === "1";
+  if (wantsEmbed) {
+    const embedToken = jar.get(EMBED_COOKIE)?.value;
+    if (embedToken) {
+      const fromEmbed = await resolveToken(embedToken);
+      if (fromEmbed) return fromEmbed;
+    }
   }
   const headerToken = req.headers.get("x-rah-token");
   return resolveToken(headerToken);
@@ -135,14 +212,30 @@ export async function resolveToken(token: string | undefined | null): Promise<Se
   return { id: session.user.id, email: session.user.email, name: session.user.name, provider: session.user.provider };
 }
 
-export function sessionCookieOptions() {
-  return {
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_TTL_MS / 1000,
-  };
+export function sessionCookieOptions(embed = false) {
+  return embed
+    ? {
+        httpOnly: true,
+        sameSite: "none" as const,
+        secure: true, // SameSite=None is rejected by browsers without Secure
+        partitioned: true, // CHIPS: the embed cookie is partitioned per embedder
+        path: "/",
+        maxAge: SESSION_TTL_MS / 1000,
+      }
+    : {
+        httpOnly: true,
+        sameSite: "lax" as const,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: SESSION_TTL_MS / 1000,
+      };
+}
+
+// The verify response carries the raw login token in the body ONLY for
+// embedded callers (x-rah-embed: 1) that provably need the header fallback;
+// normal logins get no browser-readable credential at all.
+export function callerWantsEmbedFallback(req: Request): boolean {
+  return req.headers.get("x-rah-embed") === "1";
 }
 
 export async function destroySession(token: string | undefined | null): Promise<void> {

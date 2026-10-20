@@ -129,13 +129,77 @@ try {
   let loginToken = "";
   {
     const api0 = makeApi("");
-    const good = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: EMAIL, code: devCode }) });
+    // Embedded client (x-rah-embed: 1) - the only caller that receives the
+    // no-cookie fallback credential in the response body.
+    const good = await api0("/api/auth/verify", {
+      method: "POST",
+      headers: { "x-rah-embed": "1" },
+      body: JSON.stringify({ email: EMAIL, code: devCode }),
+    });
     check(good.status === 200, "verify mints a session", JSON.stringify(good.body));
     cookie = good.setCookie?.split(";")[0] ?? "";
     loginToken = String(good.body?.token ?? ""); // body token: the no-cookie fallback credential
   }
   check(cookie.includes("rah_session="), "session cookie captured", cookie.slice(0, 24));
   const api = makeApi(cookie);
+
+  // --- auth hardening pins (P0-3/P0-4 wave) ---
+  console.log("\n--- auth hardening ---");
+  {
+    const api0 = makeApi("");
+    // Single use: the consumed code cannot log in again, embed or not.
+    const replay = await api0("/api/auth/verify", { method: "POST", headers: { "x-rah-embed": "1" }, body: JSON.stringify({ email: EMAIL, code: devCode }) });
+    check(replay.status === 400, "consumed code replay refused (single-use)", `status=${replay.status}`);
+
+    // Normal login (no embed marker) must leak NO browser-readable token.
+    const email2 = `battery-plain-${Date.now()}@rah.test`;
+    const req2 = await anon("/api/auth/request-code", { method: "POST", body: JSON.stringify({ email: email2 }) });
+    const devCode2 = req2.body?.devCode as string | undefined;
+    const plain = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: email2, code: devCode2 }) });
+    check(plain.status === 200 && plain.body?.token === undefined, "normal verify leaks NO body token", JSON.stringify(plain.body));
+    check((plain.setCookie ?? "").includes("rah_session="), "normal verify still sets the httpOnly cookie", String(plain.setCookie).slice(0, 30));
+
+    // Codes are hashed at rest: the DB row must NOT contain the plaintext.
+    const { db } = await import("@/lib/db");
+    const lc = await db.loginCode.findFirst({ where: { email: email2 }, orderBy: { id: "desc" } });
+    check(
+      !!lc && /^[0-9a-f]{64}$/.test(lc.code) && lc.code !== String(devCode2),
+      "login code stored as sha256 hash, never plaintext",
+      `len=${lc?.code.length ?? 0}`,
+    );
+    await db.$disconnect();
+
+    // Resend invalidates: issuing a fresh code kills the previous unused one.
+    const emailA = `battery-resend-${Date.now()}@rah.test`;
+    const ra1 = await anon("/api/auth/request-code", { method: "POST", body: JSON.stringify({ email: emailA }) });
+    const codeA1 = ra1.body?.devCode as string | undefined;
+    const ra2 = await anon("/api/auth/request-code", { method: "POST", body: JSON.stringify({ email: emailA }) });
+    const codeA2 = ra2.body?.devCode as string | undefined;
+    const oldTry = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailA, code: codeA1 }) });
+    check(oldTry.status === 400, "resend invalidates the previous code", `status=${oldTry.status}`);
+    const newTry = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailA, code: codeA2 }) });
+    check(newTry.status === 200, "the fresh code still works after resend", `status=${newTry.status}`);
+
+    // Brute-force: 5 wrong guesses kill the code - even the CORRECT code dies.
+    const emailB = `battery-brute-${Date.now()}@rah.test`;
+    const rb = await anon("/api/auth/request-code", { method: "POST", body: JSON.stringify({ email: emailB }) });
+    const codeB = rb.body?.devCode as string | undefined;
+    const wrong = codeB === "000000" ? "000001" : "000000";
+    let last = 0;
+    for (let i = 0; i < 5; i++) {
+      const g = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailB, code: wrong }) });
+      last = g.status;
+    }
+    check(last === 400, "wrong guesses rejected", `status=${last}`);
+    const deadTry = await api0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailB, code: codeB }) });
+    check(deadTry.status === 400, "code dead after 5 failed guesses (brute-force guard)", `status=${deadTry.status}`);
+
+    // Cleanup the pin users/codes right here so restore stays simple.
+    const { db: db2 } = await import("@/lib/db");
+    await db2.user.deleteMany({ where: { email: { in: [email2, emailA, emailB] } } });
+    await db2.loginCode.deleteMany({ where: { email: { startsWith: "battery-" } } });
+    await db2.$disconnect();
+  }
 
   // ================= 3. AUTHED SWEEP (hostile input: no 500s) =================
   console.log("\n--- sweep: authed, hostile bodies (no 500) ---");
