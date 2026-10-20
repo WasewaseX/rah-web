@@ -82,3 +82,7 @@ scripts/duolingo-reference/parity_ref_out.json
 scripts/duolingo-reference/dl.log
 scripts/duolingo-reference/dl2.log
 data/coach-workspace/
+
+# isolated-battery stack (Task 52)
+.next-battery/
+db/battery-isolated.db*
