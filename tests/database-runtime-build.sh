@@ -57,17 +57,27 @@ test "$(cat "$EMPTY_BUILD/db/custom.db")" = "initialized"
 test ! -e "$EMPTY_PROJECT/db/custom.db"
 
 # 有 Preview 数据库时，应保留数据和同目录文件，再对产物执行 schema 同步。
+# 部署管线自身的产物（备份目录、回拉统计 json）不得被打进部署包；
+# admin-token 必须随包（Task 60 数据保全：容器端点靠它校验回拉请求）。
 EXISTING_PROJECT="$TEST_ROOT/existing-project"
 EXISTING_BUILD="$TEST_ROOT/existing-build"
-mkdir -p "$EXISTING_PROJECT/db"
+mkdir -p "$EXISTING_PROJECT/db" "$EXISTING_PROJECT/db/backups"
 printf 'preview-data\n' >"$EXISTING_PROJECT/db/custom.db"
 printf 'sidecar\n' >"$EXISTING_PROJECT/db/README.txt"
+printf 'tok\n' >"$EXISTING_PROJECT/db/admin-token"
+printf 'old-backup\n' >"$EXISTING_PROJECT/db/backups/pre-pull-old.db"
+printf 'stale\n' >"$EXISTING_PROJECT/db/pre-pull-20260101-000000.db"
+printf '{}\n' >"$EXISTING_PROJECT/db/custom.db.stats.json"
 
 PROJECT_DIR="$EXISTING_PROJECT" BUILD_DIR="$EXISTING_BUILD" \
     bash "$SCRIPT_DIR/database-runtime-build.sh"
 
 test "$(cat "$EXISTING_BUILD/db/custom.db")" = "preview-data"
 test "$(cat "$EXISTING_BUILD/db/README.txt")" = "sidecar"
+test "$(cat "$EXISTING_BUILD/db/admin-token")" = "tok"
+test ! -e "$EXISTING_BUILD/db/backups"
+test ! -e "$EXISTING_BUILD/db/pre-pull-20260101-000000.db"
+test ! -e "$EXISTING_BUILD/db/custom.db.stats.json"
 test "$(wc -l <"$DB_PUSH_CALLS" | tr -d ' ')" = "2"
 grep -Fx "file:$EMPTY_BUILD/db/custom.db" "$DB_PUSH_CALLS"
 grep -Fx "file:$EXISTING_BUILD/db/custom.db" "$DB_PUSH_CALLS"

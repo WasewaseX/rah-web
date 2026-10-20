@@ -981,3 +981,27 @@ Work Log:
 
 Stage Summary:
 - Feature #4 is COMPLETE: Anki interop is now round-trip-honest - export as Anki-dialect TSV (Task 42), import CSV/TSV (Task 55), and import real .apkg packages (this task), all landing in the same FSRS queue with the same badge/budget truth as the built-in deck. The only honest limit left: Anki's new compressed format needs the legacy-export checkbox, and the app says exactly that.
+
+---
+Task ID: 60
+Agent: Super Z (main)
+Task: P0 - learner data must survive updates. User reported "First Words achievement again" after the Tasks 57-59 update wave; evaluator had marked "Safe database migrations: Done". Root-cause the wipe, fix it at every layer, prove it with a drill.
+
+Work Log:
+- Root cause PROVEN, not guessed: (1) preview URL is a tunnel to THIS workspace's dev server - /api/version fingerprints identical (same SHA, same startedAt, ~150ms apart); (2) the live learner DB is the gitignored db/custom.db; (3) update waves reprovision the workspace from git - this workspace was a Task-56-era clone while remote main already had Tasks 57-59 (curriculum.ts/apkg.ts absent locally, present on remote); (4) a reprovision is a fresh clone -> gitignored db/ dies -> dev.sh's db:push boots an EMPTY learner -> achievements re-fire. The Oct-10 comment in dev.sh (volume restore rolled the DB back) shows the same failure class struck before.
+- Why the evaluator missed it: Task 47 made SCHEMA migrations versioned/reproducible; schema safety != data persistence across environment rebuilds.
+- Fix layer 1 (survival copy): scripts/db-sync.sh - sqlite3 online backup of db/custom.db -> db/sync/rah-latest.db, SCRUBS Session + LoginCode rows (progress restores, credentials never hit git history), commits + pushes. Tracked in git (the only store that provably survives reprovision).
+- Fix layer 2 (restore-on-boot): .zscripts/dev.sh restore_db() fires at boot AND on every supervisor restart (a wipe-while-running would otherwise db:push an empty learner back into existence on the next restart); scripts/ensure-server.sh restores before reviving. FC packaging seeds from the snapshot when the workspace DB is gone (.zscripts/database-runtime-build.sh).
+- Fix layer 3 (FC/deploy guard): GET /api/admin/db (VACUUM INTO consistent snapshot download) + GET /api/admin/stats (state fingerprint), guarded by src/lib/admin-token.ts (timing-safe Bearer compare; token = RAH_ADMIN_TOKEN env or db/admin-token file packaged next to the DB; unconfigured -> 404 so nothing leaks). .zscripts/build.sh PULLS the live DB before packaging: 404/unreachable -> warn + fall back (first-deploy case); auth failure or invalid download -> ABORT the build (stale data must never silently overwrite real data). scripts/deploy.sh: pre-pull -> push -> wait for preview freshness (SHA match) -> post-deploy stats diff (xp/streak/reviews/users may never drop; regression = loud failure) -> mirror refresh -> db-sync.
+- Fix layer 4 (backups): every pre-pull swap archives the previous DB to db/backups/pre-pull-*.db (newest 20 kept); db-pull removes stale -wal/-shm after swap and bounces the local dev server (fd->old-inode hazard).
+- Tests: scripts/test-admin-db-route.ts 16/16 (locked-404, wrong-bearer-401, valid standalone snapshot, stats fingerprint, env-token path, no temp leakage; found+fixed a tuple-vs-list assert in the test itself). tests/database-runtime-build.sh extended: admin-token packaged, backups/sync/stats-json/tmps excluded. bash -n on all 9 touched scripts.
+- Rebase: this workspace was BEHIND remote (Tasks 57-59 existed only on origin). stash -u -> pull --rebase -> stash pop; merged tree has curriculum + apkg back. Verified battery-isolated.db untracking landed via Task 59.
+- Gates on the merged tree: tsc --noEmit clean, eslint clean, admin route tests 16/16, packaging tests pass, FULL ISOLATED BATTERY 391/391.
+- Restore drill (the acceptance test): killed supervisors, MOVED db/custom.db away (simulated reprovision), ran ensure-server -> "db/custom.db missing - restoring learner data from db/sync/rah-latest.db" -> boot -> stats show xp=10/streak=1/reviews=2/achievements=1/users=1 intact. PASS.
+- Live verification: /api/admin/db 401 without token, 401 wrong token, 200 correct token on the running server; first snapshot committed (d1cf9fd) and pushed.
+- Ops state: watchdog relaunched with hourly db-sync; platform-owned dev.sh picks up restore_db on its next platform restart.
+- Hygiene: .gitignore += db/admin-token, db/backups/, db/*.stats.json, db/*.snapshot-*.tmp (snapshot itself stays tracked); db-sync --no-git flag bug fixed ($2->$1).
+- Docs: ROADMAP-AUDIT.md created (incident post-mortem + standing checklist reconciling the evaluator's Oct-20 tables with what actually broke); ROADMAP-STATUS.md critical-fix #5 amended (persistence hole closed) + Task 60 velocity row + gate status.
+
+Stage Summary:
+- The P0 is closed with evidence: learner data now survives workspace reprovisioning (the actual wipe mechanism), FC-style container replacement (pull-before-package), and bad deploys (post-verify refuses to bless a regression). Four independent layers, each with a test or a drill. Residual risk honestly documented: a surprise reprovision can still lose <=1h of progress (watchdog cadence); PostgreSQL remains the structural fix when Rah goes multi-user.
