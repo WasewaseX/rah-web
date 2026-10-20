@@ -9,7 +9,7 @@
 // streams to the sidebar as it happens.
 
 import ZAI from "z-ai-web-dev-sdk";
-import { TOOLS, toolByName, ensureWorkspace, type ToolResult } from "./tools";
+import { TOOLS, toolByName, ensureWorkspace, toolTier, TIER_BUDGETS, type ToolResult } from "./tools";
 import type { ProfileJson } from "@/lib/ai";
 
 export const MAX_STEPS = 6;
@@ -271,6 +271,7 @@ export async function runAgent(
   const p = profile ?? (await (await import("@/lib/server")).buildProfile());
   const steps: { label: string; detail?: string; ok?: boolean }[] = [];
   const toolsUsed: string[] = [];
+  const tierBudgetUse: Partial<Record<string, number>> = {};
   const push = (e: AgentEvent) => emit?.(e);
 
   await ensureWorkspace();
@@ -361,8 +362,22 @@ export async function runAgent(
       continue;
     }
 
+    // Permission matrix (P1-8): tier-tag the trace and enforce per-run budgets
+    // on the dangerous tiers. A refused call never executes.
+    const tier = toolTier(def.name);
+    const budget = TIER_BUDGETS[tier];
+    const used = tierBudgetUse[tier] ?? 0;
+    if (budget !== undefined && used >= budget) {
+      steps.push({ label: `${def.name} - tier budget spent`, detail: `${tier} tier already used ${used}/${budget} this run`, ok: false });
+      push({ type: "observe", label: `${def.name} refused: ${tier}-tier budget spent (${used}/${budget} this run)`, ok: false });
+      messages.push({ role: "assistant", content: raw });
+      messages.push({ role: "user", content: `Tool "${def.name}" (${tier} tier) is refused: the per-run budget of ${budget} ${tier} calls is spent. Emit the final object now.` });
+      continue;
+    }
+    if (budget !== undefined) tierBudgetUse[tier] = used + 1;
+
     toolsUsed.push(def.name);
-    push({ type: "tool", label: def.name, detail: thought || def.desc.slice(0, 80) });
+    push({ type: "tool", label: def.name, detail: `${thought || def.desc.slice(0, 80)}` });
     steps.push({ label: def.name, detail: thought });
 
     let result: ToolResult;
@@ -377,7 +392,7 @@ export async function runAgent(
     messages.push({ role: "assistant", content: raw });
     messages.push({
       role: "user",
-      content: `[tool result] ${def.name}\nok=${result.ok}\n${result.detail ?? result.summary}\n\nContinue with the protocol: another tool call, or the final object.`,
+      content: `[tool result] ${def.name} [tier: ${tier}]\nok=${result.ok}\n${result.detail ?? result.summary}\n\nContinue with the protocol: another tool call, or the final object.`,
     });
   }
 

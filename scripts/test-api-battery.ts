@@ -256,6 +256,20 @@ try {
     check(signedOk && signed41.ok === false, "limiter: signed-in budget 40/min then 429", String(signed41.response?.status));
   }
 
+  // --- agent tool permission matrix (P1-8) ---
+  console.log("\n--- tool permissions ---");
+  {
+    const { TOOLS, TOOL_TIERS, toolTier, TIER_BUDGETS, UNTRUSTED_FRAME } = await import("@/lib/coach-agent/tools");
+    check(TOOLS.every((t: { name: string }) => TOOL_TIERS[t.name] !== undefined), "permission matrix covers every registered tool", JSON.stringify(TOOLS.filter((t: { name: string }) => TOOL_TIERS[t.name] === undefined).map((t: { name: string }) => t.name)));
+    check(toolTier("nonexistent_tool") === "state", "unknown tools default to the most dangerous tier", toolTier("nonexistent_tool"));
+    check(TIER_BUDGETS.state === 2 && TIER_BUDGETS.exec === 2 && TIER_BUDGETS.network === 4, "per-run budgets: state 2, exec 2, network 4", JSON.stringify(TIER_BUDGETS));
+    check(
+      UNTRUSTED_FRAME.head.includes("UNTRUSTED WEB CONTENT") && UNTRUSTED_FRAME.head.includes("not instructions"),
+      "prompt-injection frame marks web content as data",
+      UNTRUSTED_FRAME.head.slice(0, 60),
+    );
+  }
+
   // ================= 3. AUTHED SWEEP (hostile input: no 500s) =================
   console.log("\n--- sweep: authed, hostile bodies (no 500) ---");
   for (const r of ROUTES) {
