@@ -840,3 +840,17 @@ Work Log:
 
 Stage Summary:
 - The agent's hands now have explicit permission labels, hard per-run budgets enforced in code, and every byte of web content it reads is fenced as untrusted data. The three layers the audit asked for - restrict, validate, frame - are all in place at the loop level, not the prompt level.
+
+---
+Task ID: 52
+Agent: Super Z (main)
+Task: P1-10 - isolate automated tests from real learner state.
+
+Work Log:
+- next.config.ts: distDir now reads NEXT_DIST_DIR (default ".next"). This dissolves the Turbopack .next/dev/lock limitation that made a second dev server impossible - the test toolchain can now boot its OWN server instance.
+- scripts/test-isolated-battery.sh: full isolation runner - fresh throwaway DB (db/battery-isolated.db) built via the Task-47 `migrate deploy` path, its own next-dev server on :3100 with NEXT_DIST_DIR=.next-battery and DATABASE_URL beating .env, battery pointed at the throwaway stack via BATTERY_BASE + DATABASE_URL (the battery's direct prisma seeds and the portability restore hit the SAME throwaway db). Trap-based cleanup, port-stray pkill.
+- VERIFIED END-TO-END: 311/311 on the throwaway stack, exit 0, the real db/custom.db never opened by the run.
+- Process miss, immediately fixed: the first run's .next-battery build cache got committed (691 files) - untracked + gitignored (.next-battery/, db/battery-isolated.db*) in the follow-up cleanup commit. The repo carries the bloat in history once; it stays clean going forward.
+
+Stage Summary:
+- The audit's isolation demand is met at full strength: `bash scripts/test-isolated-battery.sh` gives the entire battery a disposable database and a disposable server - zero contact with learner state, no restore-in-place needed. The classic `bun scripts/test-api-battery.ts` against the dev server still works unchanged.
