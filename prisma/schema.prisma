@@ -285,3 +285,32 @@ model ContentFlag {
   status String   @default("open") // open | fixed | wontfix
   at     DateTime @default(now())
 }
+
+// Stage 03 feature #1 (the audit's top pick): bring-your-own-materials
+// learning. The learner pastes (or imports) real text they actually need to
+// read; Rah extracts vocabulary + collocations WITH their source sentence as
+// context, creates review cards that flow through the SAME FSRS queue, and
+// every card carries its source sentence so nothing is context-free.
+model Material {
+  id        String   @id @default(cuid())
+  title     String
+  source    String   @default("") // provenance: URL, book, "lecture notes"...
+  text      String   @default("") // the full pasted text (capped server-side)
+  words     Int      @default(0)
+  degraded  Boolean  @default(false) // extraction fell back (audit P1-7 honesty)
+  createdAt DateTime @default(now())
+  cards     MaterialCard[]
+}
+
+model MaterialCard {
+  id         String   @id // "mat:<cuid>" - the CardState key
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  front      String   // cloze sentence with ___
+  answer     String   // the blanked phrase
+  context    String   // the exact source sentence
+  note       String   @default("") // short definition / hint
+  createdAt  DateTime @default(now())
+
+  @@index([materialId])
+}

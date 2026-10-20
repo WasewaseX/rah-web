@@ -67,10 +67,16 @@ export async function queueCounts(): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
   const all = await db.cardState.findMany();
+  // BYO-material cards (cardId "mat:<id>") share the SAME queue, budget and
+  // badge truth as deck cards - the Task-44 lesson: one source of truth.
+  const deckStates = all.filter((s) => !s.cardId.startsWith("mat:"));
+  const matStates = all.filter((s) => s.cardId.startsWith("mat:"));
+  const matNew = matStates.filter((s) => !s.suspended && s.state === "new").length;
   const due = all.filter((s) => !s.suspended && s.state !== "new" && s.due <= today).length;
   const introducedToday = all.filter((s) => s.last === today && s.reps === 1).length;
-  const known = all.filter((s) => s.state !== "new").length;
-  const newLeft = Math.max(0, Math.min(l.newPerDay - introducedToday, DECK.length - known));
+  const deckKnown = deckStates.filter((s) => s.state !== "new").length;
+  const deckUnseen = Math.max(0, DECK.length - deckStates.length);
+  const newLeft = Math.max(0, Math.min(l.newPerDay - introducedToday, deckUnseen + matNew));
   const future = all.filter((s) => !s.suspended && s.state !== "new" && s.due > today).map((s) => s.due);
   return {
     due,
@@ -78,7 +84,7 @@ export async function queueCounts(): Promise<QueueCounts> {
     reviewedToday: introducedToday,
     newPerDay: l.newPerDay,
     seen: all.length,
-    unseen: Math.max(0, DECK.length - all.length),
+    unseen: deckUnseen + matNew,
     nextDue: future.length ? Math.min(...future) : null,
     dueTomorrow: future.filter((d) => d <= today + 1).length,
     due3days: future.filter((d) => d <= today + 3).length,

@@ -6,6 +6,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { BookOpen, Clock, Sparkles, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "./ui";
+import { MaterialsPanel } from "./MaterialsPanel";
 import { READINGS } from "@/lib/content";
 import { ladderFor, orderReadings, type Band } from "@/lib/ladder";
 import type { AppState } from "./App";
@@ -55,6 +56,7 @@ export default function ReadView({ state }: { state: AppState }) {
   if (!reading) {
     return (
       <div className="flex flex-col gap-4">
+        <MaterialsPanel />
         {state.learner.level !== "?" && (
           <p className="text-sm leading-relaxed text-[#a9b4c6]">
             Six texts, all written around the science this app runs on. Read once for meaning, then quiz yourself. Level {state.learner.level}.

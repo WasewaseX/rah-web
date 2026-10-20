@@ -869,3 +869,21 @@ Work Log:
 
 Stage Summary:
 - The audit's rule - never silently present low-confidence fallback results as equivalent to a full assessment - is now enforced at every assessment surface: exam builds carry degraded flags in their spec, graded results carry a degraded notice, and both render honestly to the learner. The last open P1 is closed; Stage 02 of the audit's order is complete.
+
+---
+Task ID: 54
+Agent: Super Z (main)
+Task: Stage 03 feature #1 - the audit's highest-value pick: bring-your-own-materials learning. Import real text, extract vocab/collocations WITH source context, review them in the SAME FSRS queue.
+
+Work Log:
+- Schema: Material (title, source provenance, full text, word count, degraded flag) + MaterialCard (front=cloze sentence, answer, context=exact source sentence, note) - db push + generate, schema now carries its own migrations path (next baseline diff will include it).
+- src/lib/materials.ts: ONE AI extraction call then DETERMINISTIC validation - every card's answer must appear in its source sentence, the sentence must exist verbatim-ish in the material, the cloze carries a real ___ (rebuilt deterministically from the context if the model's cloze is malformed), duplicates die, cap 12. A bad extraction cannot ship: zero valid items = honest error, never fabricated cards. Degraded extraction marks the Material row (the P1-7 rule). Mat cards enter CardState as state=new due today - the shared FSRS pipeline.
+- Queue integration (the Task-44 lesson respected): materialCardById() is the third card resolver (deck -> exam:<tag> -> mat:<id>) in BOTH the due and ahead paths; mat cards lead the new-card pool; queueCounts() splits deck/mat states - newLeft = min(budget, deckUnseen + matNew), unseen = deckUnseen + matNew - the Home badge promise stays exactly what one round delivers.
+- /api/materials: GET list (+?id= detail = the inspect-the-source surface), POST import (400 on too-short text BEFORE any model call, 502 honest provider failures, aiRateLimit'd), DELETE (removes material + cards + their CardStates - no orphans, pinned).
+- UI: MaterialsPanel on the READING tab (the natural BYO surface) - paste form (title/source/text), honest result message with the card count + fallback chip, per-material card list where every card shows its quoted source sentence, full-text details, one-tap delete.
+- kind "mat" review direction = cloze only (type the blank) - no fake translations (fa is empty on principle: the source sentence IS the context).
+- Battery section 6h (deterministic, no AI): short-text 400, seeded mat cards appear in the batch with kind/unit/prompt shape, FSRS state new-due-today, badge newLeft includes mat cards, mat card grades through the normal route (ivl>=1), detail carries source-validated context, deletion leaves zero orphan CardStates. ROUTES +1. 327/327.
+- LIVE extraction quality check (real paragraph, real model): 8/8 cards source-validated, genuine collocations picked ("dropped dramatically", "committed to", "grid infrastructure"), useful notes, correct clozes. Browser E2E 5/5: panel -> paste -> extract -> cards -> source sentences visible -> mat card in the review batch.
+
+Stage Summary:
+- The audit's top pick is shipped and gated: a learner can now bring their own article/email/notes and get contextual review cards that ride the same scheduler, budget, and badge truth as the built-in deck. Extraction is validated against the source text deterministically - the "with source context" promise is enforced in code, not hoped for from the model.

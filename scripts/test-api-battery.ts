@@ -85,6 +85,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/import", methods: ["POST"] },
   { path: "/api/listen", methods: ["GET", "POST"] },
   { path: "/api/listen/dictation", methods: ["POST"] },
+  { path: "/api/materials", methods: ["GET", "POST", "DELETE"] },
   { path: "/api/mistakes", methods: ["GET", "DELETE"] },
   { path: "/api/placement", methods: ["GET", "POST"] },
   { path: "/api/progress", methods: ["GET"] },
@@ -682,6 +683,82 @@ try {
   );
   await prismaG.$disconnect();
   console.log("queue seeds removed (full restore happens in section 7)");
+
+  // ================= 6h. BYO MATERIALS (Stage 03 #1) =================
+  console.log("\n--- materials ---");
+  {
+    // Deterministic section: the AI extraction path is exercised by live E2E;
+    // here we pin the CONTRACT - honest 502 on short text, the shared-budget
+    // queue integration (mat cards first in the new pool), FSRS grading of
+    // mat cards, and full deletion without orphans.
+    const apiM = api;
+    const short = await apiM("/api/materials", { method: "POST", body: JSON.stringify({ title: "too short", text: "Only a couple of words here." }) });
+    check(short.status === 400 && typeof short.body?.error === "string", "materials: short text refused honestly (400, no fabricated cards)", JSON.stringify(short.body).slice(0, 100));
+
+    const { PrismaClient: PC6 } = await import("@prisma/client");
+    const prM = new PC6();
+    // Fresh budget: earlier sections may have spent today's introductions.
+    await prM.learner.update({ where: { id: "me" }, data: { newPerDay: 10 } });
+    await prM.cardState.deleteMany({ where: { last: Math.floor(Date.now() / 86400000), reps: 1 } });
+
+    const matId = `m_battery${Date.now()}`;
+    const c1 = `mat:batt${Date.now()}a`;
+    const c2 = `mat:batt${Date.now()}b`;
+    const todayM = Math.floor(Date.now() / 86400000);
+    await prM.material.create({
+      data: {
+        id: matId,
+        title: "battery material",
+        source: "battery",
+        text: "The engineer decided to implement the proposal ahead of the deadline. She took the criticism on the chin and kept the momentum going.",
+        words: 26,
+      },
+    });
+    await prM.materialCard.create({ data: { id: c1, materialId: matId, front: "The engineer decided to ___ the proposal ahead of the deadline.", answer: "implement", context: "The engineer decided to implement the proposal ahead of the deadline.", note: "to put a plan into action" } });
+    await prM.materialCard.create({ data: { id: c2, materialId: matId, front: "She took the ___ on the chin and kept going.", answer: "criticism", context: "She took the criticism on the chin and kept the momentum going.", note: "to accept blame without complaining" } });
+    await prM.cardState.create({ data: { cardId: c1, due: todayM } });
+    await prM.cardState.create({ data: { cardId: c2, due: todayM } });
+    await prM.$disconnect();
+
+    const q1 = await api("/api/review/queue");
+    const batch1 = q1.body?.batch ?? [];
+    check(q1.status === 200 && batch1.length > 0, "materials: queue serves after import", `len=${batch1.length}`);
+    const matEntry = batch1.find((e: { card?: { unit?: string; kind?: string; prompt?: string } }) => e.card?.unit === "material");
+    check(
+      !!matEntry && matEntry.card?.kind === "mat" && String(matEntry.card?.prompt ?? "").includes("___"),
+      "materials: BYO card is in the batch, kind mat, cloze prompt",
+      JSON.stringify(matEntry?.card ?? batch1[0]?.card ?? {}).slice(0, 120),
+    );
+    check(
+      typeof matEntry?.state?.due === "number" && matEntry.state.state === "new",
+      "materials: mat card state enters FSRS as new, due today",
+      JSON.stringify(matEntry?.state ?? {}),
+    );
+    // badge truth: newLeft counts mat cards (deckUnseen + matNew, budget-capped)
+    const cnts = q1.body?.counts ?? {};
+    check(
+      typeof cnts.newLeft === "number" && cnts.newLeft >= 2,
+      "materials: badge newLeft includes mat cards",
+      JSON.stringify(cnts).slice(0, 120),
+    );
+    // grade one mat card through the SAME FSRS route
+    const gr = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: c1, grade: 3, dir: "cloze" }) });
+    check(gr.status === 200 && typeof gr.body?.ivl === "number" && gr.body.ivl >= 1, "materials: mat card grades through the normal FSRS route", JSON.stringify(gr.body).slice(0, 100));
+    // detail + inspect-the-source surface
+    const det = await api(`/api/materials?id=${matId}`);
+    check(
+      det.status === 200 && det.body?.cards?.length === 2 && det.body.cards.every((c: { context: string; answer: string }) => c.context.toLowerCase().includes(c.answer.toLowerCase())),
+      "materials: detail view carries source context for every card",
+      JSON.stringify(det.body?.cards?.[0] ?? {}).slice(0, 120),
+    );
+    // deletion removes cards AND their schedule state
+    const del = await api(`/api/materials?id=${matId}`, { method: "DELETE" });
+    check(del.status === 200 && del.body?.removed === 2, "materials: deletion reports removed cards", JSON.stringify(del.body));
+    const { db: dbM } = await import("@/lib/db");
+    const orphanStates = await dbM.cardState.count({ where: { cardId: { in: [c1, c2] } } });
+    check(orphanStates === 0, "materials: no orphan CardState rows after deletion", String(orphanStates));
+    await dbM.$disconnect();
+  }
 
   // ================= 7. RESTORE =================
   console.log("\n--- restore ---");
