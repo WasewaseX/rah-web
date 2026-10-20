@@ -14,11 +14,11 @@
 | 3 | Remove auth token from localStorage | **DONE** | Task 46 (`240100a`): normal login now returns NO browser-readable credential (httpOnly cookie only); embedded callers get a Partitioned SameSite=None cookie (CSRF-guarded by the custom `x-rah-embed` header) with the raw token as last resort stored in **sessionStorage** (dies with the tab); legacy localStorage tokens scrubbed on load. E2E 8/8 in a real browser: top-level = zero tokens in any JS storage; iframe = sessionStorage-only fallback works. |
 | 4 | Harden email-code auth | **DONE** | Task 46 (`240100a`): codes stored as sha256 hashes (plaintext memory-only), atomic single-use consume (`updateMany` guard — racing verifies can't both win), 5 failed guesses self-destruct the code (brute-force window = 5 of 1,000,000 per 10 min), resend invalidates previous codes, per-IP issuance throttle (loopback exempt — the toolchain lesson), devCode never in production. Battery pins all of it; battery 293/293. |
 | 5 | Safe production DB + migrations | **DONE (for SQLite era)** | Task 47 (`0c02959`): versioned migrations baselined (`prisma/migrations/0001_init`), reproducibility proven (fresh-DB deploy → schema diff = zero difference), CI now builds its DB via `migrate deploy`, `db:push` demoted to safe (asks on data loss), explicit `db:push:force` escape hatch only. PostgreSQL migration itself = mega-update (below). |
-| 6 | Protect AI/speech endpoints from abuse | **PARTIAL** | Login endpoints now rate-limited (per-email + per-IP, Task 46). Coach loop has 429/timeout backoff + bounded turns. NOT yet: per-user/per-IP quotas and daily spend budgets on every paid-model route (`coach-agent`, `speak/*`, `arena/voice`, `exam/*`, `writing`, `grammar-check`). |
+| 6 | Protect AI/speech endpoints from abuse | **DONE** | Task 50 (`d1722f7`): shared sliding-window limiter wired into ALL 14 AI-capable POST routes — 40/min signed-in per user, 15/min anonymous per client IP, 429 + Retry-After at the TOP of each POST (zero model tokens on refusal), loopback exempt for the local toolchain. Battery 307 pins + HTTP-level curl verification. |
 | 7 | Model-provider failure recovery | **PARTIAL** | 429 backoff + retry in the coach loop; exam/placement fallback paths exist. NOT yet: durable task recovery or "degraded result" labeling on fallback content. |
-| 8 | Agent tool permissions + injection boundaries | **PARTIAL** | Every tool argument is validated server-side (numeric/set/path checks; sandboxed workspace paths; `tsc`-enforced arg shapes). NOT yet: an explicit per-tool permission matrix, confirmation flow for consequential actions, and untrusted-content framing on ingested documents/web pages. |
-| 9 | Data deletion / privacy / backups | **PENDING** | Logout (`/api/auth/session` DELETE) exists; hash-sealed export/import is account-specific by construction (single learner). NOT yet: a real "delete my account" that wipes chats, sessions, mistake memory, workspace files, exams, reviews. **Next up in the P1 wave.** |
-| 10 | Tests isolated from learner state | **PARTIAL** | Battery restores the full 20-table bundle in `finally` and deletes its users (Task 46 extended cleanup to all synthetic users). Known disclosed gap (Task 44): the E2E snapshot omitted the Learner row. NOT yet: disposable-DB-per-run for every script (lock test already runs on one; battery still restores in place). |
+| 8 | Agent tool permissions + injection boundaries | **DONE** | Task 51 (`161d7cb`): explicit tier matrix (read/write/exec/network/state) covering every tool, unknown tools default to the most dangerous tier; per-run budgets enforced in loop CODE (state 2, exec 2, network 4 — refused calls never execute); both web tools wrap output in the UNTRUSTED WEB CONTENT frame; every tool result tier-tagged back to the model. Live coach drive 32/32 inside budgets. |
+| 9 | Data deletion / privacy / backups | **DONE** | Task 49 (`3b2049f`): DELETE /api/account (auth-gated) — user row + cascade sessions + login codes; LAST-user-out (single-user deployment = account == learner) wipes ALL learner state (20 tables + Learner row + coach workspace files) and un-claims the deployment; other-accounts-remaining keeps shared state and says so in the response. Sidebar two-step Delete UI. Battery 301/301 incl. the isolation pin; E2E 3/3 in a real browser. |
+| 10 | Tests isolated from learner state | **DONE** | Task 52 (`f52e593`): `bash scripts/test-isolated-battery.sh` — the full battery runs against a THROWAWAY db (migrate-deploy-built) and its own dev-server instance (env-switchable distDir bypasses the Turbopack .next lock); the real db is never opened, not even by a restore. Verified 311/311 on the throwaway stack. |
 
 ## 2. Ten critical features to add
 
@@ -80,7 +80,7 @@
 | Stage | Status |
 |-------|--------|
 | 01 Stabilize and isolate | **5/5 P0s closed** (Tasks 45–48): CI green, isolation enforced (deployment lock), auth hardened (cookie-only + code hardening), migrations versioned. |
-| 02 Make the learning system trustworthy | **IN PROGRESS** — P1 wave next: deletion (#9), AI-endpoint quotas (#6), tool-permission matrix (#8), degraded-result labeling (#7), test DB isolation (#10). |
+| 02 Make the learning system trustworthy | **P1 wave 4/5 closed** (Tasks 49–52): real account deletion, AI-endpoint rate limits, tool-permission matrix + injection boundaries, full test isolation. Remaining: degraded-result labeling (#7). |
 | 03 Add the differentiators | PENDING — BYO materials, curriculum graph, acoustic pronunciation. |
 | 04 Dependable daily product | PENDING — Anki import, offline sync, reminders, longitudinal evidence. |
 
@@ -94,5 +94,9 @@
 | 46 | `240100a` | P0-3 + P0-4 auth hardening (battery 285→293) |
 | 47 | `0c02959` | P0-5 versioned migrations, safe push defaults |
 | 48 | `0e9100e` | P0-1 deployment lock (audit-sanctioned single-user) |
+| 49 | `3b2049f` | P1-9 real account deletion (+ UI, isolation pin; battery 293→301) |
+| 50 | `d1722f7` | P1-6 AI abuse limits on all 14 AI routes (battery 301→307) |
+| 51 | `161d7cb` | P1-8 tool tier matrix + per-run budgets + injection frame (battery 307→311) |
+| 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 
-**Gate status:** battery 293/293 · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 311/311 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
