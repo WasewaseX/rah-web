@@ -1,0 +1,98 @@
+# ROADMAP STATUS — the external audit, item by item
+
+**Last updated:** 2026-10-20 · **Source:** the October 2026 external engineering + product audit ("overall: stabilize before expanding").
+**How to read:** each item carries DONE / PARTIAL / PENDING, with the evidence (task, commit, gate). Battery = `scripts/test-api-battery.ts` (293 checks); portable drive = `scripts/test-portable.ts`; all gates green at time of writing.
+
+---
+
+## 1. Critical things to fix first
+
+| # | Item | Status | Evidence |
+|---|------|--------|----------|
+| 1 | Learner data isolation | **PARTIAL → hole closed** | Task 48 (`0e9100e`): deployment lock — first account claims the deployment, further registrations refused unless `RAH_OPEN_REGISTRATION=1` (audit's sanctioned single-user alternative). Full per-user scoping (userId on every learning model, scoped queries, two-user route tests) = tracked mega-update below. Lock tested 6/6 on a throwaway migrated DB. |
+| 2 | Make GitHub CI green | **DONE** | Task 45 (`4d4f582`): root-caused the months-long Typecheck failure — `playwright` was an undeclared parent-dir dep; local tsc resolved it via `/home/z/node_modules` while CI correctly failed TS2307. Fixed with an optional-dep dynamic import; verified under true CI simulation. Audit's "branches: ain]" claim was a false positive (byte-checked). Portable drive also re-greened (15/15) with a real login. |
+| 3 | Remove auth token from localStorage | **DONE** | Task 46 (`240100a`): normal login now returns NO browser-readable credential (httpOnly cookie only); embedded callers get a Partitioned SameSite=None cookie (CSRF-guarded by the custom `x-rah-embed` header) with the raw token as last resort stored in **sessionStorage** (dies with the tab); legacy localStorage tokens scrubbed on load. E2E 8/8 in a real browser: top-level = zero tokens in any JS storage; iframe = sessionStorage-only fallback works. |
+| 4 | Harden email-code auth | **DONE** | Task 46 (`240100a`): codes stored as sha256 hashes (plaintext memory-only), atomic single-use consume (`updateMany` guard — racing verifies can't both win), 5 failed guesses self-destruct the code (brute-force window = 5 of 1,000,000 per 10 min), resend invalidates previous codes, per-IP issuance throttle (loopback exempt — the toolchain lesson), devCode never in production. Battery pins all of it; battery 293/293. |
+| 5 | Safe production DB + migrations | **DONE (for SQLite era)** | Task 47 (`0c02959`): versioned migrations baselined (`prisma/migrations/0001_init`), reproducibility proven (fresh-DB deploy → schema diff = zero difference), CI now builds its DB via `migrate deploy`, `db:push` demoted to safe (asks on data loss), explicit `db:push:force` escape hatch only. PostgreSQL migration itself = mega-update (below). |
+| 6 | Protect AI/speech endpoints from abuse | **PARTIAL** | Login endpoints now rate-limited (per-email + per-IP, Task 46). Coach loop has 429/timeout backoff + bounded turns. NOT yet: per-user/per-IP quotas and daily spend budgets on every paid-model route (`coach-agent`, `speak/*`, `arena/voice`, `exam/*`, `writing`, `grammar-check`). |
+| 7 | Model-provider failure recovery | **PARTIAL** | 429 backoff + retry in the coach loop; exam/placement fallback paths exist. NOT yet: durable task recovery or "degraded result" labeling on fallback content. |
+| 8 | Agent tool permissions + injection boundaries | **PARTIAL** | Every tool argument is validated server-side (numeric/set/path checks; sandboxed workspace paths; `tsc`-enforced arg shapes). NOT yet: an explicit per-tool permission matrix, confirmation flow for consequential actions, and untrusted-content framing on ingested documents/web pages. |
+| 9 | Data deletion / privacy / backups | **PENDING** | Logout (`/api/auth/session` DELETE) exists; hash-sealed export/import is account-specific by construction (single learner). NOT yet: a real "delete my account" that wipes chats, sessions, mistake memory, workspace files, exams, reviews. **Next up in the P1 wave.** |
+| 10 | Tests isolated from learner state | **PARTIAL** | Battery restores the full 20-table bundle in `finally` and deletes its users (Task 46 extended cleanup to all synthetic users). Known disclosed gap (Task 44): the E2E snapshot omitted the Learner row. NOT yet: disposable-DB-per-run for every script (lock test already runs on one; battery still restores in place). |
+
+## 2. Ten critical features to add
+
+| # | Feature | Status | Notes |
+|---|---------|--------|-------|
+| 1 | Bring-your-own-materials learning | **PENDING** | The audit's top pick and our tracked mega-update #9: import PDFs/articles → extract vocab/collocations with source context → cards. |
+| 2 | Complete CEFR curriculum graph | **PARTIAL** | 5-band progress map with proven-only flags (Task 39 outcomes work); deck has unit/skill/trap metadata. NOT yet: B2–C1 depth + prerequisite graph + mastery gates. |
+| 3 | Authentic exam tracks (IELTS/TOEFL/C1A) | **PARTIAL** | Exam generation with answerability + weakness targeting shipped; generic formats only. IELTS/TOEFL task types, timing, rubrics = pending. |
+| 4 | Full Anki/custom-deck import | **PARTIAL** | Anki-dialect TSV export shipped with the honesty header (Task 42); CSV/TSV import + `.apkg` = pending (static deck pipeline must open first). |
+| 5 | Acoustic pronunciation assessment | **PARTIAL (honest)** | Sound Lab (Task 43) does deterministic phoneme-contrast feedback over the ASR diff — measured evidence, inferred label, honest epistemics. True acoustic assessment (Azure Speech) = pending, API decision below. |
+| 6 | Real offline sync | **PENDING** | Roadmap #20. |
+| 7 | Goal-based weekly planner | **PENDING** | FSRS forecast chips + daily budget explain exist (Task 44); full re-planning scheduler = pending. |
+| 8 | Evidence-backed English reference | **PARTIAL** | Cards carry definitions/examples/audio; provenance of examples not yet surfaced. |
+| 9 | Writing-revision workspace | **PARTIAL** | Writing placement + grammar-check + writing diagnosis exist; drafts/revisions/rubric history = pending. |
+| 10 | Content quality console | **PARTIAL** | ContentFlag lifecycle shipped + coach can triage/resolve in conversation (Task 42); regression tests per flag = pending. |
+
+## 3. Ten existing features that need polish
+
+| # | Feature | Status | Latest evidence |
+|---|---------|--------|-----------------|
+| 1 | Review queue + FSRS | **LARGELY DONE** | Task 44: one source of truth for counts, 2:1:1 skill-mixed introductions, forecast chips + per-card scheduler lines + live intervals, Keep-practicing ahead mode with auto-continue. Remaining: configurable daily limits, suspend/difficult cards, safe undo breadth. |
+| 2 | Talk conversation mode | **DONE (v1)** | Task 41: deterministic scenarios, in-scene coach, always-present typed fallback, engine-computed session report. Mobile-browser quirks still untested. |
+| 3 | Sound Lab | **DONE (inference tier)** | Task 43. Acoustic tier = feature #5 above. |
+| 4 | AI coach transparency | **PARTIAL** | Stop control, execution trace + copy, content flags, triage loop, read_state mandate enforced in code (Tasks 40–42). Remaining: "why this recommendation" evidence surfacing. |
+| 5 | Exam generation/grading | **PARTIAL** | Answerability + weakness targeting + dedicated live retest (Task 38). Item-bank validation + distractor quality pass pending. |
+| 6 | Placement/CEFR honesty | **PARTIAL** | Bands show proven-only evidence (Task 39). Sample counts + uncertainty display pending. |
+| 7 | Mistake memory/mastery | **PARTIAL** | Persistent mistake families feed weakness bias; retirement rate in outcomes ledger. Learner-side correction of a wrong weakness tag pending. |
+| 8 | XP/gems/quests/bot | **PARTIAL** | Practice bot self-labeled (Task 44), shop tooltips. Anti-farming pass pending. |
+| 9 | Progress reports | **PARTIAL** | Effectiveness + improvement ledgers, zero-AI numbers (Tasks 39/41). Proxy-metric caveats on spoken fluency pending. |
+| 10 | Onboarding/naming | **PARTIAL** | PRACTICE BOT badge, shop tooltips, forecast copy (Task 44). Full plain-language naming audit (e.g. beyond "Behnam Blackout") pending. |
+
+## 4. Three apps to reverse-engineer next
+
+| App | Status | Output |
+|-----|--------|--------|
+| Duolingo | **DONE** | `DUOLINGO-RE.md`; word-bank tiles, streak/budget doctrine, practice-bot labeling shipped. |
+| Anki | **PARTIAL** | Review mechanics studied (forecast, ahead mode, budget); export interop shipped; import + custom scheduling settings pending. |
+| ELSA Speak | **PARTIAL** | Sound Lab = our honest version of sound-level feedback; acoustic assessment pending. |
+| LingQ | **PENDING** | Feeds feature #1 (BYO materials). |
+
+## 5. Three critical data stores
+
+| Store | Status | Notes |
+|-------|--------|-------|
+| PostgreSQL (primary) | **PENDING (by design)** | SQLite + versioned migrations now; the Postgres move is coupled with per-user scoping (mega-update, stage 01→03 bridge). |
+| Redis/Valkey (ops state) | **PENDING (by design)** | In-memory throttles are single-node-safe and documented as such (Task 46). Needed only at multi-instance scale. |
+| R2/S3 (objects) | **PENDING (by design)** | Workspace files are sandboxed local FS today; object storage comes with the deployment push. |
+
+## 6. Three critical APIs
+
+| API | Status | Notes |
+|-----|--------|-------|
+| LLM API w/ structured outputs | **DONE** | `aiJson` ladder + deterministic post-validation before any DB write; backoff/retry (Task 40+). |
+| Azure AI Speech (pronunciation) | **PENDING** | Decision gate for Sound Lab v2 (acoustic tier). |
+| Resend/transactional email | **PARTIAL** | SMTP path exists (`mailer.ts`, any provider incl. Resend); delivery-failure reporting + idempotency keys pending. |
+
+## 7. The audit's implementation order
+
+| Stage | Status |
+|-------|--------|
+| 01 Stabilize and isolate | **5/5 P0s closed** (Tasks 45–48): CI green, isolation enforced (deployment lock), auth hardened (cookie-only + code hardening), migrations versioned. |
+| 02 Make the learning system trustworthy | **IN PROGRESS** — P1 wave next: deletion (#9), AI-endpoint quotas (#6), tool-permission matrix (#8), degraded-result labeling (#7), test DB isolation (#10). |
+| 03 Add the differentiators | PENDING — BYO materials, curriculum graph, acoustic pronunciation. |
+| 04 Dependable daily product | PENDING — Anki import, offline sync, reminders, longitudinal evidence. |
+
+---
+
+## Velocity log (this audit wave)
+
+| Task | Commit | What closed |
+|------|--------|-------------|
+| 45 | `4d4f582` | P0-2 CI green (root cause + false-positive check) |
+| 46 | `240100a` | P0-3 + P0-4 auth hardening (battery 285→293) |
+| 47 | `0c02959` | P0-5 versioned migrations, safe push defaults |
+| 48 | `0e9100e` | P0-1 deployment lock (audit-sanctioned single-user) |
+
+**Gate status:** battery 293/293 · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
