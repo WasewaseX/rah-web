@@ -929,3 +929,20 @@ Work Log:
 
 Stage Summary:
 - Audit polish #1's remaining asks are closed: configurable daily limits and suspended/difficult cards are learner-operable end to end. Undo already existed (/api/review/undo + UI). The review queue polish item is now DONE rather than partially.
+
+---
+Task ID: 57
+Agent: Super Z (main)
+Task: Stage 02 close-out - honest degraded states everywhere (audit P1-7, the last open P1).
+
+Work Log:
+- src/lib/degraded.ts (new): pure, battery-pinned helpers - fallbackBrief(enginePlan, persona) words the ENGINE's real moves deterministically when the AI Director is unreachable (the Director's contract was always "re-voice the engine plan, never invent moves"); DEGRADED_CONVERSATION_LINE = an in-scene, speakable placeholder ("connection broke" is true in nearly every scene); degradedTurnPayload() = the honest banner text.
+- /api/coach/briefing GET: aiJson is now wrapped - a provider outage used to throw into an unhandled 500, which the client swallowed into the misleading "The Director had nothing worth saying" empty state. Now: engine-worded degraded brief, cached with its degraded flag inside the stored JSON (bounded calls; Re-brief retries the AI), top-level degraded boolean in every response.
+- Briefing.tsx: amber "AI offline: engine-built plan" chip (title = the honest notice) replaces "cached for today" while degraded; empty-state copy no longer lies. Chip gained an optional title prop (ui.tsx).
+- /api/speak/conversation POST: the () => ({}) fallback used to render a SILENT "..." coach line - degraded content presented as if the partner really spoke. Now the degraded callback swaps in the in-scene placeholder line and the response carries degraded + degradedNotice.
+- Speak.tsx ConversationDrill: amber Note banner when the AI dropped ("its last reply is a placeholder - send your next line and it tries again - nothing about your progress is fake"); state resets on scene pick and self-heals on the next healthy turn.
+- TOOLCHAIN FIX found by the battery run: scripts/test-isolated-battery.sh now exports RAH_OPEN_REGISTRATION=1 for the throwaway stack itself. The Task-48 contract had this var in gitignored .env, which is machine-local and got lost - fixture registrations then died on the deployment lock ("already claimed") both on :3000 (correct lock behavior vs the real claimed db) and on the fresh throwaway db. The script is now self-sufficient; production defaults stay LOCKED.
+- Battery section "degraded honesty" (10 pins): notice honesty, priority/plan follow the engine's real moves, empty-plan defaults, parenthetical-reason stripping, no em dashes, payload shape, and the live briefing contract (200 + brief + degraded flag + exactly 3 plan moves). Battery 352 -> 362.
+
+Stage Summary:
+- Audit P1-7 is CLOSED: every surface that can serve non-AI content now says so in the learner's language, at the moment it happens. Stage 02 (trustworthy learning) is 5/5. The outage path no longer bricks the dashboard's first screen - it degrades to the engine's real plan, clearly labeled.

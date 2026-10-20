@@ -823,6 +823,35 @@ try {
       const mid = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: 10 }) });
       check(mid.status === 200 && mid.body?.newPerDay === 10 && mid.body?.clamped === false, "pace: 10 stays 10, no clamp flag", JSON.stringify(mid.body));
     }
+
+    // --- degraded honesty (audit P1-7 close-out) ---
+    console.log("\n--- degraded honesty ---");
+    {
+      const { fallbackBrief, DEGRADED_CONVERSATION_LINE, degradedTurnPayload } = await import("@/lib/degraded");
+      // engine-plan wording: the AI Director only ever re-voices the engine,
+      // so the offline fallback must carry the engine's REAL moves.
+      const fb = fallbackBrief(["Clear 12 due cards (biggest leak: articles)", "Write one paragraph in Writing (weak: organization)", "Run a Speak round (delivery dipped)"], "drill");
+      check(fb.degraded === true && typeof fb.degradedNotice === "string" && fb.degradedNotice.includes("unreachable"), "degraded: fallback brief is labeled with an honest notice", JSON.stringify(fb.degradedNotice).slice(0, 100));
+      check(fb.priority.includes("Clear 12 due cards"), "degraded: priority comes from the engine's #1 move, not invented", fb.priority);
+      check(fb.plan.length === 3 && fb.plan[0].includes("Clear 12 due cards") && fb.plan[1].includes("Writing"), "degraded: 3 plan items follow the engine plan", JSON.stringify(fb.plan));
+      check(fb.pep.length > 0 && !fb.pep.includes("\u2014"), "degraded: persona pep present, no em dash", fb.pep);
+      const fbBare = fallbackBrief([], "zen");
+      check(fbBare.plan.length === 3 && fbBare.plan.every((s: string) => s.length > 0) && fbBare.degraded === true, "degraded: empty engine plan still yields 3 honest default moves", JSON.stringify(fbBare.plan));
+      const fbWeird = fallbackBrief(["Just one move (only reason)"], undefined);
+      check(fbWeird.plan.length === 3 && !fbWeird.plan.some((s: string) => s.includes("(")), "degraded: single move padded to 3, parenthetical reasons stripped", JSON.stringify(fbWeird.plan));
+      // conversation placeholder: speakable, in-scene, honest
+      check(DEGRADED_CONVERSATION_LINE.length > 10 && !DEGRADED_CONVERSATION_LINE.includes("\u2014"), "degraded: conversation placeholder line is speakable, no em dash", DEGRADED_CONVERSATION_LINE);
+      const dp = degradedTurnPayload();
+      check(dp.degraded === true && dp.degradedNotice.includes("placeholder") && dp.degradedNotice.includes("honest"), "degraded: conversation payload carries the honest banner text", JSON.stringify(dp.degradedNotice).slice(0, 100));
+      // route: briefing always answers with the degraded flag present (the
+      // outage path itself is provider-dependent; the CONTRACT is pinned here)
+      const br = await api("/api/coach/briefing");
+      check(br.status === 200 && typeof br.body?.brief?.priority === "string" && typeof br.body?.degraded === "boolean", "degraded: briefing route answers with brief + degraded flag", JSON.stringify(br.body).slice(0, 120));
+      check(Array.isArray(br.body?.brief?.plan) && br.body.brief.plan.length === 3, "degraded: briefing plan is exactly 3 moves", JSON.stringify(br.body?.brief?.plan).slice(0, 100));
+      if (br.body?.degraded === true) {
+        check(typeof br.body.brief.degradedNotice === "string" && br.body.brief.degradedNotice.length > 20, "degraded: cached degraded brief carries its notice into the response", JSON.stringify(br.body?.brief?.degradedNotice ?? "").slice(0, 100));
+      }
+    }
   }
 
   // ================= 7. RESTORE =================
