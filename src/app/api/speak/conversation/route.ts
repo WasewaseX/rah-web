@@ -7,6 +7,8 @@ import { recordMistakes } from "@/lib/mistakes";
 import { ladderFor, ladderBrief } from "@/lib/ladder";
 import { dayIndex } from "@/lib/fsrs";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
@@ -90,6 +92,10 @@ interface TurnIn {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const body = await req.json().catch(() => ({}));
   const scenarioId = String((body as { scenarioId?: unknown }).scenarioId ?? "");
   const scenario = SCENARIOS.find((s) => s.id === scenarioId);

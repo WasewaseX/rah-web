@@ -5,6 +5,8 @@ import { aiJson, placementWritingSystem } from "@/lib/ai";
 import { getLearner, bumpDaily } from "@/lib/server";
 import { tagLabel, foldPlacementMisses } from "@/lib/mistakes";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 // Adaptive placement: four sections walked by a difficulty ladder
@@ -127,6 +129,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const body = await req.json();
   const action = String(body.action ?? "");
 

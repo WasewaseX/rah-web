@@ -7,6 +7,8 @@ import { awardXp, progressQuest } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 // GET: five shadowing drills. Speakable sentences (5-14 words) from the deck,
@@ -34,6 +36,10 @@ export async function GET() {
 // POST: one rep. The browser ASR transcript comes back, the server scores it
 // against the target with a word-level diff and pays XP by accuracy.
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { target, transcript } = await req.json();
   const t = String(target ?? "").trim();
   const g = String(transcript ?? "").trim();

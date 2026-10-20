@@ -5,6 +5,8 @@ import { deckCardForToken, scheduleExamOutcomes, LISTEN_CARD_PREFIX } from "@/li
 import { recordMistakes } from "@/lib/mistakes";
 import { awardXp } from "@/lib/arcade";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 // P4: the dictation endpoint. The client sends { sentences: [{target, typed}] }
@@ -26,6 +28,10 @@ interface SentencePair {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const body = (await req.json().catch(() => null)) as { sentences?: SentencePair[] } | null;
   const pairs = Array.isArray(body?.sentences) ? body!.sentences!.slice(0, 8) : [];
   const clean = pairs

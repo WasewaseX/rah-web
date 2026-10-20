@@ -4,6 +4,8 @@ import { buildProfile, bumpDaily } from "@/lib/server";
 import { awardXp } from "@/lib/arcade";
 import { ladderFor, ladderBrief } from "@/lib/ladder";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 interface ListenQuiz {
@@ -25,6 +27,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { topic } = await req.json();
   const profile = await buildProfile();
   // P3: the ladder envelope decides the material's difficulty BEFORE the AI

@@ -10,10 +10,16 @@ import { getSessionUserWithRequest } from "@/lib/auth";
 import { awardXp } from "@/lib/arcade";
 import { runAgent, type AgentEvent } from "@/lib/coach-agent/loop";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const user = await getSessionUserWithRequest(req);
   if (!user) return NextResponse.json({ error: "Sign in to talk to your coach." }, { status: 401 });
 

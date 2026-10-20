@@ -6,6 +6,8 @@ import { buildProfile, getLearner, dueCount } from "@/lib/server";
 import { getRivalView, ensureQuests, getChain } from "@/lib/arcade";
 import { nextBestActions } from "@/lib/next-best";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 const PERSONAS = {
@@ -66,6 +68,10 @@ Rules: priority is ONE sentence naming the single highest-leverage thing for tod
 
 // POST: persona switch ({persona}) or forced regeneration ({regen:true}).
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const b = (await req.json()) as { persona?: string; regen?: boolean };
   const l = await getLearner();
   if (b.persona && ["mentor", "drill", "zen"].includes(b.persona)) {

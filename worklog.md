@@ -810,3 +810,18 @@ Work Log:
 
 Stage Summary:
 - "Delete my account" is now real: one click confirms, the account and (for a claimed single-user deployment) every trace of learning state - reviews, chats, mistakes, exams, files - is gone, and the deployment honestly reports what was removed and what was kept. The deletion E2E + the battery isolation pin lock the behavior in.
+
+---
+Task ID: 50
+Agent: Super Z (main)
+Task: P1-6 - protect the AI and speech endpoints against abuse and runaway costs (per-client rate limits on every paid-model route).
+
+Work Log:
+- src/lib/rate-limit.ts: shared in-memory sliding-window limiter (single-node honest; restart clears). Signed-in: 40 AI calls/min per user id. Anonymous: 15/min per client IP (x-forwarded-for aware). Refusals are 429 + Retry-After + a plain-English message, and the guard sits at the TOP of each POST (before parsing/persistence) so refused requests cost zero model tokens.
+- Loopback/direct-local EXEMPT (same doctrine as the Task-46 IP throttle): the battery and every E2E run shares 127.0.0.1 and would lock the whole toolchain out; production traffic arrives through a proxy that sets x-forwarded-for to the real client IP. Blast radius of direct-access abuse is bounded by the Task-48 deployment lock (one claimed user).
+- Codemod (scripts/codemod-rate-limit.js, idempotent) wired the guard into ALL 14 AI-capable POST routes: coach-agent, coach/briefing, speak, speak/conversation, arena/voice, exam/grade, quiz, writing, grammar-check, placement, listen, listen/dictation, flow, chat. 14/14 patched, uniform pattern.
+- Battery pins (lib-level, real Request objects through spoofed proxy IPs): direct-local exempt, loopback exempt, 16th anonymous call in a minute = 429 with Retry-After header, per-IP bucket isolation, signed-in 40/min budget then 429. HTTP-level verified with curl: 15 x 400 (empty-body pass-through) then 429 "Too many AI requests - slow down a little...".
+- Battery 307/307. tsc clean.
+
+Stage Summary:
+- Every route that can burn a model call now refuses request #16 within the minute from the same client instead of silently spending money. The budget shape (40 signed-in / 15 anonymous per minute) is generous for real learning and hostile to scripts, and the refusal is honest and tells the client when to come back.

@@ -6,6 +6,8 @@ import { runCoach } from "@/lib/agent/run";
 import { recordMistakes } from "@/lib/mistakes";
 import type { ProfileJson } from "@/lib/ai";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
@@ -22,6 +24,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { message } = await req.json();
   const text = String(message ?? "").trim();
   if (!text) return NextResponse.json({ error: "message required" }, { status: 400 });

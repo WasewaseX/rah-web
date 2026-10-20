@@ -5,9 +5,15 @@
 import { NextResponse } from "next/server";
 import { screenText } from "@/lib/languagetool";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { text } = await req.json().catch(() => ({ text: "" }));
   const body = String(text ?? "").trim();
   if (body.length < 20) {

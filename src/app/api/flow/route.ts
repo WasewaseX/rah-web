@@ -4,6 +4,8 @@ import { dayIndex } from "@/lib/fsrs";
 import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { buildSpeedPool } from "@/lib/arcade-items";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 const ITEMS = 12;
@@ -19,6 +21,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const b = (await req.json()) as { correct?: number; total?: number; ms?: number };
   const total = Math.min(ITEMS, Math.max(0, Math.round(Number(b.total ?? 0))));
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));

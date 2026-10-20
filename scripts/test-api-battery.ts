@@ -234,6 +234,28 @@ try {
     await dbD.$disconnect();
   }
 
+  // --- AI abuse limiter (P1-6) ---
+  console.log("\n--- ai rate limit ---");
+  {
+    const { aiRateLimit } = await import("@/lib/rate-limit");
+    const mk = (ip: string) => new Request("http://localhost:3000/api/quiz", { headers: ip ? { "x-forwarded-for": ip } : {} });
+    // loopback + direct local access exempt (battery/toolchain doctrine)
+    check(aiRateLimit(mk("")).ok === true, "limiter: direct local access exempt", "");
+    check(aiRateLimit(mk("127.0.0.1")).ok === true, "limiter: loopback exempt", "");
+    // real IP: 15 anonymous calls pass, 16th is a 429 with Retry-After
+    let last: ReturnType<typeof aiRateLimit> | null = null;
+    for (let i = 0; i < 16; i++) last = aiRateLimit(mk("203.0.113.7"));
+    check(last!.ok === false && last!.response!.status === 429, "limiter: 16th anonymous call in a minute is 429", String(last!.response?.status));
+    check((last!.response!.headers.get("retry-after") ?? "") !== "", "limiter: 429 carries Retry-After", "");
+    // a different IP is untouched (per-IP buckets)
+    check(aiRateLimit(mk("203.0.113.8")).ok === true, "limiter: per-IP isolation", "");
+    // signed-in budget is separate and higher (40/min)
+    let signedOk = true;
+    for (let i = 0; i < 40; i++) signedOk = signedOk && aiRateLimit(mk("203.0.113.9"), "user-x").ok;
+    const signed41 = aiRateLimit(mk("203.0.113.9"), "user-x");
+    check(signedOk && signed41.ok === false, "limiter: signed-in budget 40/min then 429", String(signed41.response?.status));
+  }
+
   // ================= 3. AUTHED SWEEP (hostile input: no 500s) =================
   console.log("\n--- sweep: authed, hostile bodies (no 500) ---");
   for (const r of ROUTES) {

@@ -4,6 +4,8 @@ import { aiJson, quizSystem } from "@/lib/ai";
 import { buildProfile, bumpDaily } from "@/lib/server";
 import { awardXp } from "@/lib/arcade";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 interface Quiz {
@@ -19,6 +21,10 @@ interface Quiz {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { text, source } = await req.json();
   const body = String(text ?? "").trim();
   if (body.length < 40) return NextResponse.json({ error: "Paste or send at least a paragraph." }, { status: 400 });

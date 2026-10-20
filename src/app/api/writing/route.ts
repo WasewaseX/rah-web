@@ -7,6 +7,8 @@ import { recordMistakes } from "@/lib/mistakes";
 import { noteTagOutcome } from "@/lib/mastery";
 import { screenText, findingsBlock, mergeRuleErrors } from "@/lib/languagetool";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 interface WritingResult {
@@ -35,6 +37,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { prompt, text } = await req.json();
   const body = String(text ?? "").trim();
   if (body.length < 60) return NextResponse.json({ error: "Write at least 60 characters so there is something to grade." }, { status: 400 });

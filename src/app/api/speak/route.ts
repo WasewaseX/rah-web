@@ -6,6 +6,8 @@ import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
 import { ladderFor, ladderBrief } from "@/lib/ladder";
 
+import { aiRateLimit } from "@/lib/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 interface SpeakResult {
@@ -34,6 +36,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Abuse limit (audit P1-6): AI calls cost real money - 30/min per client IP.
+  const rl = aiRateLimit(req);
+  if (!rl.ok) return rl.response!;
+
   const { prompt, transcript, round } = await req.json();
   const t = String(transcript ?? "").trim();
   if (t.length < 30) return NextResponse.json({ error: "The transcript is too short. Speak for at least 30 seconds." }, { status: 400 });
