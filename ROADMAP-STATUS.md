@@ -39,7 +39,7 @@
 
 | # | Feature | Status | Latest evidence |
 |---|---------|--------|-----------------|
-| 1 | Review queue + FSRS | **LARGELY DONE** | Task 44: one source of truth for counts, 2:1:1 skill-mixed introductions, forecast chips + per-card scheduler lines + live intervals, Keep-practicing ahead mode with auto-continue. Remaining: configurable daily limits, suspend/difficult cards, safe undo breadth. |
+| 1 | Review queue + FSRS | **DONE** | Task 44: one source of truth for counts, 2:1:1 skill-mixed introductions, forecast chips + per-card scheduler lines + live intervals, Keep-practicing ahead mode with auto-continue. Task 56 (`ab9514a`): configurable daily limit (3..30 stepper), suspend/unsuspend with preserved schedules, undo already shipped. |
 | 2 | Talk conversation mode | **DONE (v1)** | Task 41: deterministic scenarios, in-scene coach, always-present typed fallback, engine-computed session report. Mobile-browser quirks still untested. |
 | 3 | Sound Lab | **DONE (inference tier)** | Task 43. Acoustic tier = feature #5 above. |
 | 4 | AI coach transparency | **PARTIAL** | Stop control, execution trace + copy, content flags, triage loop, read_state mandate enforced in code (Tasks 40–42). Remaining: "why this recommendation" evidence surfacing. |
@@ -99,4 +99,4 @@
 | 51 | `161d7cb` | P1-8 tool tier matrix + per-run budgets + injection frame (battery 307→311) |
 | 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 
-**Gate status:** battery 336/336 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 352/352 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
