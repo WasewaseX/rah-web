@@ -27,7 +27,7 @@
 | 1 | Bring-your-own-materials learning | **DONE (v1)** | Task 54 (`33a38ec`): paste text on the Reading tab → one AI extraction call → DETERMINISTIC source validation (answer must appear in its verbatim source sentence; zero valid = honest 502, never fabricated cards) → MaterialCard rows in the SAME FSRS queue (badge truth exact, no-orphan deletion). MaterialsPanel UI with per-card quoted source sentences. Battery 327/327; live extraction 8/8 source-validated; browser E2E 5/5. PDF/EPUB upload = v2. |
 | 2 | Complete CEFR curriculum graph | **PARTIAL** | 5-band progress map with proven-only flags (Task 39 outcomes work); deck has unit/skill/trap metadata. NOT yet: B2–C1 depth + prerequisite graph + mastery gates. |
 | 3 | Authentic exam tracks (IELTS/TOEFL/C1A) | **PARTIAL** | Exam generation with answerability + weakness targeting shipped; generic formats only. IELTS/TOEFL task types, timing, rubrics = pending. |
-| 4 | Full Anki/custom-deck import | **PARTIAL** | Anki-dialect TSV export shipped with the honesty header (Task 42); CSV/TSV import + `.apkg` = pending (static deck pipeline must open first). |
+| 4 | Full Anki/custom-deck import | **PARTIAL → import v1 SHIPPED** | Export: Anki-dialect TSV (Task 42). Import: Task 55 (`038259d`) — CSV/TSV paste (tab/comma auto-detect, `#` headers skipped, quoted cells, dedupe, 300-row cap), smart row mapping (pre-blanked passthrough, auto-blanking, front-back), rides the Task-54 FSRS queue. `.apkg` binary = v2. |
 | 5 | Acoustic pronunciation assessment | **PARTIAL (honest)** | Sound Lab (Task 43) does deterministic phoneme-contrast feedback over the ASR diff — measured evidence, inferred label, honest epistemics. True acoustic assessment (Azure Speech) = pending, API decision below. |
 | 6 | Real offline sync | **PENDING** | Roadmap #20. |
 | 7 | Goal-based weekly planner | **PENDING** | FSRS forecast chips + daily budget explain exist (Task 44); full re-planning scheduler = pending. |
@@ -99,4 +99,4 @@
 | 51 | `161d7cb` | P1-8 tool tier matrix + per-run budgets + injection frame (battery 307→311) |
 | 52 | `f52e593` | P1-10 fully isolated battery stack (throwaway db + own server) |
 
-**Gate status:** battery 327/327 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
+**Gate status:** battery 336/336 · isolated battery 311/311 on throwaway stack · portable drive 15/15 · deployment-lock 6/6 · auth E2E 8/8 · deletion E2E 3/3 · live coach drive 32/32 · `tsc --noEmit` clean (CI-honest, parent-dir-dep aware).
