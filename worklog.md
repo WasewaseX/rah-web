@@ -795,3 +795,18 @@ Work Log:
 
 Stage Summary:
 - The isolation hole is closed for real deployments: a second account can no longer silently share the learner's brain. Registration is first-come-claimed by default, multi-user requires an explicit documented env opt-in, and the refusal message tells the truth. The full per-user scoping (userId on every learning model + scoped queries + two-user route tests) stays the tracked mega-update item.
+
+---
+Task ID: 49
+Agent: Super Z (main)
+Task: P1-9 - real account data deletion (the audit's "deletion must remove or anonymize chats, transcripts, mistakes, files, reviews").
+
+Work Log:
+- DELETE /api/account (auth-gated): removes the caller's User row (cascade deletes its Sessions) + LoginCode rows by email; then, ONLY when the deleted account was the LAST user of the deployment (the normal single-user case - account and learner are the same person), wipes the ENTIRE learner state: all 20 learning tables + the Learner row + the coach workspace files (rm -rf of data/coach-workspace). If other accounts remain (open-registration dev mode), the shared learner state is KEPT and the response says so honestly (notice field). After a full wipe the deployment is unclaimed again - the Task-48 lock opens for the next registration.
+- UI: CoachSidebar gains a two-step Delete control - trash icon (title "Delete account - wipes everything for good") -> inline "really delete" confirm -> DELETE -> clearRahToken + toast with the honest per-scope outcome + return to the login screen. Cancel button available at the confirm step.
+- BATTERY BUG CAUGHT BY MY OWN PIN: adding /api/account to the sweep route map made the AUTHED hostile sweep run DELETE /api/account with the MAIN battery cookie - deleting the battery user mid-run (30 downstream 401s). Fix: /api/account joins AUTH_ROUTES (skipped by the authed sweep; exercised thoroughly in its own section). PLUS a new isolation pin: "another account's deletion leaves the main session alive" - this exact class of bug can never land silently again.
+- Battery 301/301 (8 new: deletion setup, account removed, account-row report, honest shared-state notice while other accounts remain, session dead after deletion, deleted account's codes gone, main-session isolation, anon 401 in sweep). E2E 3/3 real browser (login -> sidebar trash -> really delete -> login screen again + session dead server-side). tsc clean.
+- REAL-DATA CHECK: the Learner row and owner accounts were never touched - the full-wipe branch requires remainingUsers === 0, which never occurred (verified Learner exists, cardStates state matches the Task-44 restore).
+
+Stage Summary:
+- "Delete my account" is now real: one click confirms, the account and (for a claimed single-user deployment) every trace of learning state - reviews, chats, mistakes, exams, files - is gone, and the deployment honestly reports what was removed and what was kept. The deletion E2E + the battery isolation pin lock the behavior in.

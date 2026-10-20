@@ -54,6 +54,7 @@ function makeApi(cookie: string) {
 // The full route/method map (grep-verified against src/app/api/**/route.ts).
 const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api", methods: ["GET"] },
+  { path: "/api/account", methods: ["DELETE"] },
   { path: "/api/arcade", methods: ["GET"] },
   { path: "/api/arcade/boss", methods: ["GET", "POST"] },
   { path: "/api/arcade/duel", methods: ["GET", "POST"] },
@@ -103,7 +104,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
 ];
 
 const GATED = ["/api/coach-agent", "/api/shop", "/api/feedback"]; // 401 to anonymous by design
-const AUTH_ROUTES = ["/api/auth/request-code", "/api/auth/verify", "/api/auth/session", "/api/auth/google/start", "/api/auth/google/callback"];
+const AUTH_ROUTES = ["/api/auth/request-code", "/api/auth/verify", "/api/auth/session", "/api/auth/google/start", "/api/auth/google/callback", "/api/account"]; // swept in the login/deletion sections - the authed sweep must NOT DELETE the main session's account
 
 try {
   // ================= 1. ANONYMOUS SWEEP =================
@@ -199,6 +200,38 @@ try {
     await db2.user.deleteMany({ where: { email: { in: [email2, emailA, emailB] } } });
     await db2.loginCode.deleteMany({ where: { email: { startsWith: "battery-" } } });
     await db2.$disconnect();
+  }
+
+  // --- account deletion (P1-9) ---
+  console.log("\n--- account deletion ---");
+  {
+    const emailD = `battery-del-${Date.now()}@rah.test`;
+    const apiD0 = makeApi("");
+    const rd = await apiD0("/api/auth/request-code", { method: "POST", body: JSON.stringify({ email: emailD }) });
+    const codeD = rd.body?.devCode as string | undefined;
+    const verD = await apiD0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailD, code: codeD }) });
+    check(verD.status === 200, "deletion setup: synthetic account registered", `status=${verD.status}`);
+    const cookieD = verD.setCookie?.split(";")[0] ?? "";
+    const apiD = makeApi(cookieD);
+    const del = await apiD("/api/account", { method: "DELETE" });
+    check(del.status === 200 && del.body?.ok === true, "DELETE /api/account removes the account", JSON.stringify(del.body).slice(0, 120));
+    check(del.body?.removed?.account === true, "deletion reports the account row", JSON.stringify(del.body?.removed));
+    check(typeof del.body?.notice === "string" && del.body.removed?.learnerState === false, "shared learner state honestly kept while other accounts remain", JSON.stringify(del.body?.notice).slice(0, 90));
+    const after = await apiD("/api/auth/session", { method: "GET" });
+    check(after.status === 200 && after.body?.user === null, "session dead after account deletion", JSON.stringify(after.body));
+    const gone = await apiD0("/api/auth/verify", { method: "POST", body: JSON.stringify({ email: emailD, code: "000000" }) });
+    check(gone.status === 400, "the deleted account's login codes are gone too", `status=${gone.status}`);
+
+    // Isolation: deleting account D must NOT touch the battery user's session.
+    const mainStill = await api("/api/auth/session", { method: "GET" });
+    check(
+      mainStill.status === 200 && mainStill.body?.user?.email === EMAIL,
+      "another account's deletion leaves the main session alive",
+      `status=${mainStill.status} user=${mainStill.body?.user?.email ?? "null"}`,
+    );
+    const { db: dbD } = await import("@/lib/db");
+    await dbD.user.deleteMany({ where: { email: emailD } }).catch(() => undefined);
+    await dbD.$disconnect();
   }
 
   // ================= 3. AUTHED SWEEP (hostile input: no 500s) =================

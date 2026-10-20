@@ -8,7 +8,7 @@
 // This is the "access anything, show anything on all tabs" surface.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut, FolderOpen, FileDown, Square } from "lucide-react";
+import { X, Send, GraduationCap, Wrench, Eye, BrainCircuit, FileText, ArrowRight, LogOut, FolderOpen, FileDown, Square, Trash2 } from "lucide-react";
 import { Chip, Btn } from "./ui";
 import { clearRahToken } from "@/lib/rah-fetch";
 import { getCoachActivity } from "@/lib/activity-store";
@@ -100,6 +100,8 @@ export default function CoachSidebar({
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [wsOpen, setWsOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -344,6 +346,49 @@ export default function CoachSidebar({
           </div>
           <div className="flex items-center gap-1.5">
             {state && <Chip tone="blue">{state.learner.gems ?? 0} gems</Chip>}
+            {confirmDelete ? (
+              <>
+                <button
+                  onClick={() => {
+                    if (deleting) return;
+                    setDeleting(true);
+                    void fetch("/api/account", { method: "DELETE" })
+                      .then((r) => r.json())
+                      .then((d: { ok?: boolean; removed?: { learnerState: boolean } }) => {
+                        clearRahToken();
+                        toast({
+                          title: "Account deleted",
+                          desc: d.removed?.learnerState
+                            ? "Everything was wiped: account, progress, reviews, files. The app is empty again."
+                            : "Your account is gone. Shared learner state kept (other accounts remain).",
+                        });
+                        onSignOut();
+                      })
+                      .catch(() => toast({ title: "Deletion failed", desc: "Try again in a moment." }));
+                  }}
+                  disabled={deleting}
+                  title="Really delete everything"
+                  className="rounded-lg px-2 py-1.5 text-[11px] font-bold text-[#ff6b6b] transition-colors hover:bg-[#ff6b6b]/10 disabled:opacity-50"
+                >
+                  {deleting ? "deleting…" : "really delete"}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  title="Keep my account"
+                  className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                title="Delete account - wipes everything for good"
+                className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-[#ff6b6b]/10 hover:text-[#ff6b6b]"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             <button
               onClick={() => {
                 void fetch("/api/auth/session", { method: "DELETE" }).then(() => {
