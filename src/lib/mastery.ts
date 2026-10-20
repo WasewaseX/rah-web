@@ -11,7 +11,7 @@
 //   today reads low again.
 // - Wilson lower bound (computed, never stored): a conservative success
 //   rate with uncertainty folded in. 2/2 correct is NOT 100% mastery - the
-//   bound says "at best 58%". This is what keeps three lucky answers from
+//   bound says ~34%. This is what keeps three lucky answers from
 //   retiring a weakness.
 
 import { db } from "@/lib/db";

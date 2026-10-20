@@ -5,14 +5,15 @@
 // priority ladder - so the learner's next move never depends on the LLM's
 // mood. Actions: review (due FSRS cards), drill (statistically weak tags),
 // test (hunt mistake families / close near-healed ones), teach (weakest
-// measured skill band).
+// measured skill band), unlock (closest curriculum gate).
 
 import { db } from "@/lib/db";
 import { dueCount, getLearner } from "@/lib/server";
 import { getMasteryView, type TagMasteryRow } from "@/lib/mastery";
 import { getSkillLevels } from "@/lib/agent/levels";
+import { computeCurriculum } from "@/lib/curriculum";
 
-export type NextActionKind = "review" | "drill" | "test" | "teach";
+export type NextActionKind = "review" | "drill" | "test" | "teach" | "unlock";
 
 export interface NextAction {
   action: NextActionKind;
@@ -112,6 +113,28 @@ export async function nextBestActions(): Promise<NextAction[]> {
       urgency: 0.45,
       command: `Teach me something new in ${w.skill}`,
     });
+  }
+
+  // 7. Curriculum frontier (feature #2): the closest unproven gate on the
+  //    B2->B2+->C1 map. Pure evidence math - same Wilson-bound ledger the
+  //    Progress page shows. Lowest urgency: the map guides when triage is
+  //    quiet, never overrides debt or danger.
+  if (actions.length < 4) {
+    const curriculum = computeCurriculum(
+      mastery.tags.map((t) => ({ tag: t.tag, ok: t.ok, no: t.no, ewma: t.ewma })),
+      skills.map((s) => ({ skill: s.skill, score: s.score, samples: s.samples })),
+    );
+    const frontier = curriculum.summary.frontier;
+    if (frontier) {
+      const unmet = frontier.evidence.find((e) => !e.proven);
+      actions.push({
+        action: "unlock",
+        target: frontier.node.title,
+        reason: unmet ? `closest gate on your curriculum map: ${unmet.detail}` : `closest gate on your curriculum map: ${frontier.node.blurb}`,
+        urgency: 0.4,
+        command: `Help me work toward ${frontier.node.title}`,
+      });
+    }
   }
 
   return actions.sort((a, b) => b.urgency - a.urgency).slice(0, 4);

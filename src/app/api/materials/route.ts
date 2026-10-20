@@ -70,6 +70,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: e instanceof Error ? e.message : "Import failed." }, { status: 400 });
     }
   }
+  // Anki .apkg import (feature #4 v2): the client base64s the package; the
+  // server unzips it (ZIP + SQLite via bun:sqlite) - deterministic, no model
+  // call, no context promise. Every refusal is a client-side problem: 400.
+  if (mode === "apkg") {
+    const dataB64 = String(body.dataB64 ?? "");
+    if (!dataB64) {
+      return NextResponse.json({ error: "Pick an .apkg file first." }, { status: 400 });
+    }
+    let buf: Uint8Array;
+    try {
+      buf = Uint8Array.from(Buffer.from(dataB64, "base64"));
+    } catch {
+      return NextResponse.json({ error: "The file data could not be decoded." }, { status: 400 });
+    }
+    try {
+      const { importDeckApkg } = await import("@/lib/materials");
+      const out = await importDeckApkg(title, buf);
+      return NextResponse.json({ ok: true, ...out });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Import failed." }, { status: 400 });
+    }
+  }
   // Honest client-side refusal BEFORE any model call (400: the request itself
   // is wrong). Provider failures later return 502.
   if (text.trim().length < 120) {

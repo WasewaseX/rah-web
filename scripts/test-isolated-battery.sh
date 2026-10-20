@@ -21,6 +21,12 @@ echo "== isolated battery =="
 echo "   db:     $DB"
 echo "   server: $BASE (dist: $DIST)"
 
+# The battery's auth-hardening/deletion sections register THROWAWAY fixture
+# accounts - the Task-48 deployment lock must be open for THIS test stack
+# only. Set here (not in .env): .env is machine-local and the lock must stay
+# ACTIVE by default for any real deployment (worklog Task 48 lesson).
+export RAH_OPEN_REGISTRATION=1
+
 rm -f db/battery-isolated.db
 DATABASE_URL="$DB" bunx prisma migrate deploy > /dev/null 2>&1
 echo "== throwaway db migrated =="

@@ -11,6 +11,16 @@ cd /home/z/my-project || exit 1
 export DATABASE_URL="file:/home/z/my-project/db/custom.db"
 export TELEMETRY_DISABLED=1
 
+# Disaster restore (Task 60 / Oct-20 incident): a workspace reprovision starts
+# from a fresh clone - the gitignored live db/ dies with it, and db:push below
+# would then boot an EMPTY learner ("First Words" achievement again). Restore
+# the git-tracked snapshot first so progress survives update waves.
+if [ ! -f db/custom.db ] && [ -f db/sync/rah-latest.db ]; then
+  echo "[rah-dev] boot: db/custom.db missing - restoring learner data from db/sync/rah-latest.db" | tee -a dev.log
+  cp -a db/sync/rah-latest.db db/custom.db
+  rm -f db/custom.db-wal db/custom.db-shm
+fi
+
 echo "[rah-dev] boot: installing dependencies"
 bun install >> dev.log 2>&1
 echo "[rah-dev] boot: syncing database schema"
@@ -25,6 +35,19 @@ CANARY="MistakeFamily"
 probe_db() {
   bun -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.$CANARY.count().then(c=>{console.log('canary-ok:'+c);process.exit(0)}).catch(e=>{console.log('canary-fail:'+e.code);process.exit(1)})" >/dev/null 2>&1
 }
+
+# Restore guard must fire on EVERY (re)start, not only platform boot: a
+# reprovision can wipe db/ while this supervisor is alive, and the next
+# restart would otherwise db:push an empty learner back into existence.
+restore_db() {
+  if [ ! -f db/custom.db ] && [ -f db/sync/rah-latest.db ]; then
+    echo "[rah-dev] $(date -Is) db/custom.db missing - restoring learner data from db/sync/rah-latest.db" >> dev.log
+    cp -a db/sync/rah-latest.db db/custom.db
+    rm -f db/custom.db-wal db/custom.db-shm
+  fi
+}
+restore_db
+
 for attempt in 1 2 3; do
   if probe_db; then
     echo "[rah-dev] boot: schema probe OK ($CANARY reachable)" >> dev.log
@@ -38,6 +61,7 @@ done
 FAILS=0
 while true; do
   # Clear anything squatting on the port from a previous generation.
+  restore_db
   pkill -f "next-server" 2>/dev/null
   pkill -f "next dev -p 3000" 2>/dev/null
   sleep 1

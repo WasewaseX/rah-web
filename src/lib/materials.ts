@@ -17,6 +17,7 @@ import { aiJson } from "@/lib/ai";
 import { buildProfile } from "@/lib/server";
 import { defaultState, dayIndex } from "@/lib/fsrs";
 import type { Card } from "@/lib/content";
+import { APKG_MAX_CARDS } from "@/lib/apkg";
 import { randomBytes } from "crypto";
 
 function newId(): string {
@@ -208,4 +209,42 @@ export async function importDeckCsv(title: string, csv: string): Promise<Extract
     await db.cardState.create({ data: { cardId, ...defaultState(), due: today } });
   }
   return { materialId, created: parsed.cards.length, degraded: false, reason: parsed.skipped ? `${parsed.skipped} row(s) skipped (empty, duplicate, or over the ${300}-row cap)` : undefined };
+}
+
+// Anki .apkg import (feature #4 v2): real Anki package exports become live
+// FSRS cards - same machinery as CSV, no AI, honest about what stays behind
+// (media refs and Anki's own scheduling state do not cross over).
+export async function importDeckApkg(title: string, buf: Uint8Array): Promise<ExtractionResult & { mediaRefs?: number }> {
+  const { parseApkg } = await import("@/lib/apkg");
+  const parsed = await parseApkg(buf);
+  if (parsed.cards.length === 0) {
+    throw new Error(`No usable cards found in the .apkg (${parsed.skipped} skipped: empty fronts/backs, duplicates, or the ${300}-card cap).`);
+  }
+  const materialId = `m_${newId()}`;
+  const today = dayIndex();
+  await db.material.create({
+    data: {
+      id: materialId,
+      title: title.trim().slice(0, 80) || "Imported Anki deck",
+      source: `Imported deck (Anki .apkg, ${parsed.format})`,
+      text: `(binary .apkg import - ${parsed.cards.length} cards from the collection)`,
+      words: parsed.cards.length,
+    },
+  });
+  for (const c of parsed.cards) {
+    const cardId = `mat:${newId()}`;
+    await db.materialCard.create({
+      data: { id: cardId, materialId, front: c.front, answer: c.back, context: "", note: "" },
+    });
+    await db.cardState.create({ data: { cardId, ...defaultState(), due: today } });
+  }
+  const bits = [parsed.skipped ? `${parsed.skipped} note(s) skipped (empty, duplicate, or over the ${APKG_MAX_CARDS}-card cap)` : ""];
+  if (parsed.mediaRefs > 0) bits.push(`${parsed.mediaRefs} media ref(s) left behind (audio/images do not import yet)`);
+  return {
+    materialId,
+    created: parsed.cards.length,
+    degraded: false,
+    reason: bits.filter(Boolean).join(", ") || undefined,
+    mediaRefs: parsed.mediaRefs,
+  };
 }

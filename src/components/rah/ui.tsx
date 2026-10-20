@@ -68,9 +68,11 @@ export function SectionHead({ kicker, title }: { kicker?: string; title: string 
 export function Chip({
   children,
   tone = "slate",
+  title,
 }: {
   children: ReactNode;
   tone?: "slate" | "emerald" | "amber" | "rose" | "blue" | "cyan" | "violet";
+  title?: string;
 }) {
   const tones = {
     slate: "bg-white/[0.06] text-[#b7c1d3] border-white/[0.08]",
@@ -83,6 +85,7 @@ export function Chip({
   } as const;
   return (
     <span
+      title={title}
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}
     >
       {children}

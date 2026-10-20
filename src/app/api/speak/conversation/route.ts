@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiJson, profileBlock } from "@/lib/ai";
+import { DEGRADED_CONVERSATION_LINE, degradedTurnPayload } from "@/lib/degraded";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
@@ -133,6 +134,11 @@ Rules:
 ${ladderBrief(lad, "speak")}`;
 
   let turnOut: { reply?: string; corrections?: { wrong?: string; right?: string; fa?: string; trap?: string }[] };
+  // Degraded honesty (audit P1-7): the () => ({}) fallback used to render a
+  // silent "..." coach line - degraded content presented as if the partner
+  // really spoke. Track it, swap in the honest in-scene placeholder line, and
+  // flag the turn so the UI can banner it.
+  let degradedFallback = false;
   try {
     turnOut = await aiJson<{ reply?: string; corrections?: { wrong?: string; right?: string; fa?: string; trap?: string }[] }>(
       system + "\n\n" + profileBlock(profile),
@@ -147,13 +153,19 @@ ${ladderBrief(lad, "speak")}`;
         },
       ],
       () => ({}),
-      { deep: false, temperature: 0.7 },
+      {
+        deep: false,
+        temperature: 0.7,
+        degraded: () => {
+          degradedFallback = true;
+        },
+      },
     );
   } catch (e) {
     return NextResponse.json({ error: `Coach is unreachable: ${(e as Error).message}` }, { status: 502 });
   }
 
-  const coachLine = String(turnOut.reply ?? "").trim() || "...";
+  const coachLine = degradedFallback ? DEGRADED_CONVERSATION_LINE : String(turnOut.reply ?? "").trim() || "...";
   const corrections = (Array.isArray(turnOut.corrections) ? turnOut.corrections.slice(0, 2) : []).map((c) => ({
     wrong: String(c.wrong ?? "").slice(0, 120),
     right: String(c.right ?? "").slice(0, 120),
@@ -197,5 +209,5 @@ ${ladderBrief(lad, "speak")}`;
     });
   }
 
-  return NextResponse.json({ coachLine, corrections, done, report });
+  return NextResponse.json({ coachLine, corrections, done, report, ...(degradedFallback ? degradedTurnPayload() : {}) });
 }

@@ -92,3 +92,10 @@ data/coach-workspace/
 # isolated-battery stack (Task 52)
 .next-battery/
 db/battery-isolated.db*
+
+# Task 60 deploy-pipeline artifacts - never commit or package these
+db/admin-token
+db/backups/
+db/*.stats.json
+db/*.snapshot-*.tmp
+scripts/out/*.db

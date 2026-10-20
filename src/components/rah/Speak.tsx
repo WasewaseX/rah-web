@@ -161,6 +161,7 @@ function ConversationDrill({ onChange }: { onChange: () => void }) {
   const [transcript, setTranscript] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [aiDown, setAiDown] = useState(false); // degraded honesty (audit P1-7)
   const [report, setReport] = useState<{ scores: Record<string, number>; turns: number; corrections: number } | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const hasSpeech = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
@@ -190,6 +191,7 @@ function ConversationDrill({ onChange }: { onChange: () => void }) {
     setTranscript("");
     setReport(null);
     setError("");
+    setAiDown(false);
     say(s.opening);
   };
 
@@ -243,6 +245,7 @@ function ConversationDrill({ onChange }: { onChange: () => void }) {
           onChange();
           return;
         }
+        setAiDown(Boolean(j.degraded));
         setTurns((t) => [...t, { you, coach: j.coachLine ?? "...", corrections: j.corrections ?? [] }]);
         setTranscript("");
         say(String(j.coachLine ?? ""));
@@ -295,6 +298,11 @@ function ConversationDrill({ onChange }: { onChange: () => void }) {
       </div>
 
       <div className="mt-4 flex flex-col gap-3">
+        {aiDown && (
+          <Note tone="amber">
+            The AI scene partner dropped mid-scene, so its last reply is a placeholder. Send your next line and it tries again - nothing about your progress is fake.
+          </Note>
+        )}
         {turns.map((t, i) => (
           <div key={i} className="flex flex-col gap-2">
             {t.coach && (

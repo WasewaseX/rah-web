@@ -4,7 +4,7 @@
 // per skill leak rate, writing and speaking score trends, coach advice.
 
 import { useEffect, useRef, useState } from "react";
-import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart, Scale, Compass } from "lucide-react";
+import { Flame, TrendingUp, Target, Snowflake, Radar as RadarIcon, LineChart, Scale, Compass, Map } from "lucide-react";
 import { Card, Chip, Note, Bar, Btn } from "./ui";
 import { handCoach } from "@/lib/bus";
 import { Radar, AccuracyTimeline } from "./WarRoom";
@@ -422,6 +422,9 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       {/* Effectiveness: the honest outcome read (review wave 7.4/10) */}
       <EffectivenessPanel />
 
+      {/* CEFR curriculum graph: the road from B2 to C1 with proven-only gates */}
+      <CurriculumPanel />
+
       {/* Writing portfolio: every graded essay + the growth diff */}
       <Portfolio />
 
@@ -625,6 +628,105 @@ function EffectivenessPanel() {
             Mistake-memory healing: {o.families.active} active famil{o.families.active === 1 ? "y" : "ies"}, {o.families.resolved} retired by two clean exam hits ({o.families.retirementRate}% retirement rate).
           </p>
         )}
+      </Card>
+    </div>
+  );
+}
+
+// CEFR curriculum graph (audit feature #2): the road B2 -> B2+ -> C1 as a
+// prerequisite graph with PROVEN-ONLY mastery gates. Every gate reads the
+// same numbers the rest of this page shows (Wilson-bound tag ledger, measured
+// skill bands) - the graph never says "done" on vibes, and locked nodes say
+// exactly which prerequisite is holding them.
+interface CurriculumPayload {
+  nodes: {
+    node: { id: string; band: string; kind: string; title: string; blurb: string };
+    status: "locked" | "available" | "in_progress" | "mastered";
+    blockers: string[];
+    evidence: { label: string; proven: boolean; detail: string }[];
+  }[];
+  summary: {
+    frontier: { node: { id: string; title: string; band: string } } | null;
+    mastered: number;
+    available: number;
+    locked: number;
+    line: string;
+  };
+}
+
+const BAND_LABEL: Record<string, string> = { B2: "B2 - close the interference core", "B2+": "B2+ - integrate it", C1: "C1 - precision" };
+const STATUS_STYLE: Record<string, { chip: "emerald" | "blue" | "amber" | "slate"; label: string }> = {
+  mastered: { chip: "emerald", label: "proven" },
+  in_progress: { chip: "amber", label: "in progress" },
+  available: { chip: "blue", label: "open" },
+  locked: { chip: "slate", label: "locked" },
+};
+
+function CurriculumPanel() {
+  const [c, setC] = useState<CurriculumPayload | null>(null);
+  useEffect(() => {
+    fetch("/api/curriculum", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => (j.nodes ? setC(j) : setC(null)))
+      .catch(() => setC(null));
+  }, []);
+  if (!c || c.nodes.length === 0) return null;
+  const bands = ["B2", "B2+", "C1"].filter((b) => c.nodes.some((n) => n.node.band === b));
+  return (
+    <div className="rah-rise">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-extrabold tracking-tight text-[#f2f5fa]">
+            <Map className="h-4 w-4 text-[#9dc0ff]" /> Curriculum map
+          </div>
+          <Chip tone="blue">
+            {c.summary.mastered}/{c.nodes.length} gates proven
+          </Chip>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-[#a9b4c6]">{c.summary.line}</p>
+        <div className="mt-4 flex flex-col gap-4">
+          {bands.map((band) => (
+            <div key={band}>
+              <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-[#7d889c]">{BAND_LABEL[band] ?? band}</div>
+              <div className="flex flex-col gap-2">
+                {c.nodes
+                  .filter((n) => n.node.band === band)
+                  .map((n) => {
+                    const st = STATUS_STYLE[n.status] ?? STATUS_STYLE.available;
+                    const isFrontier = c.summary.frontier?.node.id === n.node.id;
+                    return (
+                      <div
+                        key={n.node.id}
+                        className={`rounded-2xl px-4 py-3 ${isFrontier ? "border border-[var(--rah-primary)]/45 bg-[var(--rah-primary)]/[0.07]" : "bg-[#171c28]"}`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-[#e7ecf5]">{n.node.title}</span>
+                          <Chip tone={st.chip}>{st.label}</Chip>
+                          {isFrontier && <Chip tone="violet">next gate</Chip>}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-[#7d889c]">{n.node.blurb}</p>
+                        {n.blockers.length > 0 && (
+                          <p className="mt-1.5 text-xs leading-relaxed text-[#8b96a9]">
+                            Opens when proven: <span className="font-bold text-[#a9b4c6]">{n.blockers.join(", ")}</span>
+                          </p>
+                        )}
+                        {n.status !== "locked" && n.evidence.length > 0 && (
+                          <div className="mt-2 flex flex-col gap-1">
+                            {n.evidence.map((e) => (
+                              <div key={e.label} className="flex flex-wrap items-baseline gap-x-2 text-[11px] leading-relaxed">
+                                <span className={e.proven ? "font-bold text-[#7fe0ac]" : "font-bold text-[#ffb02e]"}>{e.proven ? "\u2713" : "\u25CB"} {e.label}</span>
+                                <span className="text-[#7d889c]">{e.detail}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );
