@@ -779,3 +779,19 @@ Work Log:
 
 Stage Summary:
 - Schema changes now have a real lifecycle: versioned SQL migrations, deploy-only in CI, and data-loss pushes require the explicit :force script. The audit's "particularly dangerous if accidentally used as a production deployment procedure" is dead: the default path no longer carries --accept-data-loss anywhere.
+
+---
+Task ID: 48
+Agent: Super Z (main)
+Task: P0-1 learner data isolation - the audit's sanctioned alternative: enforce the private single-user deployment instead of letting multiple accounts share the singleton Learner.
+
+Work Log:
+- The architecture fact (audit-confirmed): Learner is a singleton (id "me"), CardState/ReviewLog keyed globally, review routes operate on the singleton with no user scoping. Full per-user scoping = every learning model gets userId + every query scoped = the mega-update.
+- DEPLOYMENT LOCK implemented (auth.ts): registrationLocked() - once one User exists, NEW registrations are refused with the honest owner-facing message "This Rah deployment is private and already claimed..." unless RAH_OPEN_REGISTRATION=1 is explicitly set (documented: multi-user then ON but learner state shared). Gates verifyLoginCode's user-creation branch (existing accounts re-logging in are unaffected) and upsertGoogleUser; the Google callback catches the refusal and surfaces it as a real message instead of a 500.
+- .env (gitignored, dev-only): RAH_OPEN_REGISTRATION=1 so the battery/E2E toolchain keeps its throwaway multi-user fixtures. Production deployments leave it unset => the lock is ACTIVE by default.
+- TEST ENV LESSON (cost 3 iterations, recorded for good): bun auto-loads .env AND @prisma/client re-loads it (non-overriding) on first import - DELETING process.env.RAH_OPEN_REGISTRATION in a test lets dotenv re-populate it as "1", silently disabling the lock. Production simulation = set the var to EMPTY STRING ("" !== "1"; existing vars are never overridden by dotenv). Found by intercepting db.user.count inside the running function.
+- Test architecture note: a second next-dev instance on another port cannot boot (Turbopack locks the shared .next/dev/lock) - the lock is therefore integration-tested at the lib level against a THROWAWAY migrated DB (scripts/test-deployment-lock.ts, fresh db via the Task-47 migrate deploy path).
+- Gates: DEPLOYMENT LOCK 6/6 (first account claims; second refused with the message; owner re-login unaffected; RAH_OPEN_REGISTRATION=1 opens registration), battery 293/293, tsc clean.
+
+Stage Summary:
+- The isolation hole is closed for real deployments: a second account can no longer silently share the learner's brain. Registration is first-come-claimed by default, multi-user requires an explicit documented env opt-in, and the refusal message tells the truth. The full per-user scoping (userId on every learning model + scoped queries + two-user route tests) stays the tracked mega-update item.

@@ -24,7 +24,14 @@ export async function GET(req: Request) {
   const profile = await exchangeGoogleCode(code, origin);
   if (!profile) return fail("Google token exchange failed");
 
-  const user = await upsertGoogleUser(profile);
+  let user;
+  try {
+    user = await upsertGoogleUser(profile);
+  } catch (e) {
+    // The deployment lock refuses a second account - surface it as a real
+    // message instead of a 500.
+    return fail(e instanceof Error ? e.message : "Sign-in failed");
+  }
   const token = randomBytes(32).toString("hex");
   const { db } = await import("@/lib/db");
   const { hashToken } = await import("@/lib/auth");

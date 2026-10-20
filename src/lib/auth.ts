@@ -98,6 +98,18 @@ export interface VerifyResult {
   user?: { id: string; email: string; name: string; provider: string; isNew: boolean };
 }
 
+// DEPLOYMENT LOCK (data isolation, P0-1): the learning state is a singleton
+// (Learner id "me") - two accounts would share one brain. Until the per-user
+// scoping mega-update lands, the audit's sanctioned alternative applies: the
+// deployment is private and single-user. The FIRST account to register claims
+// it; further registrations are refused unless RAH_OPEN_REGISTRATION=1 is set
+// explicitly (multi-user is then ON but learner state is shared - documented).
+export async function registrationLocked(): Promise<boolean> {
+  if (process.env.RAH_OPEN_REGISTRATION === "1") return false;
+  const users = await db.user.count();
+  return users >= 1;
+}
+
 export async function verifyLoginCode(rawEmail: string, rawCode: string): Promise<VerifyResult> {
   const email = normalizeEmail(rawEmail);
   const code = String(rawCode ?? "").trim();
@@ -136,6 +148,12 @@ export async function verifyLoginCode(rawEmail: string, rawCode: string): Promis
   let user = await db.user.findUnique({ where: { email } });
   const isNew = !user;
   if (!user) {
+    // Deployment lock: once one account exists, no second one may register
+    // (the learner state is a singleton). Existing accounts re-logging in are
+    // unaffected - the gate only fires on FIRST registration.
+    if (await registrationLocked()) {
+      return { ok: false, error: "This Rah deployment is private and already claimed. New sign-ups are disabled by the owner." };
+    }
     user = await db.user.create({ data: { email, name: email.split("@")[0], provider: "email" } });
   }
 
@@ -294,6 +312,10 @@ export async function upsertGoogleUser(profile: GoogleProfile): Promise<{ id: st
   const email = normalizeEmail(profile.email);
   let user = await db.user.findUnique({ where: { email } });
   if (!user) {
+    // Same deployment lock as the email-code path (single-user enforcement).
+    if (await registrationLocked()) {
+      throw new Error("This Rah deployment is private and already claimed. New sign-ups are disabled by the owner.");
+    }
     user = await db.user.create({ data: { email, name: profile.name, provider: "google" } });
   }
   return { id: user.id, email: user.email, name: user.name };
