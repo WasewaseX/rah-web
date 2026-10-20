@@ -887,3 +887,16 @@ Work Log:
 
 Stage Summary:
 - The audit's top pick is shipped and gated: a learner can now bring their own article/email/notes and get contextual review cards that ride the same scheduler, budget, and badge truth as the built-in deck. Extraction is validated against the source text deterministically - the "with source context" promise is enforced in code, not hoped for from the model.
+
+---
+Task ID: 54b
+Agent: Super Z (main)
+Task: Migration lifecycle for the Task-54 schema change (the Task-47 process applied).
+
+Work Log:
+- prisma/migrations/0002_materials/migration.sql generated as a schema diff vs the pre-materials datamodel (Material + MaterialCard tables + indexes).
+- GAP FOUND BY THE PROCESS: the hand-baselined migrations dir had no migration_lock.toml - `migrate diff --from-migrations` refuses without it. Lock file added (provider sqlite).
+- Live DB baseline-resolved (0002 marked applied). REPRODUCIBILITY RE-PROVEN: fresh-DB deploy of the full chain then `migrate diff --from-url ... --to-schema-datamodel` reports "No difference detected".
+
+Stage Summary:
+- The Task-47 migration lifecycle holds under its first real schema change: versioned SQL, baseline-resolved live DB, deploy-reproducible chain, CI's db:deploy stays correct.
