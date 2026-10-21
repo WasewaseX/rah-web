@@ -140,6 +140,26 @@ fi
 PROJECT_DIR="$NEXTJS_PROJECT_DIR" BUILD_DIR="$BUILD_DIR" \
     bash "$SCRIPT_DIR/python-runtime-build.sh"
 
+# ── 数据保全（Oct-20 事故修复）─────────────────────────────────────────────
+# 部署容器的 SQLite 文件是易失的：每次更新都用打包产物整包替换容器，学习者
+# 的真实进度只存在于容器内的 db/custom.db。打包前必须先把线上数据库回拉到
+# 工作区，否则新包会带着旧快照覆盖学习者进度（"又回到 first words 成就"）。
+# 回拉失败策略：
+#   exit 3（旧包没有 /api/admin/db）/ exit 4（线上不可达）→ 告警并退回工作区快照
+#   其他失败（token 不匹配 / 下载文件校验不过）→ 立即终止构建，绝不静默覆盖
+PULL_BASE="${PREVIEW_URL:-https://preview-chat-d027ce73-8b7f-4fc0-910a-b2c665a663c0.space-z.ai/}"
+echo "🔄 回拉线上数据库（数据保全）: $PULL_BASE"
+set +e
+bash "$NEXTJS_PROJECT_DIR/scripts/db-pull.sh" "$PULL_BASE" "$NEXTJS_PROJECT_DIR/db/custom.db"
+PULL_EXIT=$?
+set -e
+case "$PULL_EXIT" in
+  0)   echo "✅ 线上数据库已回拉，本次打包将携带学习者最新进度" ;;
+  3|4) echo "⚠️  无法回拉线上数据库 (exit $PULL_EXIT)，退回使用工作区快照（首次部署或线上不可达属正常）" ;;
+  *)   echo "❌ 数据库回拉失败 (exit $PULL_EXIT)：继续打包会用旧数据覆盖学习者进度，构建终止"
+       exit 1 ;;
+esac
+
 # 有 Preview 数据库时复制现有数据；没有时直接在部署产物中初始化空库。
 # 模板源码不携带 db/custom.db，不能依赖 dev.sh 必须在 Deploy 前成功运行过。
 PROJECT_DIR="$NEXTJS_PROJECT_DIR" BUILD_DIR="$BUILD_DIR" \

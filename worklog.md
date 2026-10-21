@@ -933,6 +933,114 @@ Stage Summary:
 ---
 Task ID: 57
 Agent: Super Z (main)
+NUMBERING NOTE (added at merge, 2026-10-22): two parallel clones both numbered their next wave 57. The Oct-20 clone: 57 = degraded states, 58 = curriculum graph, 59 = .apkg import, 60/61 = data survival. The Oct-21 clone (this workspace): 57-bis = data-guard. Chronological order preserved.
+Task: Stage 02 close-out - honest degraded states everywhere (audit P1-7, the last open P1).
+
+Work Log:
+- src/lib/degraded.ts (new): pure, battery-pinned helpers - fallbackBrief(enginePlan, persona) words the ENGINE's real moves deterministically when the AI Director is unreachable (the Director's contract was always "re-voice the engine plan, never invent moves"); DEGRADED_CONVERSATION_LINE = an in-scene, speakable placeholder ("connection broke" is true in nearly every scene); degradedTurnPayload() = the honest banner text.
+- /api/coach/briefing GET: aiJson is now wrapped - a provider outage used to throw into an unhandled 500, which the client swallowed into the misleading "The Director had nothing worth saying" empty state. Now: engine-worded degraded brief, cached with its degraded flag inside the stored JSON (bounded calls; Re-brief retries the AI), top-level degraded boolean in every response.
+- Briefing.tsx: amber "AI offline: engine-built plan" chip (title = the honest notice) replaces "cached for today" while degraded; empty-state copy no longer lies. Chip gained an optional title prop (ui.tsx).
+- /api/speak/conversation POST: the () => ({}) fallback used to render a SILENT "..." coach line - degraded content presented as if the partner really spoke. Now the degraded callback swaps in the in-scene placeholder line and the response carries degraded + degradedNotice.
+- Speak.tsx ConversationDrill: amber Note banner when the AI dropped ("its last reply is a placeholder - send your next line and it tries again - nothing about your progress is fake"); state resets on scene pick and self-heals on the next healthy turn.
+- TOOLCHAIN FIX found by the battery run: scripts/test-isolated-battery.sh now exports RAH_OPEN_REGISTRATION=1 for the throwaway stack itself. The Task-48 contract had this var in gitignored .env, which is machine-local and got lost - fixture registrations then died on the deployment lock ("already claimed") both on :3000 (correct lock behavior vs the real claimed db) and on the fresh throwaway db. The script is now self-sufficient; production defaults stay LOCKED.
+- Battery section "degraded honesty" (10 pins): notice honesty, priority/plan follow the engine's real moves, empty-plan defaults, parenthetical-reason stripping, no em dashes, payload shape, and the live briefing contract (200 + brief + degraded flag + exactly 3 plan moves). Battery 352 -> 362.
+
+Stage Summary:
+- Audit P1-7 is CLOSED: every surface that can serve non-AI content now says so in the learner's language, at the moment it happens. Stage 02 (trustworthy learning) is 5/5. The outage path no longer bricks the dashboard's first screen - it degrades to the engine's real plan, clearly labeled.
+
+---
+Task ID: 58
+Agent: Super Z (main)
+Task: Stage 03 feature #2 - the CEFR curriculum graph (B2 -> B2+ -> C1) with prerequisites and proven-only mastery gates.
+
+Work Log:
+- src/lib/curriculum.ts (new, PURE - no db import): 18 nodes across three bands. B2 closes the Farsi-interference core (articles, countability/plurals, copula/statives, prepositions, perfect, question order, sentence shape, the five sound fixes); B2+ integrates (collocations, register, hedging, writing/speaking/listening proofs); C1 adds precision (precise verbs, register under pressure, writing/speaking mastery). Prerequisites encode real dependency logic (collocations need word choice, register needs collocations; the summit C1 nodes pull the whole graph).
+- Gates are PROVEN-ONLY, same statistics as the ledger: a tag needs Wilson lower bound >= 0.7 over >= 8 graded attempts (2/2 lucky answers are honestly capped at ~34%); a skill needs score >= 0.7 over >= 5 measured samples. Node states: locked (prereq unproven, names the blocker) / available / in_progress / mastered. Frontier = the closest open gate in band order. Import-time DAG guard: cycles, duplicate ids, and unknown prereq ids throw immediately.
+- GET /api/curriculum: renders the graph from the learner's REAL TagMastery + SkillLevel rows. No AI, fully deterministic.
+- Progress.tsx CurriculumPanel: three band groups, status chips (proven/in progress/open/locked), "next gate" marker on the frontier, honest evidence lines per requirement, locked nodes say exactly which prerequisite holds them.
+- Engine wiring (next-best.ts): new "unlock" action kind - the frontier's weakest requirement surfaces as the lowest-urgency next-best action with its honest evidence as the reason. The map now guides the coach, not just the Progress page.
+- Battery: route registered in the sweep map + 16 deterministic pins - gate honesty (2/2 != mastery, 34% bound; 60% record never passes; 10/10 proves), prerequisite locking + opening, frontier climbing to B2+, skill-gate sample minimum, fresh-learner layout, route shape, unlock kind in state. Battery 362 -> 380. Fixed a stale comment in mastery.ts (2/2 Wilson bound is ~34%, not 58%).
+- E2E (scripts/e2e-task58-curriculum.mjs, real browser on a throwaway stack, RAH_OPEN_REGISTRATION=1 exported by the script itself): 10/10 - login -> Progress -> Curriculum map card renders -> three bands -> next-gate marker -> open/locked chips -> prerequisite names -> honest threshold lines -> summary line.
+
+Stage Summary:
+- Feature #2 is shipped: the learner's road from B2 to C1 is a visible, prerequisite-locked graph whose every claim is a measured number from the same ledger the coach uses. The audit's "mastery gates" ask is operational: the frontier drives a real next-best action. Nothing in the graph can say "done" without Wilson-bound proof.
+
+---
+Task ID: 59
+Agent: Super Z (main)
+Task: Stage 04 lead item - real Anki .apkg package import (feature #4 complete: export TSV + import CSV/TSV + import .apkg).
+
+Work Log:
+- src/lib/apkg.ts (new): zero-dependency .apkg reader - a minimal ZIP central-directory parser (stored + deflate entries via node:zlib inflateRaw) + a runtime-adaptive SQLite reader. RUNTIME LESSON: `next dev` runs the server under NODE (node .../next dev), while package.json's start runs it under BUN - bun:sqlite exists only under bun, node:sqlite only under node. parseApkg tries node:sqlite (DatabaseSync) and falls back to bun:sqlite ONLY on a missing-module error (a corrupt collection surfaces its own error, never a masked double failure).
+- Honest boundaries stated in errors, not guesses: Anki 2.1.50+ compressed collections (collection.anki21b) are refused with the exact Anki re-export instruction ("Support older Anki versions"); 8 MB / 300-card caps; media refs ([sound:], <img>) are COUNTED and reported, never silently dropped; Anki's own FSRS state does NOT import - cards enter Rah's queue as new so Rah's scheduler builds honest intervals.
+- Parsing: first two note fields (Basic), cloze notes become blanked cards ({{c1::answer::hint}} -> "___" + answer, same convention as CSV passthrough), HTML stripped from faces, entities decoded, dedupe by front, 1-field notes skipped. importDeckApkg rides the exact Material/MaterialCard/CardState machinery as CSV/BYO.
+- POST /api/materials mode=apkg ({title, dataB64}): deterministic 400s (garbage bytes, zip without collection, .anki21b-only, missing data) before anything else happens.
+- MaterialsPanel: third mode "Anki package (.apkg)" with a real file picker, cap/honesty note in the form.
+- Battery: buildZip() fixture writer (stored-entry ZIP, crc32) builds a BYTE-TRUE .apkg in-memory (bun:sqlite collection: plain + HTML + sound-ref + cloze + 1-field + dup notes) -> 11 pins (created 4/skipped 2 honest, HTML stripped, cloze blanked, queue reachability, clean deletion, three 400 refusals). Battery 380 -> 391.
+- E2E (scripts/e2e-task59-apkg.mjs, real browser on a throwaway stack, fixture built with node:sqlite): 5/5 - file picker -> import -> honest count message -> apkg source row -> detail answers -> cloze answer -> queue reachability.
+- Hygiene: db/battery-isolated.db untracked + gitignored (it changes on every battery run and dirtied the tree).
+
+Stage Summary:
+- Feature #4 is COMPLETE: Anki interop is now round-trip-honest - export as Anki-dialect TSV (Task 42), import CSV/TSV (Task 55), and import real .apkg packages (this task), all landing in the same FSRS queue with the same badge/budget truth as the built-in deck. The only honest limit left: Anki's new compressed format needs the legacy-export checkbox, and the app says exactly that.
+
+---
+Task ID: 60
+Agent: Super Z (main)
+Task: P0 - learner data must survive updates. User reported "First Words achievement again" after the Tasks 57-59 update wave; evaluator had marked "Safe database migrations: Done". Root-cause the wipe, fix it at every layer, prove it with a drill.
+
+Work Log:
+- Root cause PROVEN, not guessed: (1) preview URL is a tunnel to THIS workspace's dev server - /api/version fingerprints identical (same SHA, same startedAt, ~150ms apart); (2) the live learner DB is the gitignored db/custom.db; (3) update waves reprovision the workspace from git - this workspace was a Task-56-era clone while remote main already had Tasks 57-59 (curriculum.ts/apkg.ts absent locally, present on remote); (4) a reprovision is a fresh clone -> gitignored db/ dies -> dev.sh's db:push boots an EMPTY learner -> achievements re-fire. The Oct-10 comment in dev.sh (volume restore rolled the DB back) shows the same failure class struck before.
+- Why the evaluator missed it: Task 47 made SCHEMA migrations versioned/reproducible; schema safety != data persistence across environment rebuilds.
+- Fix layer 1 (survival copy): scripts/db-sync.sh - sqlite3 online backup of db/custom.db -> db/sync/rah-latest.db, SCRUBS Session + LoginCode rows (progress restores, credentials never hit git history), commits + pushes. Tracked in git (the only store that provably survives reprovision).
+- Fix layer 2 (restore-on-boot): .zscripts/dev.sh restore_db() fires at boot AND on every supervisor restart (a wipe-while-running would otherwise db:push an empty learner back into existence on the next restart); scripts/ensure-server.sh restores before reviving. FC packaging seeds from the snapshot when the workspace DB is gone (.zscripts/database-runtime-build.sh).
+- Fix layer 3 (FC/deploy guard): GET /api/admin/db (VACUUM INTO consistent snapshot download) + GET /api/admin/stats (state fingerprint), guarded by src/lib/admin-token.ts (timing-safe Bearer compare; token = RAH_ADMIN_TOKEN env or db/admin-token file packaged next to the DB; unconfigured -> 404 so nothing leaks). .zscripts/build.sh PULLS the live DB before packaging: 404/unreachable -> warn + fall back (first-deploy case); auth failure or invalid download -> ABORT the build (stale data must never silently overwrite real data). scripts/deploy.sh: pre-pull -> push -> wait for preview freshness (SHA match) -> post-deploy stats diff (xp/streak/reviews/users may never drop; regression = loud failure) -> mirror refresh -> db-sync.
+- Fix layer 4 (backups): every pre-pull swap archives the previous DB to db/backups/pre-pull-*.db (newest 20 kept); db-pull removes stale -wal/-shm after swap and bounces the local dev server (fd->old-inode hazard).
+- Tests: scripts/test-admin-db-route.ts 16/16 (locked-404, wrong-bearer-401, valid standalone snapshot, stats fingerprint, env-token path, no temp leakage; found+fixed a tuple-vs-list assert in the test itself). tests/database-runtime-build.sh extended: admin-token packaged, backups/sync/stats-json/tmps excluded. bash -n on all 9 touched scripts.
+- Rebase: this workspace was BEHIND remote (Tasks 57-59 existed only on origin). stash -u -> pull --rebase -> stash pop; merged tree has curriculum + apkg back. Verified battery-isolated.db untracking landed via Task 59.
+- Gates on the merged tree: tsc --noEmit clean, eslint clean, admin route tests 16/16, packaging tests pass, FULL ISOLATED BATTERY 391/391.
+- Restore drill (the acceptance test): killed supervisors, MOVED db/custom.db away (simulated reprovision), ran ensure-server -> "db/custom.db missing - restoring learner data from db/sync/rah-latest.db" -> boot -> stats show xp=10/streak=1/reviews=2/achievements=1/users=1 intact. PASS.
+- Live verification: /api/admin/db 401 without token, 401 wrong token, 200 correct token on the running server; first snapshot committed (d1cf9fd) and pushed.
+- Ops state: watchdog relaunched with hourly db-sync; platform-owned dev.sh picks up restore_db on its next platform restart.
+- Hygiene: .gitignore += db/admin-token, db/backups/, db/*.stats.json, db/*.snapshot-*.tmp (snapshot itself stays tracked); db-sync --no-git flag bug fixed ($2->$1).
+- Docs: ROADMAP-AUDIT.md created (incident post-mortem + standing checklist reconciling the evaluator's Oct-20 tables with what actually broke); ROADMAP-STATUS.md critical-fix #5 amended (persistence hole closed) + Task 60 velocity row + gate status.
+
+Stage Summary:
+- The P0 is closed with evidence: learner data now survives workspace reprovisioning (the actual wipe mechanism), FC-style container replacement (pull-before-package), and bad deploys (post-verify refuses to bless a regression). Four independent layers, each with a test or a drill. Residual risk honestly documented: a surprise reprovision can still lose <=1h of progress (watchdog cadence); PostgreSQL remains the structural fix when Rah goes multi-user.
+
+---
+
+Task ID: 61
+Agent: Super Z (main)
+Task: SECOND data-wipe wave (20:28 reprovision, stale clone pre-dating the Task-60 fix): rebuilt the survival layer from scratch, merged it with the remote Task-60 layer, verified recovery limits.
+
+Work Log:
+- Forensics on live DB: Learner.createdAt = 2026-10-20T20:31:51Z; all history tables 0 rows; User re-registered 20:39; first_words re-earned 20:39:48; .env + prisma/migrations all stamped 20:28:42 -> environment rebuilt from git, and the DB was NOT in git (db/custom.db gitignored). Total data loss confirmed; achievement logic itself was idempotent (not the bug).
+- Built the data-survival layer: scripts/db-snapshot-core.ts (hygiene + SQLite VACUUM INTO, safe while server runs), scripts/db-snapshot.sh (content-aware sha256 skip, gzip ~6KB, keeps 10, in tracked backups/), scripts/db-restore.sh (restore-if-missing only), scripts/db-migrate-safe.sh (migrate deploy + P3005 baseline; NEVER reset/push-force), scripts/ensure-watchdog.sh.
+- Wired into ops paths: ensure-server.sh (restore -> migrate-safe -> snapshot -> watchdog self-start), deploy.sh (snapshot + commit before every push), watchdog.sh (daily autosnap + commit + push, loss window <= 1 day), .gitignore (backups state files only).
+- Disaster drill PASSED: snapshot -> deleted db/custom.db -> restore + baseline 0001/0002 (P3005 handled) -> byte-identical data (streak 1, xp 10, 2 reviews, first_words.at unchanged -> no re-fire).
+- GET /api/version now carries data provenance { createdAt, xp, streak, reviews, latestSnapshot } - instant tripwire if data ever resets (failure-isolated).
+- tsc --noEmit clean; eslint clean on touched files; server restarted through the full guard path; watchdog running (pid verified).
+- Created ROADMAP-AUDIT.md (incident record + 40-entry tracker summary + stage order); updated ROADMAP-STATUS.md (item 5 amended, new row 11 P0-11 DONE, velocity log, gate status).
+
+Stage Summary:
+- Root cause proven: only git-tracked files survive updates; the learner DB never was one. All pre-2026-10-20T20:31Z data is unrecoverable (no snapshot existed); honest about that.
+- From now on: every deploy snapshots + commits learner data first; boot restores it if missing; /api/version data.createdAt is the regression tripwire.
+- Next per audit guidance: single-vs-multi-user decision, then validated pronunciation assessment / authentic exam structures / effectiveness measurement - no feature sprawl.
+
+Work Log (Task 61 continuation - merge + gates):
+- Discovered remote already held a Task-60 fix (5156b4b) + db-sync snapshots (18:52/18:57/19:56); this workspace was a stale Task-56-era clone, which is exactly why the 20:28 reprovision wiped the DB again despite the fix being on GitHub.
+- Recovery check (honest): all remote snapshots POST-date wipe #1 (~18:16; the 19:56 snapshot has Learner.createdAt=18:16:57) -> pre-wipe history unrecoverable; snapshot not restored (not richer than live; would kill the learner's fresh session).
+- Merged origin/main (6 conflicts resolved): unified ensure-server (restore-if-missing preferring db/sync/rah-latest.db -> backups/ history -> db-migrate-safe with P3005 baseline; NEVER reset/db-push), merged watchdog (their hourly db-sync + my daily history push), merged deploy (their db-pull/freshness/stats-never-drop flow + my history snapshot at 2.5), docs unified in ROADMAP-AUDIT.md + ROADMAP-STATUS.md (Tasks 60+61).
+- Added scripts/session-start.sh: git sync + ensure-server as the FIRST session action (the stale-reprovision countermeasure).
+- Gates on merged tree: tsc clean, eslint clean, admin route tests 16/16, MERGED restore drill PASS (wipe confirmed -> restore from db/sync -> clean deploy -> byte-identical state, first_words untouched), FULL ISOLATED BATTERY 391/391, real db untouched.
+
+Stage Summary:
+- One coherent data-survival system from two independent fixes: freshness (hourly db/sync/rah-latest.db, scrubbed) + depth (daily backups/ history, keeps 10) + boot restore + deploy pre-pull/post-verify + /api/version data tripwire + session-start sync doctrine.
+- Honest limits: pre-Oct-20 history is gone forever; surprise reprovision can still cost <=1h of progress (PostgreSQL remains the structural fix at multi-user time); db/sync path scrubs sessions so a restore via that path costs one re-login (backups/ path keeps active sessions).
+
+---
+Task ID: 57-bis (data-guard wave - NUMBERING COLLISION: the parallel Oct-20 clone also used 57; that one is the Stage-02 close-out entry above)
+Agent: Super Z (main)
 Task: The learner's top-priority bug report - "first word achievement fired AGAIN after update" ("wtf happened to the supposedly safe database if it wont survive with updates") - plus the long-pending ROADMAP-AUDIT.md.
 
 Work Log:

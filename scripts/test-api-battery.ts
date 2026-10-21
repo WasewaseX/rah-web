@@ -72,6 +72,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/auth/request-code", methods: ["POST"] },
   { path: "/api/auth/session", methods: ["GET", "DELETE"] },
   { path: "/api/auth/verify", methods: ["POST"] },
+  { path: "/api/curriculum", methods: ["GET"] },
   { path: "/api/chat", methods: ["GET", "POST", "DELETE"] },
   { path: "/api/coach-agent", methods: ["POST"] },
   { path: "/api/coach/briefing", methods: ["GET", "POST"] },
@@ -785,6 +786,64 @@ try {
       check(empty.status === 400, "csv: header-only import refused honestly", JSON.stringify(empty.body).slice(0, 100));
     }
 
+    // --- Anki .apkg import (feature #4 v2) ---
+    console.log("\n--- apkg import ---");
+    {
+      // Build a REAL Anki collection in-memory with bun:sqlite, wrap it in a
+      // stored-entry ZIP via the lib's own writer - a byte-true .apkg fixture.
+      const { buildZip } = await import("@/lib/apkg");
+      const { Database } = await import("bun:sqlite");
+      const { mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const { tmpdir } = await import("node:os");
+      const dir = await mkdtemp(join(tmpdir(), "battery-apkg-"));
+      const dbPath = join(dir, "collection.anki2");
+      const sq = new Database(dbPath);
+      sq.run("CREATE TABLE notes (id INTEGER PRIMARY KEY, flds TEXT)");
+      const ins = sq.query("INSERT INTO notes (flds) VALUES (?)");
+      ins.run("What is the capital of France?\x1fParis");
+      ins.run("to <b>implement</b>\x1fto put a plan into action [sound:na.mp3]");
+      ins.run("{{c1::implement}} the plan\x1f"); // cloze: front blanked, back = the answer
+      ins.run("only one field"); // no back -> skipped
+      ins.run("dup\x1fone"); // valid: the FIRST dup row is a real card
+      ins.run("dup\x1ftwo"); // duplicate front -> skipped
+      sq.close();
+      const coll = new Uint8Array(await readFile(dbPath));
+      const zipBytes = buildZip([
+        { name: "collection.anki2", data: coll },
+        { name: "media", data: new TextEncoder().encode("{}") },
+      ]);
+      const b64 = Buffer.from(zipBytes).toString("base64");
+      const enc = new TextEncoder();
+
+      const imp = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "battery apkg", mode: "apkg", dataB64: b64 }) });
+      check(imp.status === 200 && imp.body?.created === 4, "apkg: import creates 4 cards (plain, html, cloze, first-dup)", JSON.stringify(imp.body).slice(0, 140));
+      check(String(imp.body?.reason ?? "").includes("2 note(s) skipped"), "apkg: skipped count is honest (1-field + duplicate)", JSON.stringify(imp.body?.reason));
+      check(String(imp.body?.reason ?? "").includes("media ref"), "apkg: media refs are counted and reported, not silently dropped", JSON.stringify(imp.body?.reason));
+
+      const detail = await api(`/api/materials?id=${imp.body.materialId}`);
+      const cards = detail.body?.cards ?? [];
+      const plain = cards.find((c: { front: string }) => c.front === "What is the capital of France?");
+      const htmlCard = cards.find((c: { front: string }) => c.front === "to implement");
+      const cloze = cards.find((c: { front: string }) => String(c.front).includes("___"));
+      check(!!plain && plain.answer === "Paris", "apkg: plain front/back survives", JSON.stringify(plain));
+      check(!!htmlCard && htmlCard.answer === "to put a plan into action" && !htmlCard.front.includes("<b>"), "apkg: HTML stripped from the face", JSON.stringify(htmlCard));
+      check(!!cloze && cloze.front === "___ the plan" && cloze.answer === "implement", "apkg: cloze note becomes a blanked card", JSON.stringify(cloze));
+      const qA = await api("/api/review/queue");
+      const apkgEntry = (qA.body?.batch ?? []).find((e: { card?: { unit?: string; prompt?: string } }) => e.card?.unit === "material" && e.card?.prompt === "What is the capital of France?");
+      check(!!apkgEntry, "apkg: imported card is reachable in the review queue");
+      const delA = await api(`/api/materials?id=${imp.body.materialId}`, { method: "DELETE" });
+      check(delA.status === 200 && delA.body?.removed === 4, "apkg: deletion removes all imported cards", JSON.stringify(delA.body));
+
+      const garbage = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg", dataB64: Buffer.from("not a zip at all").toString("base64") }) });
+      check(garbage.status === 400 && String(garbage.body?.error ?? "").includes("not a valid .apkg"), "apkg: garbage bytes refused honestly", JSON.stringify(garbage.body).slice(0, 100));
+      const noColl = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg", dataB64: Buffer.from(buildZip([{ name: "readme.txt", data: enc.encode("hi") }])).toString("base64") }) });
+      check(noColl.status === 400 && String(noColl.body?.error ?? "").includes("No Anki collection"), "apkg: zip without a collection refused honestly", JSON.stringify(noColl.body).slice(0, 100));
+      const missing = await api("/api/materials", { method: "POST", body: JSON.stringify({ title: "x", mode: "apkg" }) });
+      check(missing.status === 400, "apkg: missing file data refused", JSON.stringify(missing.body).slice(0, 80));
+      await rm(dir, { recursive: true, force: true });
+    }
+
     // --- suspend + daily pace (polish #1 completion) ---
     console.log("\n--- suspend + pace ---");
     {
@@ -822,6 +881,94 @@ try {
       check(bad.status === 400, "pace: non-numeric refused", JSON.stringify(bad.body));
       const mid = await api("/api/settings", { method: "POST", body: JSON.stringify({ newPerDay: 10 }) });
       check(mid.status === 200 && mid.body?.newPerDay === 10 && mid.body?.clamped === false, "pace: 10 stays 10, no clamp flag", JSON.stringify(mid.body));
+    }
+
+    // --- degraded honesty (audit P1-7 close-out) ---
+    console.log("\n--- degraded honesty ---");
+    {
+      const { fallbackBrief, DEGRADED_CONVERSATION_LINE, degradedTurnPayload } = await import("@/lib/degraded");
+      // engine-plan wording: the AI Director only ever re-voices the engine,
+      // so the offline fallback must carry the engine's REAL moves.
+      const fb = fallbackBrief(["Clear 12 due cards (biggest leak: articles)", "Write one paragraph in Writing (weak: organization)", "Run a Speak round (delivery dipped)"], "drill");
+      check(fb.degraded === true && typeof fb.degradedNotice === "string" && fb.degradedNotice.includes("unreachable"), "degraded: fallback brief is labeled with an honest notice", JSON.stringify(fb.degradedNotice).slice(0, 100));
+      check(fb.priority.includes("Clear 12 due cards"), "degraded: priority comes from the engine's #1 move, not invented", fb.priority);
+      check(fb.plan.length === 3 && fb.plan[0].includes("Clear 12 due cards") && fb.plan[1].includes("Writing"), "degraded: 3 plan items follow the engine plan", JSON.stringify(fb.plan));
+      check(fb.pep.length > 0 && !fb.pep.includes("\u2014"), "degraded: persona pep present, no em dash", fb.pep);
+      const fbBare = fallbackBrief([], "zen");
+      check(fbBare.plan.length === 3 && fbBare.plan.every((s: string) => s.length > 0) && fbBare.degraded === true, "degraded: empty engine plan still yields 3 honest default moves", JSON.stringify(fbBare.plan));
+      const fbWeird = fallbackBrief(["Just one move (only reason)"], undefined);
+      check(fbWeird.plan.length === 3 && !fbWeird.plan.some((s: string) => s.includes("(")), "degraded: single move padded to 3, parenthetical reasons stripped", JSON.stringify(fbWeird.plan));
+      // conversation placeholder: speakable, in-scene, honest
+      check(DEGRADED_CONVERSATION_LINE.length > 10 && !DEGRADED_CONVERSATION_LINE.includes("\u2014"), "degraded: conversation placeholder line is speakable, no em dash", DEGRADED_CONVERSATION_LINE);
+      const dp = degradedTurnPayload();
+      check(dp.degraded === true && dp.degradedNotice.includes("placeholder") && dp.degradedNotice.includes("honest"), "degraded: conversation payload carries the honest banner text", JSON.stringify(dp.degradedNotice).slice(0, 100));
+      // route: briefing always answers with the degraded flag present (the
+      // outage path itself is provider-dependent; the CONTRACT is pinned here)
+      const br = await api("/api/coach/briefing");
+      check(br.status === 200 && typeof br.body?.brief?.priority === "string" && typeof br.body?.degraded === "boolean", "degraded: briefing route answers with brief + degraded flag", JSON.stringify(br.body).slice(0, 120));
+      check(Array.isArray(br.body?.brief?.plan) && br.body.brief.plan.length === 3, "degraded: briefing plan is exactly 3 moves", JSON.stringify(br.body?.brief?.plan).slice(0, 100));
+      if (br.body?.degraded === true) {
+        check(typeof br.body.brief.degradedNotice === "string" && br.body.brief.degradedNotice.length > 20, "degraded: cached degraded brief carries its notice into the response", JSON.stringify(br.body?.brief?.degradedNotice ?? "").slice(0, 100));
+      }
+    }
+
+    // --- CEFR curriculum graph (feature #2) ---
+    console.log("\n--- curriculum ---");
+    {
+      const { computeCurriculum, CURRICULUM } = await import("@/lib/curriculum");
+      check(CURRICULUM.length >= 16 && CURRICULUM.some((n: { band: string }) => n.band === "B2") && CURRICULUM.some((n: { band: string }) => n.band === "B2+") && CURRICULUM.some((n: { band: string }) => n.band === "C1"), "curriculum: graph spans B2/B2+/C1 with a real node count", String(CURRICULUM.length));
+
+      // Gate honesty: 2/2 lucky answers are NOT mastery (Wilson bound).
+      const lucky = computeCurriculum([{ tag: "articles", ok: 2, no: 0, ewma: 1 }], []);
+      const luckyNode = lucky.nodes.find((n) => n.node.id === "b2_articles")!;
+      check(luckyNode.status === "in_progress" && luckyNode.gateMet === false, "curriculum: 2/2 correct is NOT mastery (in_progress, gate unmet)", JSON.stringify(luckyNode.status));
+      check(luckyNode.evidence[0].detail.includes("34%"), "curriculum: Wilson bound honestly caps 2/2 at ~34%", luckyNode.evidence[0].detail);
+
+      // Proven gate: 10/10 crosses Wilson 0.7 over 8+ samples.
+      const proven = computeCurriculum([{ tag: "articles", ok: 10, no: 0, ewma: 1 }], []);
+      const provenNode = proven.nodes.find((n) => n.node.id === "b2_articles")!;
+      check(provenNode.status === "mastered" && provenNode.evidence[0].proven === true, "curriculum: 10/10 proves the articles gate", JSON.stringify(provenNode.status));
+
+      // Weak record never proves: 6/4 over 10 samples = 60% raw, Wilson < 0.7.
+      const shaky = computeCurriculum([{ tag: "articles", ok: 6, no: 4, ewma: 0.6 }], []);
+      check(shaky.nodes.find((n) => n.node.id === "b2_articles")!.status !== "mastered", "curriculum: a 60% record never passes the 70% proven gate", "ok=6 no=4");
+
+      // Prerequisites: collocations requires sentence_shape (adjectives+word_choice).
+      const mid = computeCurriculum([{ tag: "word_choice", ok: 9, no: 1, ewma: 0.9 }, { tag: "adjectives", ok: 9, no: 1, ewma: 0.9 }], []);
+      const colloc = mid.nodes.find((n) => n.node.id === "b2p_collocations")!;
+      check(colloc.status === "locked" && colloc.blockers.includes("Sentence shape"), "curriculum: unproven prerequisite locks the downstream node", JSON.stringify(colloc.blockers));
+      const full = computeCurriculum(
+        ["articles", "countability", "plurals", "copula", "statives", "prepositions", "perfect", "question_order", "that_omission", "adjectives", "word_choice", "th_sounds", "w_v", "clusters", "ng", "stress"].map((tag) => ({ tag, ok: 10, no: 0, ewma: 1 })),
+        [],
+      );
+      const collocOpen = full.nodes.find((n) => n.node.id === "b2p_collocations")!;
+      check(collocOpen.status !== "locked", "curriculum: proven prerequisites open the B2+ node", JSON.stringify(collocOpen.status));
+      // The frontier moved into B2+ once the whole B2 row is proven.
+      check(full.summary.frontier?.node.band === "B2+", "curriculum: frontier climbs to B2+ when B2 gates prove", String(full.summary.frontier?.node.band));
+      // Skill gate: 0.8 over 5 samples proves; 0.8 over 2 does not.
+      const withSkill = computeCurriculum(
+        ["articles", "countability", "plurals", "copula", "statives", "prepositions", "perfect", "question_order", "that_omission", "adjectives", "word_choice", "register"].map((tag) => ({ tag, ok: 10, no: 0, ewma: 1 })),
+        [{ skill: "writing", score: 0.8, samples: 2 }],
+      );
+      const reg = withSkill.nodes.find((n) => n.node.id === "b2p_register")!;
+      check(reg.status !== "mastered" && reg.evidence.some((e) => e.detail.includes("2 sample")), "curriculum: skill gate needs 5+ measured samples, 2 is not proof", JSON.stringify(reg.evidence.map((e) => e.detail)));
+
+      // Empty ledger: B2 nodes open, C1 locked, frontier = the first B2 node.
+      const fresh = computeCurriculum([], []);
+      check(fresh.nodes.filter((n) => n.node.band === "B2").every((n) => n.status === "available"), "curriculum: fresh learner sees open B2 gates", JSON.stringify(fresh.nodes.filter((n) => n.node.band === "B2").map((n) => n.status)));
+      check(fresh.nodes.filter((n) => n.node.band === "C1").every((n) => n.status === "locked"), "curriculum: C1 is locked for a fresh learner", "C1 locked");
+      check(fresh.summary.frontier?.node.id === "b2_articles" && fresh.summary.line.includes("Next gate"), "curriculum: frontier starts at the first B2 node with an honest line", fresh.summary.line);
+
+      // Route: the live graph answers from the real ledger.
+      const cur = await api("/api/curriculum");
+      check(cur.status === 200 && Array.isArray(cur.body?.nodes) && cur.body.nodes.length === CURRICULUM.length, "curriculum: route serves the full graph", `nodes=${cur.body?.nodes?.length}`);
+      const valid = ["locked", "available", "in_progress", "mastered"];
+      check(cur.body?.nodes?.every((n: { status: string }) => valid.includes(n.status)), "curriculum: every node status is valid", JSON.stringify([...new Set((cur.body?.nodes ?? []).map((n: { status: string }) => n.status))]));
+      check(typeof cur.body?.summary?.mastered === "number" && typeof cur.body?.summary?.line === "string", "curriculum: summary counts + line present", JSON.stringify(cur.body?.summary?.line ?? "").slice(0, 80));
+      // The unlock action rides the state the coach reads.
+      const st = await api("/api/state");
+      const hasShape = (st.body?.nextBest ?? []).every((a: { action: string }) => ["review", "drill", "test", "teach", "unlock"].includes(a.action));
+      check(st.status === 200 && hasShape, "curriculum: state nextBest actions carry the unlock kind when present", JSON.stringify((st.body?.nextBest ?? []).map((a: { action: string }) => a.action)));
     }
   }
 

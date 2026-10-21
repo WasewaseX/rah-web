@@ -12,6 +12,8 @@ interface Brief {
   priority: string;
   plan: string[];
   pep: string;
+  degraded?: boolean;
+  degradedNotice?: string;
 }
 
 const PERSONAS = [
@@ -104,18 +106,24 @@ export default function Briefing() {
             ))}
           </ol>
           <div className="text-xs italic text-[#8b96a9]">&ldquo;{brief.pep}&rdquo;</div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Btn variant="soft" className="!min-h-9 !px-3 !py-1.5 !text-xs" onClick={speak} disabled={speaking}>
               <Volume2 className="h-3.5 w-3.5" /> {speaking ? "Speaking..." : "Listen"}
             </Btn>
             <Btn variant="ghost" className="!min-h-9 !px-3 !py-1.5 !text-xs" onClick={() => load(true)} disabled={regening}>
               <RefreshCw className={`h-3.5 w-3.5 ${regening ? "animate-spin" : ""}`} /> Re-brief
             </Btn>
-            <Chip tone="slate" >cached for today</Chip>
+            {brief.degraded ? (
+              <Chip tone="amber" title={brief.degradedNotice ?? "Built by the engine - the AI Director is offline."}>
+                AI offline: engine-built plan
+              </Chip>
+            ) : (
+              <Chip tone="slate">cached for today</Chip>
+            )}
           </div>
         </div>
       ) : (
-        <div className="text-sm text-[#8b96a9]">The Director had nothing worth saying. Rare. Try re-briefing.</div>
+        <div className="text-sm text-[#8b96a9]">The Director is unreachable right now. Tap Re-brief in a minute - your plan comes back.</div>
       )}
     </Card>
   );

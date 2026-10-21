@@ -1,11 +1,65 @@
-# ROADMAP AUDIT — combined master document
+# ROADMAP AUDIT — checklist, incidents, and open items
 
-**Created:** 2026-10-21 · **Sources:** the October 2026 external engineering + product audit (rating 8.5/10, "overall: stabilize before expanding"), the pre-audit feature roadmap (Tasks 1–44), and the 2026-10-21 data-loss regression raised by the learner.
-**Companion:** `ROADMAP-STATUS.md` holds the same items with full evidence links. This file is the single master: the plan, the complete checklist, and the regression log.
+**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-22 (REG-1/REG-2 waves: third wipe forensics, db-guard, and the public-repo privacy purge) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
+
+Purpose: one place that tracks (a) incident post-mortems with acceptance tests, (b) the standing audit checklist, (c) what an external evaluator praised vs. what actually broke. Update it every wave; do not let "DONE" claims outrun the drills that prove them.
 
 ---
 
-## 0. Regression log (newest first)
+## 0. Incident log (chronological)
+
+## 0. Incident log
+
+### 2026-10-20 — "First Words achievement again" (P0, learner data wiped by an update)
+
+**Symptom.** After the Tasks 57–59 update wave, the learner was reset: the "First Words" achievement re-fired, XP/streak/history back to near-zero. Third occurrence pattern ("again").
+
+**Root cause (proven, not guessed).**
+- The preview URL is a **tunnel to THIS workspace's dev server** — proven by comparing `/api/version` fingerprints (same git SHA, same `startedAt`, ~150 ms apart). There is no second database elsewhere serving the learner.
+- The live learner DB is `/home/z/my-project/db/custom.db` — **gitignored** ("runtime data - not for the public repo").
+- Update waves **reprovision the workspace from git** (this workspace was proven to be a Task-56-era clone while remote main already had Tasks 57–59). A reprovision is a fresh clone: the gitignored DB dies with it.
+- `.zscripts/dev.sh` (platform boot supervisor) then runs `db:push` against the missing DB → empty learner → "First Words" re-fires. The prior "2026-10-10 incident" comment in dev.sh (platform volume restore rolled the DB back) shows this class of failure had already struck once.
+
+**Why the evaluator's "Safe database migrations: Done" missed it.** Task 47 made *schema* migrations versioned and reproducible. Schema safety ≠ data persistence across environment rebuilds. Lesson: an audit item is only DONE when a drill reproduces the failure mode and proves the fix.
+
+**Fix (four independent layers, all in this wave):**
+1. **Git-tracked survival snapshot** — `scripts/db-sync.sh` writes `db/sync/rah-latest.db` (consistent `sqlite3` online backup) and **scrubs Session + LoginCode** rows; committed and pushed so the repo carries learner progress across reprovisions. Triggered hourly by the watchdog, at every deploy, and manually.
+2. **Restore-on-boot** — `.zscripts/dev.sh` (at boot AND on every supervisor restart) and `scripts/ensure-server.sh` restore `db/custom.db` from the snapshot when the live DB is missing, before any `db:push` can create an empty learner.
+3. **FC/deploy path guard** — `/api/admin/db` (consistent `VACUUM INTO` snapshot download) + `/api/admin/stats` (state fingerprint), both guarded by a timing-safe-compared admin token (env `RAH_ADMIN_TOKEN` or `db/admin-token`, packaged next to the DB). `.zscripts/build.sh` now **pulls the live DB before packaging** (falls back only on 404/unreachable; ABORTS the build on auth failure or invalid download so stale data can never silently overwrite real data). `scripts/deploy.sh` waits for preview freshness, then diffs pre/post stats (xp/streak/reviews/users must never drop) and fails loudly on regression.
+4. **Local backups** — every pre-pull swap archives the previous DB to `db/backups/pre-pull-*.db` (newest 20 kept).
+
+**Acceptance evidence.**
+- Route tests 16/16 (`bun scripts/test-admin-db-route.ts`): 404-locked-when-unconfigured, 401 on wrong/missing bearer, snapshot = standalone valid SQLite with seeded state, scrubbing, env-token path, no temp-file leakage.
+- Packaging tests (`bash tests/database-runtime-build.sh`): DB + sidecars + admin-token packaged; `backups/`, `sync/`, stats json, snapshot tmps excluded; empty-DB seeding now prefers the git snapshot when the live DB is gone.
+- **Restore drill PASS:** `db/custom.db` deleted (simulated reprovision) → `ensure-server` boot → learner state intact (xp 10, streak 1, 2 reviews, 1 achievement, 1 user).
+- Full battery 391/391 on the throwaway stack; `tsc --noEmit` + `eslint` clean.
+
+**Residual risks (honest).**
+- Data written **since the last snapshot** is still exposed to a surprise reprovision (window: ≤1 h via watchdog, ≤ one deploy via deploy.sh). The evaluator's PostgreSQL recommendation remains the structural fix for multi-user; for the single-learner era this window is accepted and documented.
+- The old supervisor instance ran pre-patch code until restarted; the new restore logic is active from this boot onward (drill ran against the live supervisor path).
+- `db/custom.db.stats.json` / `post-pull-stats.json` are workspace artifacts — gitignored and excluded from packages.
+
+### 2026-10-20 20:28 UTC — SECOND wipe the same day: the stale-reprovision lesson (Task 61)
+
+**What happened.** Hours after the Task-60 fix landed on remote main, another reprovision hit. Forensics from the live DB: `Learner.createdAt = 20:31:51`, user re-registered 20:39:28, `first_words` re-earned 20:39:48, `.env` + `prisma/migrations/**` all stamped 20:28:42 — and the working tree was back at the **Task-56-era commit (`79ac327`)**, i.e. the reprovision restored a STALE ref that pre-dated the Task-60 boot-restore. The fix was on GitHub, but the booting tree didn't contain it. The learner saw the achievement fire for the third time.
+
+**Recovery limits (checked, honestly negative).** The remote Task-60 snapshots (`db/sync/rah-latest.db` at 18:52 / 18:57 / 19:56) all POST-date wipe #1 (≈18:16): the 19:56 snapshot itself has `Learner.createdAt = 18:16:57` — i.e. the first wipe had already destroyed the original history before any snapshot existed. The learner re-registered twice (18:27 and 20:39) and re-did their first reviews each time. **Pre-wipe history is confirmed unrecoverable**; the 19:56 snapshot is not richer than the live DB, so no restore was performed (it would only have killed the learner's fresh session).
+
+**Task-61 additions (complementary layer, merged with Task 60 in this wave):**
+1. **Timestamped history snapshots** — `scripts/db-snapshot-core.ts` + `db-snapshot.sh`: hygiene (expired auth rows pruned, ACTIVE sessions kept — the learner stays logged in across updates) then SQLite `VACUUM INTO` (consistent while the server runs), gzip (~6 KB), content-aware sha256 skip (zero churn), keeps 10, in git-tracked `backups/`. Triggered per deploy and daily by the watchdog (bounds surprise-reprovision loss to ≤1 day even with no deploys).
+2. **Migration-safe restore** — `scripts/db-migrate-safe.sh`: `migrate deploy`, and on **P3005** (schema without history — exactly what the previous bare-`db push` restore produced) baselines every existing migration as applied, then deploys. NEVER `migrate reset`, NEVER `db push --accept-data-loss`.
+3. **Unified restore-if-missing** — `scripts/db-restore.sh`: prefers `db/sync/rah-latest.db` (hourly cadence), falls back to newest `backups/` history; runs before the server boots in `ensure-server.sh`.
+4. **Visible tripwire** — `GET /api/version` now returns `data: { createdAt, xp, streak, reviews, latestSnapshot }` (failure-isolated). Doctrine: after every update, `data.createdAt` must be UNCHANGED; if it equals the deploy time, data died and we know instantly.
+5. **Watchdog self-start** — `scripts/ensure-watchdog.sh` called from `ensure-server.sh`, so the watchdog (and both snapshot cadences) survive reprovisions that boot a stale-but-alive tree.
+6. **Session-start sync doctrine** — first action of every working session: `git fetch` + fast-forward pull BEFORE starting servers, so a stale reprovision is upgraded to the newest code (with its restore logic) and newest snapshots before anything boots.
+
+**Task-61 acceptance evidence.** Disaster drill: snapshot → `db/custom.db` deleted → `db-restore.sh` + `db-migrate-safe.sh` (P3005 detected → 0001/0002 baselined → deploy OK) → post-restore DB byte-identical (streak 1, xp 10, 2 reviews; `first_words.at` unchanged → no re-fire). `/api/version` serving `data` block on the live server. Watchdog relaunched and independently produced the first history push (`b02be56`) within minutes of boot. `tsc --noEmit` clean; eslint clean on touched files.
+
+**Merged-ops note.** The two layers now share one boot path (`ensure-server.sh`: restore → migrate-safe → health → snapshot + db-sync + watchdog) and one deploy path (`deploy.sh`: db-pull → history snapshot → push → freshness wait → stats-never-drop verify → mirror refresh → db-sync). Watchdog: hourly `db-sync` (freshness) + daily `backups/` history (depth).
+
+---
+
+---
 
 ### REG-1 (2026-10-21, CRITICAL, CLOSED): learner DB destroyed by update — "First Words" achievement re-fired
 
@@ -38,7 +92,58 @@
 
 ---
 
-## 1. The audit's implementation order (stage plan)
+### REG-2 (2026-10-22, CRITICAL PRIVACY, CLOSED): learner data published to the PUBLIC repo — the Task 60/61 survival fix created a leak
+
+**Symptom (evaluator's 2026-10-22 re-review, rating 7.6/10 overall / 8.6/10 engineering):** the public repo (WasewaseX/rah-web) carries `db/sync/rah-latest.db` via `scripts/db-sync.sh`, plus `backups/rah-*.sqlite.gz` history snapshots. The scrub removes Session/LoginCode but keeps the User row (learner EMAIL), learner profile, chat messages, writing submissions, speaking transcripts, and learning history — "sufficient to make this a critical risk" even though the inspected snapshot was small.
+
+**Forensic sizing (blobs inspected, not assumed):** every published snapshot version (18:57 through 21:05 UTC) is byte-equivalent in content: 14 rows total — 1 User (email), 1 Learner (xp=10, streak=1), 2 ReviewLog, 2 CardState, 1 Achievement, 1 DailyStat, bootstrap rows. ChatMsg/WritingSub/SpeakSession all ZERO (the wipe had already taken the rich history before the first snapshot). So the leak is REAL but SMALL: one email address + first-session progress, across ~30 commits of public git history.
+
+**Fixes shipped (Task 62):**
+1. `scripts/db-sync.sh` retargeted: local snapshot stays at `db/sync/rah-latest.db` (gitignored, freshest restore source for db-guard); the PUSH now goes to the PRIVATE vault repo (WasewaseX/vault), new folder `rah-web/`, layout `rah-latest.db` + `history/rah-<UTC>.db` (keep 30), README documenting the doctrine. Token never hardcoded — derived at runtime from the configured remote.
+2. `scripts/deploy.sh` + `scripts/watchdog.sh` retargeted the same way (their "learner history rides every push" doctrine is REVERSED: the public repo now carries ZERO learner data).
+3. PUBLIC GIT HISTORY SCRUBBED: `git filter-repo` removed `db/sync/`, `backups/`, and `db/battery-isolated.db*` from every commit; main force-pushed. (Third-party caches of the old commits can still exist — treat the email as exposed; GitHub Support can purge remaining cached views.)
+4. RECOVERY BONUS: the newest public snapshot was RESTORED into the live DB (14 rows: email account, streak=1, xp=10, 2 reviews, first_words) — the learner's post-Oct-21-wipe state is back, and the deployment-lock posture is preserved (User row restored = deployment claimed).
+5. db-guard gained the db-sync snapshot as a third restore source (freshest-first: db/sync → upload/rah-backups OSS mount → db/backups).
+
+**Doctrine change:** snapshots live ONLY in the private vault (access-controlled). The public repo carries code, docs, and synthetic test data — never learner rows. Retention: 30 dated copies in the vault. Encryption of vault snapshots = open decision (needs a key-management answer; the DB holds no secrets by the redaction doctrine, the vault is private).
+
+**Gates:** vault push verified via API (rah-web/rah-latest.db present, private repo); public repo verified via API + raw URL (snapshot paths 404, history clean); restore verified on the live DB; battery + tsc + eslint green.
+
+---
+
+## 1. Standing checklist (evaluator's October 20 + 22 updates, reconciled)
+Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this wave.
+
+### Critical fixes (9/10 closed + 1 hole found and closed)
+- ✅ Green GitHub CI (Task 45)
+- ✅ No browser-readable auth tokens (Task 46)
+- ✅ Secure email verification codes (Task 46)
+- 🟡→✅ Safe database — evaluator's ✅ was **half true** 🔺: schema migrations safe, data persistence broken. Closed by Tasks 60+61 + 57-bis (three wipes total; see incident log). **REG-2 amendment (2026-10-22):** the survival fix itself leaked learner data into the public repo — closed by moving ALL snapshots to the private vault repo and scrubbing public history.
+- ✅ AI endpoint rate limits (Task 50)
+- ✅ AI-provider failure recovery (Task 57)
+- ✅ Agent permissions + prompt-injection defenses (Task 51)
+- ✅ Account deletion + privacy cleanup (Task 49)
+- ✅ Isolated automated tests (Task 52)
+- 🟡 Learner data isolation — deployment lock in place (Task 48); per-user scoping + two-user tests still pending (multi-user mega-update). The evaluator's 2026-10-22 P0-architecture row — unchanged in priority.
+
+### Critical features (3 done, 5 partial, 2 pending)
+- ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59)
+- 🟡 Exam tracks (IELTS/TOEFL/C1A) · 🟡 Acoustic pronunciation assessment · 🟡 Evidence-backed reference · 🟡 Writing-revision workspace · 🟡 Content quality console
+- ❌ Offline sync · ❌ Goal-based weekly planner
+
+### Polish (3 done, 7 partial)
+- ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier)
+- 🟡 Coach transparency · exam generation/grading · placement confidence · mistake memory · XP/gems/quests · progress reports · onboarding naming
+
+### Reverse-engineering targets
+- ✅ Anki · ✅ Duolingo · 🟡 ELSA (acoustic tier missing) · ❌ LingQ (imported-reading workflow study)
+
+### External stores / APIs (deliberately deferred, single-user era)
+- ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · ❌ Azure Speech · 🟡 Transactional email delivery guarantees
+
+---
+
+## 2. Stage plan (the audit's implementation order)
 
 | Stage | Scope | Status |
 |-------|-------|--------|
@@ -49,55 +154,30 @@
 
 **Audit's score-lift doctrine (binding):** the next score increase must come from *validated teaching + real speech assessment*, NOT another batch of unrelated features. Passing CI proves engineering behavior, not educational effectiveness.
 
-## 2. Checklist status (audit's 39 items, consolidated)
+---
 
-Counts at last audit: **17 done / 15 partial / 7 not done.** Movement since: data-loss guard closed (REG-1), CI trigger fixed, BYO materials + CSV import shipped (already counted in the audit's totals). Current ledger below (D=done, P=partial, N=not done):
+## 3. Next-wave priorities (evaluator 2026-10-22, reconciled with the incident log)
 
-| # | Item | Status | Where |
-|---|------|--------|-------|
-| 1 | Learner data isolation | P | Deployment lock closes the hole; per-user scoping = mega-update |
-| 2 | CI green **and triggering** | D | Tasks 45 + 57 (branch selector was corrupted; fixed) |
-| 3 | No auth token in localStorage | D | Task 46 |
-| 4 | Email-code auth hardened | D | Task 46 |
-| 5 | Safe DB + versioned migrations | D | Task 47 (Postgres = mega-update) |
-| 6 | AI endpoint abuse limits | D | Task 50 |
-| 7 | Model-provider failure recovery | P | Backoff/retry exists; durable recovery + degraded labeling pending |
-| 8 | Agent tool permissions + injection boundaries | D | Task 51 |
-| 9 | Deletion / privacy / **backups** | D | Task 49 + Task 57 guard (REG-1) |
-| 10 | Tests isolated from learner state | D | Task 52 |
-| 11 | BYO-materials learning | D | Task 54 (v1; PDF/EPUB v2) |
-| 12 | Full CEFR curriculum graph | P | 5-band map exists; B2–C1 graph + gates pending |
-| 13 | Authentic exam tracks | P | Generic exams shipped; IELTS/TOEFL task types + rubrics pending |
-| 14 | Anki/custom-deck import | P | CSV/TSV shipped (Task 55); `.apkg` binary v2 |
-| 15 | Acoustic pronunciation assessment | P | Sound Lab inference tier honest; Azure Speech = decision gate |
-| 16 | Real offline sync | N | Roadmap #20 |
-| 17 | Goal-based weekly planner | P | Forecast + budget explain exist; full re-planner pending |
-| 18 | Evidence-backed English reference | P | Cards have defs/examples/audio; provenance surfacing pending |
-| 19 | Writing-revision workspace | P | Diagnosis exists; drafts/revision history pending |
-| 20 | Content quality console | P | Flag lifecycle + coach triage shipped; per-flag regression tests pending |
-| 21 | Review queue + FSRS polish | D | Tasks 44 + 56 (limits, suspend, undo) |
-| 22 | Talk conversation mode | P | v1 done (Task 41); mobile quirks untested |
-| 23 | Sound Lab | P | Inference tier done; acoustic tier = item 15 |
-| 24 | AI coach transparency | P | Trace + flags + triage shipped; "why this" evidence pending |
-| 25 | Exam generation/grading | P | Answerability + weakness targeting; item-bank validation pending |
-| 26 | Placement/CEFR honesty | P | Proven-only bands; sample counts + uncertainty pending |
-| 27 | Mistake memory/mastery | P | Families feed weakness bias; learner tag-correction pending |
-| 28 | XP/gems/quests economy | P | Bot labeled; anti-farming pass pending |
-| 29 | Progress reports | P | Zero-AI ledgers exist; spoken-fluency caveats pending |
-| 30 | Onboarding/naming | P | Partial (badges/tooltips); full naming audit pending |
-| 31 | Reverse-engineer: Duolingo | D | `DUOLINGO-RE.md`; tiles/streak/bot doctrine shipped |
-| 32 | Reverse-engineer: Anki | P | Mechanics studied, TSV both ways; scheduling settings + `.apkg` pending |
-| 33 | Reverse-engineer: ELSA Speak | P | Sound Lab = honest version; acoustic analysis pending |
-| 34 | Reverse-engineer: LingQ | N | Next research target (imported-reading → vocab workflow) |
-| 35 | PostgreSQL primary store | N | By design — coupled with per-user scoping |
-| 36 | Redis/Valkey ops state | N | By design — needed only at multi-instance scale |
-| 37 | R2/S3 object storage | N | By design — comes with the deployment push |
-| 38 | LLM structured outputs | D | `aiJson` ladder + deterministic validation |
-| 39 | Transactional email | P | SMTP path exists; delivery-failure reporting + idempotency pending |
+| Priority | Remaining work | Status |
+|----------|----------------|--------|
+| P0 — privacy | **Stop publishing live learner DB snapshots; private backups only** | **CLOSED (Task 62)** — vault repo + history scrub; email treated as exposed |
+| P0 — architecture | Real per-user data isolation before public multi-user | OPEN — deployment lock holds the line |
+| P1 — learning quality | Genuine acoustic pronunciation assessment | OPEN — Azure Speech decision gate |
+| P1 — curriculum | Authentic IELTS/TOEFL/C1A tracks | OPEN |
+| P1 — reliability | Offline sync + real mobile-browser testing | OPEN |
+| P2 — depth | Writing revision history, learner-memory corrections, goal planner | OPEN |
+| P2 — operations | Transactional email delivery reporting + idempotency | OPEN |
 
-**Ledger today (this table's classification): 12 D · 22 P · 5 N.** The audit's own baseline read **17 D / 15 P / 7 N**; the delta is classification strictness — several items the audit marked done are pinned here only at v1/honest-partial level (e.g. Talk v1, Sound Lab, review queue) — plus this wave's movement (data-loss guard REG-1, CI trigger fix, BYO materials Task 54, CSV import Task 55). The stricter ledger is the planning truth: it is what the score-lift doctrine measures against.
+Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-counts two separately-listed items against the original 39 recommendations — the true ledger stays 17 done / 15 partial / 7 pending, and this wave's REG-2 closure is a privacy fix, not a new feature. CI note: the newest visible run (Oct 20) pre-dates 57-bis because `on.push.branches` was corrupted — pushes to main never triggered CI until Task 57-bis; the force-push after the history scrub is the first run under the fixed selector.
 
-## 3. Decisions pending (the audit's "before more features" list)
+2. Per-user ownership/scoping + PostgreSQL (unblocks public multi-user; also shrinks the snapshot-window risk class).
+3. True acoustic pronunciation assessment (evaluate Azure Speech against real learner audio; honesty gates like Sound Lab's).
+4. Authentic exam task structures + rubric validation against expert-reviewed examples.
+5. Prove learning effectiveness (retention/writing/listening/speaking over time) — CI green ≠ teaching works.
+
+---
+
+## 4. Decisions pending (the audit's "before more features" list)
 
 1. **Single vs multi-user** — the deployment lock is the sanctioned interim; the real decision (multi-tenant Postgres with per-user scoping vs staying single-learner) gates the data-store stage. No date promised; the lock keeps either path safe.
 2. **Azure AI Speech** — the only validated acoustic scoring path; gates Sound Lab v2 and items 15/33. Decision needed before "pronunciation" claims move from honest-inference to measured.

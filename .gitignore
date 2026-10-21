@@ -59,6 +59,14 @@ server.log
 
 # runtime data - not for the public repo
 db/custom.db
+
+# REG-2 doctrine (2026-10-22): the PUBLIC repo carries ZERO learner data.
+# Snapshots (backups/, db/sync/) go to the PRIVATE vault repo only.
+backups/
+db/sync/
+backups/.last-autosnap
+backups/.vacuum-*
+backups/.tmp-*
 /rah-web-export/
 /rah-repo/
 
@@ -87,8 +95,23 @@ data/coach-workspace/
 .next-battery/
 db/battery-isolated.db*
 
+<<<<<<< HEAD
 # data-guard runtime artifacts (2026-10-21)
 db/backups/
 db/boot-guard.log
 db/.guard.lock
 upload/rah-backups/
+=======
+# Task 60 deploy-pipeline artifacts - never commit or package these
+db/admin-token
+db/backups/
+db/*.stats.json
+db/*.snapshot-*.tmp
+scripts/out/*.db
+db/post-pull-stats.json
+
+# data-guard runtime artifacts (Task 57)
+db/boot-guard.log
+db/.guard.lock
+upload/rah-backups/
+>>>>>>> origin/main

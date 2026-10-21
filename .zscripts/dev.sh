@@ -11,14 +11,15 @@ cd /home/z/my-project || exit 1
 export DATABASE_URL="file:/home/z/my-project/db/custom.db"
 export TELEMETRY_DISABLED=1
 
-# DATA GUARD (2026-10-21 incident): a workspace-rebuilding update erased the
-# untracked custom.db and db:push silently recreated it EMPTY. The learner
-# lost every review, every achievement, the whole FSRS schedule - and the
-# schema canary below passed because it checks SHAPE, not DATA. The guard
-# runs FIRST, needs nothing but bash+python3 (no bun install required), and:
-#   - restores the newest verified backup (upload/rah-backups survives
-#     workspace replacement) when the live DB is missing or shows no real
-#     usage, and
+# DATA GUARD (2026-10-21 REG-1, hardened 2026-10-22 REG-2): a workspace-
+# rebuilding update erased the untracked custom.db and db:push silently
+# recreated it EMPTY. The guard runs FIRST (needs only bash+python3, before
+# even bun install) and:
+#   - restores the newest VERIFIED backup when the live DB is missing or
+#     shows no real usage. Sources, in order: upload/rah-backups/ (the OSS
+#     mount that survives workspace replacement), db/backups/, and the
+#     db-sync snapshot db/sync/rah-latest.db (now gitignored - REG-2 moved
+#     all learner data out of the PUBLIC repo into the private vault).
 #   - snapshots the live DB BEFORE db:push can touch it when it holds data.
 echo "[rah-dev] boot: data guard (restore-if-fresh / snapshot-if-used)"
 bash scripts/db-guard.sh boot 2>&1 | tee -a dev.log
@@ -37,6 +38,18 @@ CANARY="MistakeFamily"
 probe_db() {
   bun -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.$CANARY.count().then(c=>{console.log('canary-ok:'+c);process.exit(0)}).catch(e=>{console.log('canary-fail:'+e.code);process.exit(1)})" >/dev/null 2>&1
 }
+
+# Restore guard must fire on EVERY (re)start, not only platform boot: a
+# reprovision can wipe db/ while this supervisor is alive, and the next
+# restart would otherwise db:push an empty learner back into existence.
+restore_db() {
+  if [ ! -f db/custom.db ]; then
+    echo "[rah-dev] $(date -Is) db/custom.db missing - running data guard restore" >> dev.log
+    bash scripts/db-guard.sh boot >> dev.log 2>&1
+  fi
+}
+restore_db
+
 for attempt in 1 2 3; do
   if probe_db; then
     echo "[rah-dev] boot: schema probe OK ($CANARY reachable)" >> dev.log
@@ -50,6 +63,7 @@ done
 FAILS=0
 while true; do
   # Clear anything squatting on the port from a previous generation.
+  restore_db
   pkill -f "next-server" 2>/dev/null
   pkill -f "next dev -p 3000" 2>/dev/null
   sleep 1
