@@ -1056,3 +1056,21 @@ Work Log:
 
 Stage Summary:
 - The user's worst fear was correct: the database did NOT survive updates. Root cause closed as a CLASS (restore-if-fresh + dual-location rotating backups + pre-schema-work snapshots), verified by a 27-pin battery that replays the exact incident. Lost history is honestly declared unrecoverable from the sandbox; a kept .rah portable export remains the learner's own recovery path. CI is green AND actually triggering on main now. Next per the audit doctrine: validated teaching (Azure Speech decision) and the LingQ research, not more feature confetti.
+
+---
+Task ID: 62
+Agent: Super Z (main)
+Task: Evaluator re-review (2026-10-22, 7.6/10 overall / 8.6/10 engineering) flagged a NEW critical P0: the Task-60/61 data-survival fix committed learner snapshots (db/sync/rah-latest.db + backups/rah-*.sqlite.gz) to the PUBLIC repo. Learner instruction: "simply save the data at the private vault repo make a new folder".
+
+Work Log:
+- Merge of the parallel Oct-20 clone (Tasks 57-61: degraded states, CEFR curriculum graph, .apkg import, first+second wipe fixes) into this workspace's Task-57-bis line; worklog numbering collision documented (two clones both used 57).
+- LEAK SIZED FROM BLOBS (not assumed): every published snapshot version = 14 rows (1 User email, Learner xp=10/streak=1, 2 ReviewLog, 2 CardState, first_words); ChatMsg/WritingSub/SpeakSession all zero. BUT a deeper history scan found the ORIGINAL learner db/custom.db committed in the pre-gitignore era (40f0363): 4 chat messages, 2 writing submissions, 1 speaking transcript, 6 reviews - the learner's actual work, public all along.
+- scripts/db-sync.sh REWRITTEN: local snapshot stays db/sync/rah-latest.db (gitignored, freshest db-guard restore source); push goes to the PRIVATE vault repo (WasewaseX/vault), NEW FOLDER rah-web/ per the learner's instruction - rah-latest.db + history/rah-<UTC>.db keep-30 + README doctrine. Token derived at runtime from the configured remote, never in tracked files.
+- scripts/deploy.sh + scripts/watchdog.sh retargeted (the "learner history rides every push" doctrine REVERSED: public repo now carries ZERO learner data).
+- HISTORY SCRUBBED: git filter-repo removed db/custom.db, db/sync/, backups/, db/battery-isolated.db from every commit; origin main + tags force-pushed. VERIFIED via API: db/sync/rah-latest.db 404, backups/... 404, db/custom.db 404, commits touching db/sync on main: 0.
+- RECOVERY: the newest public snapshot's 14 rows RESTORED into the live DB (scripts/restore-from-snapshot.py; kept live auth + today's Quest/Rival/League bootstrap): User filixah964@aravites.com back (deployment lock posture intact), Learner xp=10/streak=1, 2 reviews, 2 CardStates, first_words achievement - the learner's post-wipe state recovered from the very repo that leaked it.
+- db-guard gained the db-sync snapshot as third restore source (freshest-first: db/sync -> upload/rah-backups OSS mount -> db/backups). First REAL guard snapshot taken post-restore (local + OSS mount).
+- Gates on the merged+scrubbed tree: battery 391/391, tsc clean, eslint clean, all shell scripts parse; live /api/version healthy.
+
+Stage Summary:
+- The evaluator's P0 is closed and the doctrine inverted: PUBLIC repo = code/docs/synthetic data only; ALL learner snapshots live in the private vault (rah-web/ folder, keep-30 retention) with three independent restore sources for updates. The leak itself (email + first-session progress + the early chats/writings/transcripts) must be treated as exposed - history rewrite removes it from the repo but third-party caches may persist. Vault encryption is the recorded open decision (needs key management). Next per the evaluator: per-user isolation (P0 architecture), Azure Speech (P1), exam tracks (P1), offline sync (P1).

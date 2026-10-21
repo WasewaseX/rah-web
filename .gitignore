@@ -115,3 +115,6 @@ db/boot-guard.log
 db/.guard.lock
 upload/rah-backups/
 >>>>>>> origin/main
+
+# private-vault sync working clone (Task 62)
+db/vault-work/
