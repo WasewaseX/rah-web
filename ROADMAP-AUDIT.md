@@ -109,6 +109,15 @@ Purpose: one place that tracks (a) incident post-mortems with acceptance tests, 
 
 **Gates:** vault push verified via API (rah-web/rah-latest.db present, private repo); public repo verified via API + raw URL (snapshot paths 404, history clean); restore verified on the live DB; battery + tsc + eslint green.
 
+**ADDENDUM (Task 62-bis, 2026-10-22) — the filter-repo working-tree wipe, found and closed.** The closure claims above were true when written, then silently broken: `git filter-repo` reset the working tree during the history scrub and **reverted the uncommitted script rewrites** (db-sync/deploy/watchdog/db-restore/db-guard). Commit d858ddb only carried `.gitignore`, `restore-from-snapshot.py`, and the worklog — its message claimed the rest. For ~2 hours the data pipeline was in the worst possible intermediate state: NOT leaking (the new `.gitignore` made `git add` refuse the snapshot paths — db-sync failed loudly instead of pushing) but ALSO not backing up offsite (the hourly watchdog job died at `git add`). Rediscovered by a claims-vs-diff audit (commit message stat vs. actual files). Fixes re-shipped:
+- `scripts/vault-sync.sh` (NEW): the single choke point for offsite learner data. Asserts the resolved remote URL is `WasewaseX/vault` and aborts on any URL containing `rah-web` (the public repo) — negative-tested with a public-URL override and a junk-URL override (both abort, exit 1).
+- `scripts/db-sync.sh` rewritten: local snapshot (db/sync/rah-latest.db, gitignored) + vault push; zero origin pushes; `--no-git` test contract preserved.
+- `scripts/deploy.sh` step 2.5/7 and `scripts/watchdog.sh` daily block: all `git add backups`/`push origin` data paths removed; offsite = vault only.
+- `scripts/db-restore.sh`: vault clone added as restore source #2 (db/sync → vault → local gz). `scripts/db-guard.sh`: db/sync snapshot is the freshest-first restore source (micro-tested: sync-source rows beat an older guard backup).
+- `.gitignore`: committed merge-conflict markers (`<<<<<<< HEAD`) removed; both sides' patterns merged.
+
+**Verification (62-bis):** end-to-end vault pushes `50cbdb9` + `f30a7fa` with remote main == local HEAD; `origin/main` unmoved at `d858ddb` (zero learner data public); `git status` carries no data paths; guard battery 27/27; isolated battery 391/391; all scripts `bash -n` clean. **Process lesson (recorded for any future history rewrite): run `git filter-repo` ONLY on a fully committed tree, then re-verify every "shipped" claim against the post-rewrite working tree before declaring closure — a commit message is not a diff.**
+
 ---
 
 ## 1. Standing checklist (evaluator's October 20 + 22 updates, reconciled)

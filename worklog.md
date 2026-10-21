@@ -1074,3 +1074,21 @@ Work Log:
 
 Stage Summary:
 - The evaluator's P0 is closed and the doctrine inverted: PUBLIC repo = code/docs/synthetic data only; ALL learner snapshots live in the private vault (rah-web/ folder, keep-30 retention) with three independent restore sources for updates. The leak itself (email + first-session progress + the early chats/writings/transcripts) must be treated as exposed - history rewrite removes it from the repo but third-party caches may persist. Vault encryption is the recorded open decision (needs key management). Next per the evaluator: per-user isolation (P0 architecture), Azure Speech (P1), exam tracks (P1), offline sync (P1).
+
+---
+Task ID: 62-bis
+Agent: Super Z (main)
+Task: The learner's "i expected much more from you you have stopped so fast" — Task 62 was declared closed in commit d858ddb, but a claims-vs-diff audit proved the history scrub had silently reverted most of the retargeting work. Finish REG-2 for real; verify every claim against the tree, not the message.
+
+Work Log:
+- CLAIMS-VS-DIFF AUDIT (the new gate): d858ddb's message claimed "db-sync retargeted / deploy.sh+watchdog.sh retargeted / db-guard third restore source", but `git show d858ddb --stat` carried only .gitignore, restore-from-snapshot.py, worklog.md. Root cause of the gap: `git filter-repo` reset the working tree during the history scrub and the uncommitted script rewrites died with it — the docs and message were written as if shipped.
+- LUCK THAT CONTAINED THE DAMAGE: the new .gitignore (the one thing that DID land) made `git add db/sync/rah-latest.db` refuse the path — the old db-sync.sh then failed loudly at every watchdog tick instead of re-leaking. Net effect while broken: no public leak, but also ZERO offsite backups and an hourly erroring job.
+- scripts/vault-sync.sh BUILT (the missing choke point): derives the vault URL from the repo's own origin URL (rah-web.git -> vault.git swap, so a rotated PAT propagates; no secret in tracked files), asserts target == WasewaseX/vault and ABORTS on any URL containing "rah-web", refreshes db/vault-work clone (pull --ff-only), ships db/sync/rah-latest.db + unpacks new backups/rah-*.sqlite.gz into rah-web/history/, rotates keep-30, commits+pushes only on content change.
+- scripts/db-sync.sh REWRITTEN (again): local gitignored snapshot + vault call; zero origin pushes; --no-git test contract preserved. deploy.sh step 2.5/7 and watchdog.sh daily block: every `git add backups` / `push origin` data path removed. db-restore.sh: vault clone = restore source #2 (db/sync -> vault -> local gz). db-guard.sh boot restore: db/sync is now freshest-first (micro-tested: sync rows 777 beat older guard backup 111).
+- .gitignore: committed merge-conflict markers (<<<<<<< HEAD / ======= / >>>>>>> origin/main) resolved; both sides' patterns merged.
+- LIVE E2E: db-sync ran green twice — vault commits 50cbdb9 + f30a7fa, remote main == local HEAD verified via ls-remote; vault now holds rah-web/rah-latest.db (Session/LoginCode scrubbed to 0 rows) + history/rah-20261021-214145.db + history/rah-20261021T225730Z.db. origin/main UNMOVED at d858ddb throughout; git status shows no data paths. Negative tests: public-URL override and junk-URL override both abort exit 1.
+- Learner state note: live DB now xp=220 / streak=2 (was xp=10 / streak=1 right after Task 62's restore) — the learner has been using the app since recovery; the pipeline works and is worth protecting.
+- GATES: guard battery 27/27; isolated battery 391/391 ("real db untouched"); bash -n clean on all six touched scripts; restore-priority micro-test PASS.
+
+Stage Summary:
+- REG-2 is now closed against the TREE, not the message: public repo carries zero learner data (verified again post-push), the private vault holds the only offsite copies under rah-web/ with keep-30 retention, and every writer (db-sync/deploy/watchdog) routes through the asserted vault-sync choke point. Standing process lesson recorded in ROADMAP-AUDIT.md REG-2 addendum: run filter-repo only on a fully committed tree, then re-verify every "shipped" claim against the post-rewrite working tree — a commit message is not a diff. Open decisions unchanged: vault snapshot encryption (needs key management), per-user isolation before multi-user (P0 architecture), Azure Speech decision (P1).

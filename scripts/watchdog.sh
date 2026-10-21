@@ -3,12 +3,13 @@
 # Run detached at all times:  nohup bash scripts/watchdog.sh >/dev/null 2>&1 &
 # (ensure-server.sh and ensure-watchdog.sh self-start it after rebuilds.)
 #
-# DATA SURVIVAL (Task 60/61): two content-aware snapshot writers.
-#  - HOURLY: scripts/db-sync.sh refreshes db/sync/rah-latest.db and commits it
-#    ([skip ci]) - the freshest survival copy for a surprise reprovision.
+# DATA SURVIVAL (Task 60/61, retargeted by REG-2/Task 62): snapshot writers.
+#  - HOURLY: scripts/db-sync.sh refreshes db/sync/rah-latest.db (gitignored
+#    local restore source) and pushes it to the PRIVATE vault repo.
 #  - DAILY: scripts/db-snapshot.sh appends a timestamped history snapshot in
-#    tracked backups/ and pushes it - bounds the loss window even across
-#    long stretches with no deploys. Push failures are logged, never fatal.
+#    gitignored backups/ (bounds the loss window), and vault-sync ships it to
+#    the private vault. The PUBLIC repo never receives learner data (REG-2).
+#    Push failures are logged, never fatal.
 cd /home/z/my-project || exit 1
 
 TICK=0
@@ -37,12 +38,8 @@ while true; do
     {
       echo "$(date -Is) watchdog: daily data snapshot"
       bash scripts/db-snapshot.sh
-      if git status --porcelain -- backups 2>/dev/null | grep -q .; then
-        git add backups
-        git commit -q -m "data: daily learner history snapshot $(date -u +%F) [skip ci]" && git push origin HEAD -q && echo "daily history snapshot pushed" || echo "(daily history commit ok, push skipped/failed)"
-      else
-        echo "daily history snapshot: no content change since last push"
-      fi
+      # REG-2: the public repo never sees learner data - offsite = private vault
+      bash scripts/vault-sync.sh
     } >> watchdog.log 2>&1
   fi
 done

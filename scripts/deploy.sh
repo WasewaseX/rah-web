@@ -3,8 +3,9 @@
 #   1. local server healthy
 #   2. PULL the live production DB back into the workspace (data-preservation
 #      guard - the container DB is ephemeral; see scripts/db-pull.sh)
-#   2.5 timestamped history snapshot in tracked backups/ (Task 61; complements
-#      the hourly db/sync/rah-latest.db) - learner history rides every push
+#   2.5 timestamped local history snapshot (backups/, gitignored; REG-2:
+#      learner data is NEVER committed to the public repo - offsite copies
+#      go to the private vault via scripts/vault-sync.sh, called by db-sync)
 #   3. push to GitHub
 #   4. wait until the preview serves THIS commit (freshness beacon)
 #   5. verify the learner's data survived the container swap (stats diff)
@@ -32,12 +33,10 @@ case "$PULL_OK" in
 esac
 PRE_STATS="$(cat db/custom.db.stats.json 2>/dev/null || echo "")"
 
-echo "== 2.5 history snapshot (backups/ - timestamped, content-aware)"
+echo "== 2.5 local history snapshot (backups/ - timestamped, content-aware, gitignored)"
 bash scripts/db-snapshot.sh || true
-if git status --porcelain -- backups 2>/dev/null | grep -q .; then
-  git add backups
-  git commit -q -m "data: learner history snapshot before deploy $(date -u +%FT%TZ) [skip ci]" && echo "history snapshot committed" || echo "(history snapshot commit skipped)"
-fi
+# REG-2: no git add/commit/push here - the public repo carries ZERO learner
+# data. Offsite copy happens in step 7 (db-sync -> scripts/vault-sync.sh).
 
 echo "== 3. github"
 git push origin HEAD -q || echo "(push skipped: nothing new or remote rejected)"
@@ -102,7 +101,7 @@ PY
   bash scripts/db-pull.sh "$PREVIEW_URL" db/custom.db || echo "(mirror refresh skipped: exit $?)"
 fi
 
-echo "== 7. learner-data snapshot to git (survives workspace reprovisioning)"
+echo "== 7. learner-data snapshot (local + PRIVATE vault repo - survives reprovisioning)"
 bash scripts/db-sync.sh || echo "(db-sync skipped: exit $?)"
 
 echo "== done"

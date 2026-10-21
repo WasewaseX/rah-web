@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Sync the learner database to a GIT-TRACKED snapshot (db/sync/rah-latest.db)
-# so it survives workspace reprovisioning - the actual wipe mechanism behind
-# the Oct-20 incident: the preview serves THIS workspace, the live DB is a
-# gitignored file, and an update wave that rebuilds the workspace starts from
-# a fresh clone -> no db/custom.db -> empty learner -> "First Words" again.
-# The git repo is the only durable store that provably survives (the roadmap,
-# tasks and code all live there). Snapshot cadence: every deploy, hourly via
-# the watchdog, and manually via this script.
+# Refresh the LOCAL learner-data snapshot (db/sync/rah-latest.db) and ship it
+# to the PRIVATE vault repo via scripts/vault-sync.sh (folder rah-web/).
 #
-# Sensitive runtime tables (Session tokens, LoginCode hashes) are SCRUBBED
-# from the snapshot: learning progress restores perfectly, credentials never
-# land in git history.
+# REG-2 (2026-10-22): this script used to commit the snapshot to the PUBLIC
+# repo - that leaked the learner's email, progress and chats, and is the
+# reason this file exists in its current form. Doctrine now:
+#   - db/sync/rah-latest.db  = LOCAL freshest restore source (gitignored,
+#     survives only same-volume incidents; read by db-guard.sh at boot)
+#   - vault repo rah-web/    = the ONLY offsite copy (private, access-controlled)
+#   - the public repo        = ZERO learner data, forever
+# Sensitive runtime tables (Session tokens, LoginCode hashes) are scrubbed
+# from every snapshot: restores bring PROGRESS back, never credentials.
 #
 # Usage:  bash scripts/db-sync.sh [--no-git]
-#   --no-git   only refresh the snapshot file (used by tests)
+#   --no-git   only refresh the local snapshot file, no vault push (tests)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -27,10 +27,10 @@ if [ ! -f "$LIVE_DB" ]; then
 fi
 
 mkdir -p db/sync
-RAH_DB_PATH="$LIVE_DB" python3 - <<'PY'
-import os, sqlite3
+RAH_DB_PATH="$LIVE_DB" python3 - "$SNAP" <<'PY'
+import os, sqlite3, sys
 src = sqlite3.connect(os.environ["RAH_DB_PATH"])
-con = sqlite3.connect("db/sync/rah-latest.db")
+con = sqlite3.connect(sys.argv[1])
 src.backup(con)  # consistent online backup - safe while the server writes
 # scrub credential tables: the snapshot restores PROGRESS, never sessions
 for t in ("Session", "LoginCode"):
@@ -42,18 +42,12 @@ con.commit()
 con.close()
 src.close()
 PY
+echo "db-sync: local snapshot refreshed -> $SNAP (gitignored; offsite = private vault)"
 
 if [ "$NO_GIT" = "--no-git" ]; then
-  echo "db-sync: snapshot refreshed -> $SNAP (git skipped)"
+  echo "db-sync: --no-git - local snapshot only, vault push skipped"
   exit 0
 fi
 
-git add "$SNAP"
-if git diff --cached --quiet -- "$SNAP"; then
-  echo "db-sync: no learner-data changes since the last snapshot"
-  exit 0
-fi
-git -c user.name="rah-db-sync" -c user.email="db-sync@rah.local" \
-  commit -q -m "db-sync: learner data snapshot $(date -u +%Y%m%d-%H%M%S) [skip ci]" -- "$SNAP"
-git push origin HEAD -q 2>/dev/null || echo "db-sync: push failed (offline?) - snapshot committed locally"
-echo "db-sync: learner data committed to git -> $SNAP"
+# Offsite copy goes to the PRIVATE vault repo only (asserted inside).
+bash scripts/vault-sync.sh || echo "db-sync: WARNING - vault push failed (offline?); local snapshot is current"

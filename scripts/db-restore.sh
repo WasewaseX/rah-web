@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# DATA SURVIVAL - restore side (Task 60/61). The workspace can be reprovisioned
-# from git at any time (sometimes from a stale ref), and the gitignored live DB
-# dies with it. Restore-if-missing ONLY - never touches an existing live DB.
-# Source preference:
-#   1. db/sync/rah-latest.db   - the hourly watchdog-synced snapshot (freshest)
-#   2. backups/rah-*.sqlite.gz - timestamped history (deploy/daily cadence)
+# DATA SURVIVAL - restore side (Task 60/61; REG-2 sources, Task 62). The
+# workspace can be reprovisioned from git at any time (sometimes from a stale
+# ref), and the gitignored live DB dies with it. Restore-if-missing ONLY -
+# never touches an existing live DB. Source preference:
+#   1. db/sync/rah-latest.db          - hourly watchdog/db-sync snapshot
+#                                       (freshest; local, gitignored)
+#   2. db/vault-work/rah-web/rah-latest.db - the PRIVATE vault repo clone
+#                                       (offsite; refreshed here when present)
+#   3. backups/rah-*.sqlite.gz        - timestamped local history
+# (The OSS mount copies under upload/rah-backups are covered by db-guard.sh,
+# which is the first restore chance at boot. After a full workspace rebuild
+# the vault clone is gone too - cloning it back needs credentials that do not
+# live in the repo, so the OSS mount is the true rebuild-proof offsite.)
 # Versioned migrations (db-migrate-safe.sh, run right after by ensure-server.sh)
 # then bring the schema forward and record history (fixes the P3005 hole that
 # a bare `db push` restore used to leave behind).
@@ -15,7 +22,7 @@ DB="db/custom.db"
 
 [ -s "$DB" ] && exit 0  # live db present; nothing to restore
 
-# 1) freshest: the git-tracked latest snapshot
+# 1) freshest: the local latest snapshot
 if [ -s "db/sync/rah-latest.db" ]; then
   rm -f "$DB-journal" "$DB-wal" "$DB-shm"
   cp -a db/sync/rah-latest.db "$DB"
@@ -23,7 +30,19 @@ if [ -s "db/sync/rah-latest.db" ]; then
   exit 0
 fi
 
-# 2) fallback: newest timestamped history snapshot
+# 2) offsite: the PRIVATE vault clone (REG-2; refresh then restore)
+V="db/vault-work/rah-web/rah-latest.db"
+if [ -d db/vault-work/.git ]; then
+  git -C db/vault-work pull --ff-only -q origin main 2>/dev/null || true
+fi
+if [ -s "$V" ]; then
+  rm -f "$DB-journal" "$DB-wal" "$DB-shm"
+  cp -a "$V" "$DB"
+  echo "restore: $V -> $DB ($(du -h "$DB" | cut -f1))"
+  exit 0
+fi
+
+# 3) fallback: newest timestamped local history snapshot
 LATEST=$(ls -1t backups/rah-*.sqlite.gz 2>/dev/null | head -1)
 if [ -z "$LATEST" ]; then
   echo "restore: no live db and no snapshots; genuinely first boot"

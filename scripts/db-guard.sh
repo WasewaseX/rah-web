@@ -129,6 +129,17 @@ do_backup() {
 
 do_restore() {
   local src
+  # Freshest source first (REG-2, Task 62): the hourly db-sync snapshot.
+  if probe "$GUARD_ROOT/db/sync/rah-latest.db"; then
+    log "FRESH LIVE DB - restoring freshest db-sync snapshot: db/sync/rah-latest.db"
+    cp -f "$GUARD_ROOT/db/sync/rah-latest.db" "$GUARD_DB"
+    if probe "$GUARD_DB"; then
+      log "RESTORE OK: learner data recovered from db/sync/rah-latest.db"
+      return 0
+    fi
+    log "ERROR: db/sync restore failed probe - falling back to guard backups"
+    rm -f "$GUARD_DB"
+  fi
   if ! src="$(newest_backup)"; then
     log "live DB is fresh and NO verified backup exists anywhere - starting clean (nothing to restore)"
     return 1
