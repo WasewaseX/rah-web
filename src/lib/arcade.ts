@@ -352,6 +352,11 @@ function ctxUnlocks(c: AchCtx): string[] {
 
 // Unlock anything newly satisfied. Returns the fresh rows (already earned
 // ones are untouched). Safe to call as often as wanted.
+//
+// 2026-10-21 hardening: two concurrent graders can both pass the have/fresh
+// check and race the createMany. key is @id, so the loser used to throw
+// P2002 and 500 a legit grade route. A unique violation now means "another
+// request already awarded it" - swallowed; any other error still throws.
 export async function evaluateAchievements(): Promise<{ key: string; title: string; desc: string; icon: string }[]> {
   const ctx = await achCtx();
   const should = new Set(ctxUnlocks(ctx));
@@ -359,7 +364,12 @@ export async function evaluateAchievements(): Promise<{ key: string; title: stri
   const haveKeys = new Set(have.map((a) => a.key));
   const fresh = [...should].filter((k) => !haveKeys.has(k));
   if (fresh.length === 0) return [];
-  await db.achievement.createMany({ data: fresh.map((key) => ({ key })) });
+  try {
+    await db.achievement.createMany({ data: fresh.map((key) => ({ key })) });
+  } catch (e: unknown) {
+    if ((e as { code?: string })?.code !== "P2002") throw e;
+    return [];
+  }
   return fresh.map((key) => {
     const d = ACHIEVEMENTS.find((a) => a.key === key)!;
     return { key, title: d.title, desc: d.desc, icon: d.icon };

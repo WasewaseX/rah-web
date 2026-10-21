@@ -86,3 +86,9 @@ data/coach-workspace/
 # isolated-battery stack (Task 52)
 .next-battery/
 db/battery-isolated.db*
+
+# data-guard runtime artifacts (2026-10-21)
+db/backups/
+db/boot-guard.log
+db/.guard.lock
+upload/rah-backups/

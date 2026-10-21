@@ -11,6 +11,18 @@ cd /home/z/my-project || exit 1
 export DATABASE_URL="file:/home/z/my-project/db/custom.db"
 export TELEMETRY_DISABLED=1
 
+# DATA GUARD (2026-10-21 incident): a workspace-rebuilding update erased the
+# untracked custom.db and db:push silently recreated it EMPTY. The learner
+# lost every review, every achievement, the whole FSRS schedule - and the
+# schema canary below passed because it checks SHAPE, not DATA. The guard
+# runs FIRST, needs nothing but bash+python3 (no bun install required), and:
+#   - restores the newest verified backup (upload/rah-backups survives
+#     workspace replacement) when the live DB is missing or shows no real
+#     usage, and
+#   - snapshots the live DB BEFORE db:push can touch it when it holds data.
+echo "[rah-dev] boot: data guard (restore-if-fresh / snapshot-if-used)"
+bash scripts/db-guard.sh boot 2>&1 | tee -a dev.log
+
 echo "[rah-dev] boot: installing dependencies"
 bun install >> dev.log 2>&1
 echo "[rah-dev] boot: syncing database schema"
@@ -51,6 +63,9 @@ while true; do
   FAILS=0
   while kill -0 "$SERVER_PID" 2>/dev/null; do
     sleep 15
+    # Daily data snapshot while the server runs (stamp-guarded inside the
+    # guard; a long-lived container must not depend on reboots for backups).
+    bash scripts/db-guard.sh daily >> dev.log 2>&1 || true
     if curl -sf -o /dev/null --max-time 5 http://localhost:3000/api/version; then
       FAILS=0
     else

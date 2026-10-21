@@ -28,7 +28,10 @@ rm -f db/battery-isolated.db-*
 
 # The dev server for the test stack: own DB (process env beats .env) + own
 # dist dir (Turbopack's .next/dev/lock is per dist dir).
-NEXT_DIST_DIR="$DIST" DATABASE_URL="$DB" setsid nohup bunx next dev -p "$PORT" > /tmp/battery-server.log 2>&1 < /dev/null &
+# RAH_OPEN_REGISTRATION=1 is scoped to THIS throwaway stack only (the battery
+# builds multi-user fixtures). The REAL deployment keeps the Task-48
+# deployment lock active - the unlock never touches the shared .env.
+RAH_OPEN_REGISTRATION=1 NEXT_DIST_DIR="$DIST" DATABASE_URL="$DB" setsid nohup bunx next dev -p "$PORT" > /tmp/battery-server.log 2>&1 < /dev/null &
 
 
 echo "== waiting for server =="
