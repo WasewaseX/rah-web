@@ -1217,3 +1217,19 @@ Work Log:
 
 Stage Summary:
 - The evaluator's P0 #1 moved from "decision pending" to "decision made + path validated on a real PostgreSQL 17.5 server, with the live learner data proven to cross zero-mismatch". PG battery 16/16 is a new standing gate (scripts/pg-validate.ts). Next: P0 #2 privacy-incident completion (dangling-commit/cache sweep), then P1 #3 the learner pilot protocol.
+
+---
+Task ID: 75
+Agent: Super Z (main)
+Task: The evaluator's P0 #2 - finish the privacy incident response: probe whether pre-scrub commits really survive in third-party/GitHub caches, with evidence.
+
+Work Log:
+- scripts/privacy-sweep.py (re-runnable, exits 1 while human action is pending): probes 16 pre-scrub SHAs harvested from the roadmap velocity logs against the GitHub API, the raw snapshot blob at each, the public events feed, vault privacy, and a zero-learner-data tree sweep.
+- FINDING 1: 15 of 16 pre-scrub SHAs are STILL RETRIEVABLE (dangling objects): 4d4f582, 240100a, 0c02959, 0e9100e, 3b2049f, d1722f7, 161d7cb, f52e593, cd35f15, 3e49329, 6b9fda4, 5156b4b, b02be56, 79ac327, ab9514a (only 9b9c360 gone).
+- FINDING 2 (severity): the leaked snapshot ITSELF is anonymously fetchable at 5156b4b - raw.githubusercontent.com/.../5156b4b/db/sync/rah-latest.db returns HTTP 200 / 217,088 bytes with NO auth, and the full pre-scrub tree downloads via codeload tar.gz. At every other dangling SHA the snapshot paths 404. The auditor's cache warning is now evidence, not assumption.
+- FINDING 3 (clean): events API carries zero pre-scrub SHAs; public tree carries ZERO learner-data paths; vault private=true; nothing is LISTED - every exposure requires knowing a hash.
+- Recorded REG-2 ADDENDUM 3 in ROADMAP-AUDIT.md with the full SHA list and a copy-pasteable GitHub Support sensitive-data-removal template - the purge CANNOT be filed from inside the sandbox (needs the account holder); that is the one remaining human action. STATUS honest-ledger paragraph updated with the confirmed severity.
+- Task 74 wrap (same wave): docs finalized (AUDIT open critical #1 = validation DONE + remaining flip recorded; STATUS rows 1/5 updated: isolation DONE content+state, PG path VALIDATED), worklog entries for 74/75, PG battery 16/16 + cutover zero-mismatch + sweep findings all claims-vs-diff verifiable in the tree.
+
+Stage Summary:
+- The privacy incident is now precisely bounded: what the rewrite fixed (listed history, tree, events), what survives (dangling by-hash objects, one anonymously serving the snapshot), and exactly what remains (one Support request by the account holder, template ready). Next: Task 76 - the P1 learner pilot protocol + metrics, then continue the backlog without stopping.
