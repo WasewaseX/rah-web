@@ -17,6 +17,7 @@ export type SkillId =
   | "paraphrase"
   | "writing-prompt"
   | "generate-exam"
+  | "exam-track"
   | "grade-exam"
   | "assess-level"
   | "mistakes"
@@ -69,6 +70,10 @@ export interface ExamSpec {
   minutes: number;
   title: string;
   weakTags: string[]; // active mistake families this exam was built to hunt
+  // Authentic exam-format track (audit P1 curriculum, Task 66). Present when
+  // the learner asked for IELTS/TOEFL/C1A-style practice; grading attaches the
+  // deterministic band reference when set. See lib/agent/exam-tracks.ts.
+  track?: "ielts" | "toefl" | "c1a";
   degraded?: boolean; // true = some generation rounds fell back; count/answerability gates still enforced (audit P1-7)
 }
 
@@ -107,6 +112,11 @@ export interface ExamResult {
   // unreachable and the result is regex-only. Never silently equivalent.
   degraded?: boolean;
   degradedNotice?: string;
+  // Track flavor (Task 66): present only when the exam was generated on an
+  // authentic-format track; the band is a deterministic rough reference, the
+  // note carries the not-an-official-score disclaimer.
+  trackLabel?: string;
+  band?: { band: string; note: string };
 }
 
 export interface SkillLevelRow {

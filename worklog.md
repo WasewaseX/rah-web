@@ -1149,3 +1149,19 @@ Work Log:
 
 Stage Summary:
 - Both remaining P2s are closed with tests, and the memory sweep caught + fixed a real isolation gap (unscooped DELETE + unscoped memory tables) before it could matter. Audit backlog now: P1 exam tracks (IELTS/TOEFL/C1A), P1 offline sync + mobile testing, and the recorded isolation residual (CardState + arcade meta) for the next multi-user push.
+
+---
+Task ID: 66
+Agent: Super Z (main)
+Task: Audit P1 curriculum - authentic IELTS/TOEFL/C1A exam-format tracks.
+
+Work Log:
+- Scoped the exam engine first: generateExam already has a spec (skills, count, weak-tag quota), an answerability gate, freshness rotation and a mechanical grader with an arbiter. The tracks re-weight WHAT is asked instead of building a second engine - the same honesty machinery applies to every track item.
+- lib/agent/exam-tracks.ts (pure, deterministic): three track definitions with label/titlePrefix/disclaimer/prompt-brief/timing/default count. The brief blocks encode the publicly documented task types: IELTS (opinion framing, trend/process description, paraphrase control), TOEFL (campus/academic contexts, mini-texts embedded in-item, concise rephrasing), C1A (key word transformations with the prompt word required, word formation, B2-plausible distractors vs C1-precise keys).
+- Threaded through: ExamSpec.track -> generateExam(..., {track}) -> examSystem (track block appended, shares may override the generic mix) -> title prefixed (trackTitle, idempotent, travels to card + replay) -> grading attaches bandReference(pct, track) + trackLabel to the result. Band maps are RANGE-strings on purpose (one short set cannot honestly pin a finer number) and monotone/clamped - proven by the battery.
+- Coach surface: new POWER_SKILL "exam-track" (triggers: ielts / toefl / cambridge c1 / c1a; SkillId union extended) routes before the generic exam builder; the reply carries the track's disclaimer verbatim. Generic exam requests still hit the plain builder - battery-proven both ways.
+- HONESTY: every track's disclaimer says not-affiliated + rough-reference; the band note carries the actual pct; nothing anywhere calls the result an official score. Tracks are generated format-practice - licensed past papers stay out of scope for a zero-licensing app (recorded in ROADMAP-AUDIT as the honest limit of this row).
+- GATES: exam-track battery 42/42 (bank shape + disclaimer wording, band monotonicity/clamping/scale differences, title prefix idempotency, skill routing incl. negative case), main battery 413/413, tsc 0, eslint 0.
+
+Stage Summary:
+- Audit P1 curriculum row: PARTIAL -> format tracks shipped and tested; the honest limit (no licensed papers) is recorded rather than hidden. Remaining audit backlog: P1 offline sync + real mobile-browser testing; isolation residual (CardState + arcade meta) for the next multi-user push.

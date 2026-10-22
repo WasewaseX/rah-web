@@ -8,6 +8,7 @@ import { aiJson } from "@/lib/ai";
 import type { ProfileJson } from "@/lib/ai";
 import { gradeAnswer } from "./fuzzy";
 import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace } from "./types";
+import { EXAM_TRACKS, bandReference, trackTitle, isTrackId, type TrackId } from "./exam-tracks";
 import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
 import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
@@ -98,12 +99,15 @@ function examSystem(p: ProfileJson, spec: ExamSpec, fresh: Freshness): string {
     `AVOID these worn-out templates entirely: ${OVERUSED.map((t) => JSON.stringify(t)).join("; ")}`,
   ].filter(Boolean).join("\n\n");
   const quota = spec.weakTags.length ? Math.min(4, Math.max(1, Math.ceil(spec.plannedCount / 3))) : 0;
+  const trackBlock = spec.track ? `\n\n${EXAM_TRACKS[spec.track].brief}` : "";
   return `You are the examiner inside Rah, an English app for Farsi speakers. Build ONE exam targeted at ${spec.level} level, focused on: ${spec.targetSkills.join(", ")}.
 
 The learner sits around ${p.level}. Recent weak spots: ${p.weakSkills.join(", ") || "general B2 range"}. Push at the edge of ${spec.level} toward C1: collocations, register, precise verbs, Farsi interference traps (articles, countability, prepositions, present perfect, question order).
 ${spec.weakTags.length ? `WEAKNESS QUOTA: this learner has these recurring mistake families on file: ${p.mistakes.map((m) => `${m.tag} x${m.count}`).join(", ")}. At least ${quota} items MUST carry a "tag" field naming the family they hunt (one of: ${spec.weakTags.join(", ")}), and the item must genuinely force that exact weakness into play with a FRESH sentence - the ban lists still apply. Never invent a tag outside the list; items not built for a family simply omit the tag field.` : ""}
 
-Exactly ${spec.plannedCount} items. Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite. Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
+Exactly ${spec.plannedCount} items.${trackBlock}
+
+Mix, in this rough share: 40% mcq, 30% cloze, 15% short, 15% rewrite.${spec.track ? " (The track block above may override these shares - follow the track when it does.)" : ""} Every item tests ONE teachable point. Wrong choices for mcq must be plausible for a Farsi speaker.
 
 ITEM TYPE CONTRACTS (an answerability gate rejects any item that breaks them; a rejected item is wasted):
 - TRIVIA BAN: never ask for terms, definitions, or world knowledge ("what term describes...", "what do you call...", "which document/instrument..."). Every item must test ENGLISH itself: a grammatical form, a collocation, register, a connector, or meaning in context. To teach a word, put it in a sentence blank.
@@ -141,6 +145,7 @@ export async function generateExam(
   targetSkills: string[],
   count: number,
   emit: (l: string, d?: string) => void,
+  opts?: { track?: TrackId },
 ): Promise<{ client: ExamClient; items: ExamItem[]; spec: ExamSpec }> {
   // Weakness quota input: mistake families carry production evidence, but the
   // mastery ledger can prove a weakness the families have not seen yet (three
@@ -149,16 +154,19 @@ export async function generateExam(
   const ledgerTags = await masteryWeakTags();
   const familyTags = p.mistakes.map((m) => m.tag);
   const weakTags = [...new Set([...familyTags, ...ledgerTags])].slice(0, 3);
+  const track = opts?.track && isTrackId(opts.track) ? opts.track : undefined;
+  const plannedCount = Math.max(4, Math.min(20, count));
   const spec: ExamSpec = {
     level: p.level === "?" ? "B2" : p.level,
     targetSkills: targetSkills.length ? targetSkills : ["collocation", "grammar", "vocabulary"],
-    plannedCount: Math.max(4, Math.min(20, count)),
-    minutes: Math.max(5, Math.round(count * 1.1)),
+    plannedCount,
+    minutes: Math.max(5, Math.round(plannedCount * (track ? EXAM_TRACKS[track].minutesPerItem : 1.1))),
     title: "",
     weakTags,
+    ...(track ? { track } : {}),
   };
 
-  emit("Calibrating difficulty", `level ${spec.level}, edge of ${spec.level} toward C1`);
+  emit(track ? `Building the ${EXAM_TRACKS[track].label} set` : "Calibrating difficulty", `level ${spec.level}, edge of ${spec.level} toward C1`);
   const fresh = await loadFreshness();
   emit("Rotating topics", fresh.domains.join(", "));
   const genOpts = { deep: true, temperature: 0.9 };
@@ -360,7 +368,7 @@ export async function generateExam(
   }
 
   const id = newId();
-  const title = String(raw.title ?? "").trim().slice(0, 60) || `${spec.level} checkpoint`;
+  const title = spec.track ? trackTitle(String(raw.title ?? "").trim().slice(0, 60) || `${spec.level} checkpoint`, spec.track) : String(raw.title ?? "").trim().slice(0, 60) || `${spec.level} checkpoint`;
   const client: ExamClient = {
     id,
     title,
@@ -487,6 +495,7 @@ export async function gradeExamSubmission(
     verdicts,
     headline,
     scheduled,
+    ...(spec.track ? { trackLabel: EXAM_TRACKS[spec.track].label, band: bandReference(pct, spec.track) } : {}),
     ...(degradedReason ? { degraded: true, degradedNotice: `Graded mechanically: the answer arbiter was unreachable (${degradedReason.slice(0, 90)}). Meaning-equal answers may be marked wrong.` } : {}),
   };
 

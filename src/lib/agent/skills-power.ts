@@ -11,6 +11,7 @@ import { startDaily, clearMode } from "./mode-flow";
 import { updateSkillLevels, getSkillLevels, buildAssessment, spreadLine } from "./levels";
 import { parseThemeRequest, presetById, PRESETS } from "./theme";
 import { topMistakes } from "@/lib/mistakes";
+import { EXAM_TRACKS } from "@/lib/agent/exam-tracks";
 import { contentUserId } from "@/lib/scope";
 import { basePersona } from "./skills-util";
 
@@ -469,6 +470,33 @@ Output ONE JSON object, no em dash.`,
 
 
 
+  {
+    id: "exam-track",
+    name: "Exam-format tracks",
+    oneLiner: "IELTS / TOEFL / Cambridge C1-style practice with a rough band reference",
+    commands: ["ielts", "toefl", "c1"],
+    triggers: [
+      /\b(ielts)\b/i,
+      /\btoefl\b/i,
+      /\b(c1 advanced|cambridge c1|c1a)\b/i,
+    ],
+    run: async (ctx) => {
+      const steps: StepTrace[] = [];
+      const track = /\bielts\b/i.test(ctx.text) ? "ielts" : /\btoefl\b/i.test(ctx.text) ? "toefl" : "c1a";
+      const t = EXAM_TRACKS[track];
+      const countMatch = ctx.text.match(/(\d{1,2})\s*(questions?|items?|q\b)/i) ?? ctx.args.match(/(\d{1,2})/);
+      const count = countMatch ? parseInt(countMatch[1], 10) : t.defaultCount;
+      const { client, spec } = await generateExam(ctx.profile, ["collocation", "grammar", "vocabulary", "reading", "writing"], count, (l, d) => steps.push({ label: l, detail: d }), { track });
+      return {
+        skill: "exam-track",
+        reply: `${client.title}: ${client.count} questions, about ${spec.minutes} minutes, ${t.label} task types. Submit when done and I will break it down by skill with a band reference. Honest limits: ${t.disclaimer}`,
+        corrections: [],
+        fa_note: "",
+        steps,
+        exam: client,
+      };
+    },
+  },
   {
     id: "generate-exam",
     name: "Exam builder",
