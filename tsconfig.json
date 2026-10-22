@@ -50,6 +50,8 @@
     "download",
     "skills",
     "tests",
-    "upload"
+    "upload",
+    "scripts/pg-validate.ts",
+    "prisma/pg-client"
   ]
 }

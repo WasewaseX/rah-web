@@ -18,6 +18,9 @@
  *      which this battery proves works (step 0 of this battery IS the diff).
  *
  * Run: bun scripts/pg-validate.ts
+ * NOTE: excluded from tsconfig (Task 76-bis) - it depends on the generated
+ * PG client (prisma/pg-client, gitignored), which a fresh CI checkout does
+ * not have. It runs where the PG sandbox exists, not in CI.
  * Never touches the SQLite live DB or the app's Prisma client (separate
  * schema.postgres.prisma -> prisma/pg-client output).
  */
