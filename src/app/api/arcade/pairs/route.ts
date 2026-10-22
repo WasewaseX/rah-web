@@ -11,15 +11,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, type FsrsState } from "@/lib/fsrs";
-import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { touchStreak } from "@/lib/server";
 import { buildPairs } from "@/lib/pairs";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 async function dueCardsForPairs(): Promise<Card[]> {
   const today = dayIndex();
-  const all = await db.cardState.findMany();
+  const all = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const due = all
     .filter((s) => !s.suspended && s.state !== "new" && s.due <= today)
     .sort((a, b) => cardR(a as unknown as FsrsState, today) - cardR(b as unknown as FsrsState, today))
@@ -37,7 +38,7 @@ async function dueCardsForPairs(): Promise<Card[]> {
 export async function GET() {
   const cards = await dueCardsForPairs();
   const board = buildPairs(cards, dayIndex());
-  const best = await db.gameStat.findUnique({ where: { key: "pairs:clean" } });
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "pairs:clean" } } });
   return NextResponse.json({
     left: board.left,
     right: board.right,
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
   const graded = matched.length;
   const clean = graded > 0 && missteps === 0;
   const xpAmount = graded * 2 + (clean ? 10 : 0);
-  const xp = xpAmount > 0 ? await awardXp(xpAmount, { chainHit: clean }) : null;
+  const xp = xpAmount > 0 ? await awardGameXp("pairs", xpAmount, { chainHit: clean }) : null;
 
   await bumpStat("pairs:plays");
   if (clean) await bumpStat("pairs:clean", graded);
@@ -85,7 +86,8 @@ export async function POST(req: Request) {
   return NextResponse.json({
     graded,
     clean,
-    xpGain: xpAmount,
+    xpGain: xp?.paid ?? 0,
+    capped: xp?.capped ?? false,
     totalXp: xp?.total ?? 0,
     leveledUp: xp?.leveledUp ?? false,
     level: xp?.level ?? 0,

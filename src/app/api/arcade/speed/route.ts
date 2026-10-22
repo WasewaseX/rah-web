@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildSpeedPool, type ArcadeItem } from "@/lib/arcade-items";
-import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 // the submitted aggregate.
 export async function GET() {
   const items = await buildSpeedPool(40);
-  const best = await db.gameStat.findUnique({ where: { key: "speed:best" } });
-  const combo = await db.gameStat.findUnique({ where: { key: "speed:combo" } });
+  const u = await contentUserId().catch(() => "me");
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:best" } } });
+  const combo = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:combo" } } });
   return NextResponse.json({
     items: items.map((i: ArcadeItem) => ({ ...i })),
     best: best?.best ?? 0,
@@ -51,14 +53,15 @@ export async function POST(req: Request) {
   await bumpStat("speed:plays");
   await bumpDaily("reviews", total);
   await bumpDaily("correct", correct);
-  const xp = await awardXp(Math.min(80, Math.round(score / 12)), { chainHit: correct > 0 });
+  const xp = await awardGameXp("speed", Math.min(80, Math.round(score / 12)), { chainHit: correct > 0 });
   if (correct < total) await registerMiss();
   await touchStreak();
   await progressQuest("speed_play", 1);
   if (maxCombo > 0) await progressQuest("speed_combo_8", maxCombo);
 
   return NextResponse.json({
-    xpGain: Math.min(80, Math.round(score / 12)),
+    xpGain: xp.paid,
+    capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     level: xp.level,

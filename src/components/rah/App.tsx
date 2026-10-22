@@ -25,6 +25,7 @@ import {
 import { Chip } from "./ui";
 import HomeView from "./Home";
 import PwaBootstrap from "./PwaBootstrap";
+import OfflineBadge from "./OfflineBadge";
 import ReviewView from "./Review";
 import PlacementView from "./Placement";
 import WriteView from "./Write";
@@ -36,6 +37,7 @@ import ArcadeView from "./Arcade";
 import CoachSidebar from "./CoachSidebar";
 import LoginView from "./Login";
 import { applyTheme } from "@/lib/theme-bus";
+import { installOfflineSync, flush } from "@/lib/offline";
 
 import type { GameView, RivalView, LeagueView } from "@/lib/arcade";
 
@@ -172,6 +174,18 @@ export default function RahApp() {
     }
   }, []);
 
+  // Real offline sync (Task 68): install the reconnect-flush triggers once;
+  // the badge announces what is queued, the toast announces what synced.
+  useEffect(() => {
+    installOfflineSync();
+    void flush().then((r) => {
+      if (r && r.sent > 0) {
+        pushToast({ title: "Offline grades synced", desc: `${r.sent} grade${r.sent === 1 ? "" : "s"} from this device reached the server.` });
+        void refresh();
+      }
+    });
+  }, [pushToast, refresh]);
+
   useEffect(() => {
     const applyHash = () => {
       const h = window.location.hash.replace("#", "") as ViewId;
@@ -211,6 +225,7 @@ export default function RahApp() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--rah-bg)] md:flex-row">
       <PwaBootstrap />
+      <OfflineBadge onSynced={() => void refresh()} />
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0e1421] via-[#101725] to-[#0d1119] px-4 py-6 md:flex">
         <div className="mb-9 flex items-center gap-3 px-2">

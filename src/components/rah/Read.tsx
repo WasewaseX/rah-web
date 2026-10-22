@@ -4,9 +4,10 @@
 // reading to the built-in AI and a retrieval quiz comes back.
 
 import { useCallback, useMemo, useState } from "react";
-import { BookOpen, Clock, Sparkles, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { BookOpen, Clock, Sparkles, CheckCircle2, XCircle, ArrowLeft, BookOpenText } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "./ui";
 import { MaterialsPanel } from "./MaterialsPanel";
+import MaterialReader from "./MaterialReader";
 import { READINGS } from "@/lib/content";
 import { ladderFor, orderReadings, type Band } from "@/lib/ladder";
 import type { AppState } from "./App";
@@ -18,6 +19,7 @@ interface Quiz {
 
 export default function ReadView({ state }: { state: AppState }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [readerOpen, setReaderOpen] = useState(false);
   const [quiz, setQuiz] = useState<Record<string, Quiz>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -53,10 +55,15 @@ export default function ReadView({ state }: { state: AppState }) {
     }
   }, []);
 
-  if (!reading) {
+  if (!reading && !readerOpen) {
     return (
       <div className="flex flex-col gap-4">
         <MaterialsPanel />
+        <div>
+          <Btn variant="ghost" onClick={() => setReaderOpen(true)}>
+            <BookOpenText className="h-4 w-4" /> Read your materials
+          </Btn>
+        </div>
         {state.learner.level !== "?" && (
           <p className="text-sm leading-relaxed text-[#a9b4c6]">
             Six texts, all written around the science this app runs on. Read once for meaning, then quiz yourself. Level {state.learner.level}.
@@ -87,6 +94,16 @@ export default function ReadView({ state }: { state: AppState }) {
       </div>
     );
   }
+
+  if (readerOpen && !reading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <MaterialReader onExit={() => setReaderOpen(false)} />
+      </div>
+    );
+  }
+
+  if (!reading) return null; // unreachable: the two branches above cover it, this narrows the type
 
   const q = quiz[reading.id];
   const rightCount = q ? q.items.filter((it, i) => checked[reading.id] && answers[`${reading.id}:${i}`] === it.a).length : 0;

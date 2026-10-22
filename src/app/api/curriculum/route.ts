@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // the same numbers the Progress war room shows. No AI, fully deterministic.
 export async function GET() {
   const u = await contentUserId();
-  const [tagRows, skillRows] = await Promise.all([db.tagMastery.findMany({ where: { userId: u } }), db.skillLevel.findMany()]);
+  const [tagRows, skillRows] = await Promise.all([db.tagMastery.findMany({ where: { userId: u } }), db.skillLevel.findMany({ where: { userId: u } })]);
   const result = computeCurriculum(
     tagRows.map((t) => ({ tag: t.tag, ok: t.ok, no: t.no, ewma: t.ewma })),
     skillRows.map((s) => ({ skill: s.skill, score: s.score, samples: s.samples })),

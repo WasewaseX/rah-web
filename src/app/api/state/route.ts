@@ -21,11 +21,11 @@ export async function GET() {
   const chatCount = await db.chatMsg.count({ where: { userId: u } });
   const writes = await db.writingSub.count({ where: { userId: u } });
   const speaks = await db.speakSession.count({ where: { userId: u } });
-  const seen = await db.cardState.count();
+  const seen = await db.cardState.count({ where: { userId: u } });
   const profile = await buildProfile();
   const theme = l.theme ? JSON.parse(l.theme) : null;
   await ensureQuests();
-  const [game, rival, quests, league, chain, mastery, nextBest, shop] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain(), getMasteryView(), nextBestActions(), Promise.resolve(shopView(l.gems, l.freezes, l.boostUntil))]);
+  const [game, rival, quests, league, chain, mastery, nextBest, shop] = await Promise.all([getGameView(), getRivalView(), db.quest.findMany({ where: { userId: u, day: today }, orderBy: { id: "asc" } }), getLeagueView(), getChain(), getMasteryView(), nextBestActions(), Promise.resolve(shopView(l.gems, l.freezes, l.boostUntil))]);
   return NextResponse.json({
     learner: {
       level: l.level,

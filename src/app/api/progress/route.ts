@@ -18,7 +18,7 @@ export async function GET() {
     return { day: d, reviews: s?.reviews ?? 0, correct: s?.correct ?? 0, xp: s?.xp ?? 0 };
   });
 
-  const states = await db.cardState.findMany();
+  const states = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const byUnit: Record<string, { total: number; started: number; mature: number }> = {};
   for (const c of DECK) {
     byUnit[c.unit] ??= { total: 0, started: 0, mature: 0 };
@@ -61,8 +61,12 @@ export async function GET() {
     .filter((x): x is { at: Date; avg: number } => !!x)
     .reverse();
 
-  const totalReviews = await db.reviewLog.count();
-  const totalLapses = await db.reviewLog.count({ where: { grade: 1 } });
+  // Scoped (Task 67 straggler, caught during the Task-72 polish): these are
+  // the learner's lifetime review numbers - another account's rows must not
+  // inflate them.
+  const uT = await contentUserId().catch(() => "me");
+  const totalReviews = await db.reviewLog.count({ where: { userId: uT } });
+  const totalLapses = await db.reviewLog.count({ where: { userId: uT, grade: 1 } });
   const skillLevels = await getSkillLevels();
 
   // P5: the CEFR band map's evidence, computed from real rows only - the

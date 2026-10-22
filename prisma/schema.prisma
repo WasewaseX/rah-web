@@ -70,8 +70,12 @@ model Session {
 }
 
 // FSRS-5 memory state per card. Keys mirror the verified Rust core.
+// Per-user isolation (Task 67, the recorded residual): the FSRS deck queue is
+// learner state, so it carries the (userId, cardId) composite key like every
+// other learning table. Legacy rows keep userId "me".
 model CardState {
-  cardId    String  @id
+  userId    String  @default("me") // per-user isolation (audit P0)
+  cardId    String
   s         Float   @default(0)
   d         Float   @default(0)
   due       Int     @default(0)
@@ -82,6 +86,9 @@ model CardState {
   lastivl   Int     @default(0)
   dir       String  @default("") // last retrieval direction used
   suspended Boolean @default(false)
+
+  @@id([userId, cardId])
+  @@index([userId, due])
 }
 
 model ReviewLog {
@@ -95,6 +102,18 @@ model ReviewLog {
   source String   @default("review") // review | exam | dictation | shadow: where the outcome was earned
 
   @@index([userId])
+}
+
+// Offline-sync receipt (Task 68, audit P1): the client grades reviews offline
+// and replays them on reconnect. gid is the CLIENT-generated idempotency key
+// (uuid per grade attempt) - the stored response lets a replay return the
+// ORIGINAL result, so a double flush can never double-count XP, streaks or
+// quest progress. Receipts expire (7-day purge on write).
+model GradeAck {
+  gid      String   @id
+  userId   String
+  response String // the exact JSON the first attempt returned
+  at       DateTime @default(now())
 }
 
 // Transactional email ledger (audit P2): every send attempt is recorded with
@@ -113,12 +132,15 @@ model MailLog {
 }
 
 model Placement {
-  id           String   @id @default("main")
+  userId       String   @default("me") // per-user isolation (audit P0)
+  id           String   @default("main")
   answers      String   @default("[]")
   phase        String   @default("quiz")
   level        String   @default("?")
   writingLevel String   @default("?")
   updatedAt    DateTime @updatedAt
+
+  @@id([userId, id])
 }
 
 model ChatMsg {
@@ -189,34 +211,46 @@ model Exam {
 }
 
 // Measured CEFR band per skill, separate from the overall placement level.
+// Found still-global during the Task-67 sweep and scoped with the rest: a
+// measured band is learner data (audit P0).
 model SkillLevel {
-  skill     String   @id // grammar | vocabulary | writing | speaking | reading | listening
+  userId    String   @default("me") // per-user isolation (audit P0)
+  skill     String // grammar | vocabulary | writing | speaking | reading | listening
   level     String   @default("?")
   score     Float    @default(0) // 0..1 rolling mastery
   samples   Int      @default(0)
   updatedAt DateTime @updatedAt
+
+  @@id([userId, skill])
 }
 
 // Unlocked trophies. Keyed by stable achievement key from arcade.ts.
 model Achievement {
-  key  String   @id
-  at   DateTime @default(now())
-  meta String   @default("")
+  userId String   @default("me") // per-user isolation (audit P0)
+  key    String
+  at     DateTime @default(now())
+  meta   String   @default("")
+
+  @@id([userId, key])
 }
 
 // Per-game records: speed best score / best combo, boss wins, flawless runs.
 model GameStat {
-  key       String   @id // "speed:best", "speed:combo", "boss:wins", ...
+  userId    String   @default("me") // per-user isolation (audit P0)
+  key       String // "speed:best", "speed:combo", "boss:wins", ...
   best      Int      @default(0)
   plays     Int      @default(0)
   updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
 }
 
 // Three daily quests, regenerated deterministically from the learner's weak
 // spots. Progress is bumped from the same hooks that award XP; finishing a
 // quest pays its XP automatically.
 model Quest {
-  id       String  @id // "<day>:<key>"
+  userId   String  @default("me") // per-user isolation (audit P0)
+  id       String // "<day>:<key>"
   day      Int
   key      String  // template key: reviews_20, speed_play, boss_win, ...
   title    String
@@ -225,13 +259,16 @@ model Quest {
   progress Int     @default(0)
   done     Boolean @default(false)
   xp       Int     @default(0)
+
+  @@id([userId, id])
 }
 
 // The rubber-band rival. Its weekly XP is derived deterministically from the
 // learner's own 7-day average plus a seeded per-day jitter, so the race always
 // feels alive and winnable without any background jobs.
 model Rival {
-  id          String @id // "me"
+  userId      String @default("me") // per-user isolation (audit P0)
+  id          String // "me" (legacy singleton key)
   name        String
   weekXp      Int    @default(0)
   lastWeekXp  Int    @default(0)
@@ -239,25 +276,33 @@ model Rival {
   wins        Int    @default(0) // weeks the learner out-gained the rival
   losses      Int    @default(0)
   taunt       String @default("")
+
+  @@id([userId, id])
 }
 
 // Weekly league: one row, lazily rolled over. Division index into the
 // DIVISIONS ladder; history keeps every settled week (place, promoted...).
 model League {
-  id       String @id // "me"
+  userId   String @default("me") // per-user isolation (audit P0)
+  id       String // "me" (legacy singleton key)
   weekKey  Int    @default(-1)
   division Int    @default(0) // 0=Wood .. 5=Rahiator
   history  String @default("[]") // JSON: [{ week, division, place, promoted, demoted }]
+
+  @@id([userId, id])
 }
 
 // Generic run state for server-graded games: the Daily Dungeon keeps one row
 // per day (id "day:<n>"), the Gauntlet keeps a single live row (id
 // "gauntlet"). All gameplay lives in the JSON blob.
 model RunState {
-  id    String @id
+  userId String @default("me") // per-user isolation (audit P0)
+  id    String
   day   Int    @default(0)
   state String @default("{}") // JSON: { floors, hearts, shieldUsed, streak, seed, done, cleared }
   updatedAt DateTime @updatedAt
+
+  @@id([userId, id])
 }
 
 // The AI Director's daily briefing, cached per day so it never re-bills.
@@ -376,6 +421,7 @@ model ContentFlag {
 // every card carries its source sentence so nothing is context-free.
 model Material {
   id        String   @id @default(cuid())
+  userId    String   @default("me") // per-user isolation (audit P0, found in the Task-67 sweep: pasted texts are learner content)
   title     String
   source    String   @default("") // provenance: URL, book, "lecture notes"...
   text      String   @default("") // the full pasted text (capped server-side)
@@ -383,6 +429,8 @@ model Material {
   degraded  Boolean  @default(false) // extraction fell back (audit P1-7 honesty)
   createdAt DateTime @default(now())
   cards     MaterialCard[]
+
+  @@index([userId])
 }
 
 model MaterialCard {

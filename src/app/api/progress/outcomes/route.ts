@@ -23,10 +23,11 @@ const median = (xs: number[]): number => {
 export async function GET() {
   const today = dayIndex();
   const window = 30;
+  const u = await contentUserId().catch(() => "me");
 
   // 1) First-attempt retention: share of retrievals graded Good/Easy per day.
   const logs = await db.reviewLog.findMany({
-    where: { day: { gte: today - window } },
+    where: { userId: u, day: { gte: today - window } },
     select: { day: true, grade: true },
   });
   const byDay = new Map<number, { total: number; good: number }>();
@@ -47,7 +48,7 @@ export async function GET() {
   // 2) Stability proxy: median scheduled interval of retrievals per day -
   // rising intervals mean FSRS trusts the memory more (stability growth).
   const ivlLogs = await db.reviewLog.findMany({
-    where: { day: { gte: today - window } },
+    where: { userId: u, day: { gte: today - window } },
     select: { day: true, ivl: true },
   });
   const ivlByDay = new Map<number, number[]>();
@@ -64,7 +65,7 @@ export async function GET() {
     .map(([day, ivls]) => ({ day, medianIvl: median(ivls) }));
 
   // 3) Mature memory: how much of the started deck has crossed s >= 21d.
-  const states = await db.cardState.findMany();
+  const states = await db.cardState.findMany({ where: { userId: u } });
   const started = states.filter((s) => s.state !== "new");
   const mature = started.filter((s) => s.s >= 21);
   const memory = {
@@ -77,7 +78,6 @@ export async function GET() {
 
   // 4) Mistake-family extinction: how many persistent error families the
   // healing loop has retired (2 clean exam hits) vs still active.
-  const u = await contentUserId();
   const fams = await db.mistakeFamily.findMany({ where: { userId: u }, select: { kind: true, resolvedAt: true, count: true } });
   const families = {
     total: fams.length,

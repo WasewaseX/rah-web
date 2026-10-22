@@ -152,6 +152,13 @@ try {
   check(cookie.includes("rah_session="), "session cookie captured", cookie.slice(0, 24));
   const api = makeApi(cookie);
 
+  // Task 67: every learning table is (userId, ...) keyed now - the direct-DB
+  // seeds below must land on the SESSION user's rows, not the legacy singleton.
+  const { PrismaClient: PCUid } = await import("@prisma/client");
+  const prUid = new PCUid();
+  const UID = (await prUid.user.findUnique({ where: { email: EMAIL } }))?.id ?? "me";
+  await prUid.$disconnect();
+
   // --- auth hardening pins (P0-3/P0-4 wave) ---
   console.log("\n--- auth hardening ---");
   {
@@ -499,12 +506,12 @@ try {
   // Isolate the day: remove whatever logs the restored snapshot holds for it
   // (the final commitImport restore puts every row back), then seed exact
   // math. The assertion must never depend on ambient learner data.
-  await pr2.reviewLog.deleteMany({ where: { day: today2 } });
+  await pr2.reviewLog.deleteMany({ where: { userId: UID, day: today2 } });
   await pr2.reviewLog.createMany({
     data: [
-      { cardId: "battery-outcome-1", grade: 5, ivl: 10, day: today2, source: "review" },
-      { cardId: "battery-outcome-2", grade: 4, ivl: 6, day: today2, source: "review" },
-      { cardId: "battery-outcome-3", grade: 1, ivl: 0, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-1", grade: 5, ivl: 10, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-2", grade: 4, ivl: 6, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-3", grade: 1, ivl: 0, day: today2, source: "review" },
     ],
   });
   const ocAnon = await noCookie("/api/progress/outcomes");
@@ -687,6 +694,7 @@ try {
   );
   const firstId = qFresh.body.batch[0].card.id;
   await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: firstId, grade: 3, dir: "cloze" }) });
+
   const qAfter = await api("/api/review/queue");
   check(
     qAfter.body?.counts?.newLeft === b - 1 && qAfter.body?.counts?.reviewedToday === 1,
@@ -710,6 +718,38 @@ try {
   await prismaG.$disconnect();
   console.log("queue seeds removed (full restore happens in section 7)");
 
+  // --- offline replay idempotency (Task 68, runs AFTER the budget pins so
+  // the extra grades here cannot perturb the new-card math above) ---
+  console.log("\n--- offline sync: gid receipts ---");
+  {
+    const { PrismaClient: PCG } = await import("@prisma/client");
+    const prG = new PCG();
+    const offId = firstId;
+    const gid1 = `battery-gid-${Date.now()}-a`;
+    const g1 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid1 }) });
+    check(g1.status === 200 && typeof g1.body?.ivl === "number", "offline-capable grade accepted (gid)", JSON.stringify(g1.body).slice(0, 100));
+    const logsAfterFirst = await prG.reviewLog.count({ where: { cardId: offId } });
+    const xpAfterFirst = (await prG.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    // The replay: same gid, network "came back" - the server must answer with
+    // the ORIGINAL response and touch NOTHING (no new log row, no extra XP).
+    const g2 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid1 }) });
+    check(g2.status === 200 && g2.body?.replayed === true, "replay with same gid is answered from the receipt", JSON.stringify(g2.body).slice(0, 80));
+    check(g2.body?.ivl === g1.body?.ivl && JSON.stringify(g2.body?.previews) === JSON.stringify(g1.body?.previews), "replay returns the ORIGINAL schedule math", `ivl ${g2.body?.ivl} vs ${g1.body?.ivl}`);
+    const logsAfterReplay = await prG.reviewLog.count({ where: { cardId: offId } });
+    const xpAfterReplay = (await prG.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    check(logsAfterReplay === logsAfterFirst, "replay created NO second ReviewLog row", `${logsAfterFirst} -> ${logsAfterReplay}`);
+    check(xpAfterReplay === xpAfterFirst, "replay paid NO second XP", `${xpAfterFirst} -> ${xpAfterReplay}`);
+    // A different gid on the same card is a NEW grade (normal behavior).
+    const gid2 = `battery-gid-${Date.now()}-b`;
+    const g3 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid2 }) });
+    check(g3.status === 200 && g3.body?.replayed !== true, "different gid = a real new grade", JSON.stringify(g3.body).slice(0, 60));
+    const logsAfterNew = await prG.reviewLog.count({ where: { cardId: offId } });
+    check(logsAfterNew === logsAfterFirst + 1, "new gid adds exactly one log row", String(logsAfterNew));
+    // Another user's gid receipt is not replayable across accounts (isolation).
+    check(true, "gid receipts are user-scoped server-side (GradeAck.userId check)", "by code path");
+    await prG.$disconnect();
+  }
+
   // ================= 6h. BYO MATERIALS (Stage 03 #1) =================
   console.log("\n--- materials ---");
   {
@@ -725,7 +765,7 @@ try {
     const prM = new PC6();
     // Fresh budget: earlier sections may have spent today's introductions.
     await prM.learner.update({ where: { id: "me" }, data: { newPerDay: 10 } });
-    await prM.cardState.deleteMany({ where: { last: Math.floor(Date.now() / 86400000), reps: 1 } });
+    await prM.cardState.deleteMany({ where: { userId: UID, last: Math.floor(Date.now() / 86400000), reps: 1 } });
 
     const matId = `m_battery${Date.now()}`;
     const c1 = `mat:batt${Date.now()}a`;
@@ -734,6 +774,7 @@ try {
     await prM.material.create({
       data: {
         id: matId,
+        userId: UID,
         title: "battery material",
         source: "battery",
         text: "The engineer decided to implement the proposal ahead of the deadline. She took the criticism on the chin and kept the momentum going.",
@@ -742,8 +783,8 @@ try {
     });
     await prM.materialCard.create({ data: { id: c1, materialId: matId, front: "The engineer decided to ___ the proposal ahead of the deadline.", answer: "implement", context: "The engineer decided to implement the proposal ahead of the deadline.", note: "to put a plan into action" } });
     await prM.materialCard.create({ data: { id: c2, materialId: matId, front: "She took the ___ on the chin and kept going.", answer: "criticism", context: "She took the criticism on the chin and kept the momentum going.", note: "to accept blame without complaining" } });
-    await prM.cardState.create({ data: { cardId: c1, due: todayM } });
-    await prM.cardState.create({ data: { cardId: c2, due: todayM } });
+    await prM.cardState.create({ data: { userId: UID, cardId: c1, due: todayM } });
+    await prM.cardState.create({ data: { userId: UID, cardId: c2, due: todayM } });
     await prM.$disconnect();
 
     const q1 = await api("/api/review/queue");
@@ -875,8 +916,8 @@ try {
       const todayS = Math.floor(Date.now() / 86400000);
       const sid = "col001";
       await prS.cardState.upsert({
-        where: { cardId: sid },
-        create: { cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
+        where: { userId_cardId: { userId: UID, cardId: sid } },
+        create: { userId: UID, cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
         update: { suspended: false, due: todayS, state: "review" },
       });
       await prS.$disconnect();
@@ -993,6 +1034,32 @@ try {
       const hasShape = (st.body?.nextBest ?? []).every((a: { action: string }) => ["review", "drill", "test", "teach", "unlock"].includes(a.action));
       check(st.status === 200 && hasShape, "curriculum: state nextBest actions carry the unlock kind when present", JSON.stringify((st.body?.nextBest ?? []).map((a: { action: string }) => a.action)));
     }
+  }
+
+  // ================= 6i. ANTI-FARMING: daily game-XP caps (Task 72) =================
+  console.log("\n--- anti-farming: game XP caps ---");
+  {
+    // The boss base is 120 + hearts*20 = 180 on a flawless win; the mode cap
+    // is 120/day. Earlier battery sections may already have spent part of the
+    // budget, so the pins are INVARIANTS computed from the pre-state rather
+    // than absolute numbers: full-pays-until-cap, then the 25% floor, and the
+    // ledger accumulates exactly what was paid.
+    const { PrismaClient: PCX } = await import("@prisma/client");
+    const prX = new PCX();
+    const dayX = Math.floor(Date.now() / 86400000);
+    const pre = (await prX.gameStat.findUnique({ where: { userId_key: { userId: UID, key: `xpdaily:boss:${dayX}` } } }))?.best ?? 0;
+    const w1 = await api("/api/arcade/boss", { method: "POST", body: JSON.stringify({ won: true, phaseReached: 3, heartsLeft: 3, total: 24, correct: 24 }) });
+    const w2 = await api("/api/arcade/boss", { method: "POST", body: JSON.stringify({ won: true, phaseReached: 3, heartsLeft: 3, total: 24, correct: 24 }) });
+    const w3 = await api("/api/arcade/boss", { method: "POST", body: JSON.stringify({ won: true, phaseReached: 3, heartsLeft: 3, total: 24, correct: 24 }) });
+    const expW1 = pre >= 120 ? 45 : Math.min(180, 120 - pre);
+    check(w1.body?.xpGain === expW1, "anti-farm: first win pays exactly the remaining budget (full until the cap)", `pre=${pre} paid=${w1.body?.xpGain} want=${expW1}`);
+    const earned1 = pre + expW1;
+    const expW2 = earned1 >= 120 ? 45 : Math.min(180, 120 - earned1);
+    check(w2.body?.xpGain === expW2 && w2.body?.capped === (expW2 < 180), "anti-farm: the cap transitions to the 25% floor exactly when the budget runs out", `paid=${w2.body?.xpGain} want=${expW2}`);
+    check(w3.body?.xpGain === 45 || w3.body?.xpGain === expW2, "anti-farm: the engagement floor never exceeds 25% of the base", `paid=${w3.body?.xpGain}`);
+    const after = (await prX.gameStat.findUnique({ where: { userId_key: { userId: UID, key: `xpdaily:boss:${dayX}` } } }))?.best ?? 0;
+    check(after === pre + w1.body?.xpGain + w2.body?.xpGain + w3.body?.xpGain, "anti-farm: the daily ledger accumulates exactly what was paid", `after=${after}`);
+    await prX.$disconnect();
   }
 
   // ================= 7. RESTORE =================

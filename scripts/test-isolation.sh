@@ -176,6 +176,77 @@ print(c.execute(\"SELECT COUNT(*) FROM ChatMsg WHERE userId=?\", (b,)).fetchone(
 check "A's delete removes only A's chats" "$A_LEFT" "0"
 check "B's chats survive A's delete"      "$B_LEFT" "1"
 
+# --- state isolation (Task 67): FSRS queue + arcade meta + bands + materials --
+# The Task-63/65 sweeps left CardState (the deck queue) + arcade meta global.
+# Task 67 keys ALL of them (userId, ...) - this section proves the queue, the
+# trophies, the game records, quests, the rival, the measured bands, the
+# placement history and the imported materials are per-user now.
+python3 - "$DB" <<'PY'
+import sqlite3, sys
+db = sys.argv[1].replace("file:", "")
+c = sqlite3.connect(db)
+a = c.execute("SELECT id FROM User WHERE email='iso-a@rah.test'").fetchone()[0]
+b = c.execute("SELECT id FROM User WHERE email='iso-b@rah.test'").fetchone()[0]
+c.execute("INSERT INTO CardState (userId, cardId, s, d, due, state) VALUES (?,?,?,?,?,?)", (a, "col002", 3, 5, 1, "review"))
+c.execute("INSERT INTO CardState (userId, cardId, s, d, due, state) VALUES (?,?,?,?,?,?)", (b, "col003", 3, 5, 1, "review"))
+c.execute("INSERT INTO Achievement (userId, key, at) VALUES (?,?,datetime('now'))", (a, "millennium"))
+c.execute("INSERT INTO GameStat (userId, key, best, plays, updatedAt) VALUES (?,?,?,?,datetime('now'))", (a, "speed:best", 321, 1))
+c.execute("INSERT INTO Placement (userId, id, answers, phase, level, writingLevel, updatedAt) VALUES (?,?,?,?,?,?,datetime('now'))", (a, "main", "{}", "done", "C1", "C1"))
+c.execute("INSERT INTO Material (id, userId, title, source, text, words, createdAt) VALUES (?,?,?,?,?,?,datetime('now'))", ("m_isoA", a, "A-SECRET-material", "test", "A secret reading passage for isolation testing. " * 4, 24))
+c.execute("INSERT INTO MaterialCard (id, materialId, front, answer, context, note) VALUES (?,?,?,?,?,?)", ("mat:isoA", "m_isoA", "___ passage", "secret", "A secret reading passage.", "hint"))
+c.commit()
+print("seeded state rows")
+c.close()
+PY
+A_Q=$(curl -s -b "$JA" "$BASE/api/review/queue" | python3 scripts/iso-parse.py queue_has "col002")
+B_Q=$(curl -s -b "$JB" "$BASE/api/review/queue" | python3 scripts/iso-parse.py queue_has "col002")
+check "A's queue serves A's card"          "$A_Q" "1"
+check "B's queue never serves A's card"    "$B_Q" "0"
+curl -s -b "$JA" -X POST "$BASE/api/review/grade" -H 'content-type: application/json' -d '{"cardId":"col001","grade":3,"dir":"cloze"}' > /dev/null
+A_SEEN=$(curl -s -b "$JA" "$BASE/api/state" | python3 scripts/iso-parse.py state_seen)
+B_SEEN=$(curl -s -b "$JB" "$BASE/api/state" | python3 scripts/iso-parse.py state_seen)
+check "A's seen count = own cards (2)"     "$A_SEEN" "2"
+check "B's seen count = own cards (1)"     "$B_SEEN" "1"
+A_ACH=$(curl -s -b "$JA" "$BASE/api/state" | python3 scripts/iso-parse.py state_unlocked "millennium")
+B_ACH=$(curl -s -b "$JB" "$BASE/api/state" | python3 scripts/iso-parse.py state_unlocked "millennium")
+check "A has own trophy"                   "$A_ACH" "1"
+check "B does NOT have A's trophy"         "$B_ACH" "0"
+A_BEST=$(curl -s -b "$JA" "$BASE/api/arcade/speed" | python3 scripts/iso-parse.py speed_best)
+B_BEST=$(curl -s -b "$JB" "$BASE/api/arcade/speed" | python3 scripts/iso-parse.py speed_best)
+check "A sees own speed record"            "$A_BEST" "321"
+check "B does NOT see A's speed record"    "$B_BEST" "0"
+# Quests + rival: lazily created per user by /api/state - both users must get
+# their OWN rows under the SAME day and the SAME ids (composite PK allows it).
+curl -s -b "$JA" "$BASE/api/state" > /dev/null; curl -s -b "$JB" "$BASE/api/state" > /dev/null
+QDB=$(echo $DB | sed s/file://)
+QA=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$QDB')
+a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
+print(c.execute('SELECT COUNT(*) FROM Quest WHERE userId=?', (a,)).fetchone()[0])")
+QB=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$QDB')
+b = c.execute(\"SELECT id FROM User WHERE email='iso-b@rah.test'\").fetchone()[0]
+print(c.execute('SELECT COUNT(*) FROM Quest WHERE userId=?', (b,)).fetchone()[0])")
+check "A has own quest rows (3)"           "$QA" "3"
+check "B has own quest rows (3)"           "$QB" "3"
+RIVALS=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$QDB')
+print(c.execute('SELECT COUNT(*) FROM Rival').fetchone()[0])")
+check "rival rows are per-user (2)"        "$RIVALS" "2"
+A_PL=$(curl -s -b "$JA" "$BASE/api/placement" | python3 scripts/iso-parse.py placement_level)
+B_PL=$(curl -s -b "$JB" "$BASE/api/placement" | python3 scripts/iso-parse.py placement_level)
+check "A reads own placement band (C1)"    "$A_PL" "C1"
+check "B does NOT read A's placement"      "$B_PL" "?"
+MAT_B=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" "$BASE/api/materials?id=m_isoA")
+check "B reading A's material = 404"       "$MAT_B" "404"
+MAT_DEL=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" -X DELETE "$BASE/api/materials?id=m_isoA")
+check "B deleting A's material = 404"      "$MAT_DEL" "404"
+MAT_A=$(curl -s -b "$JA" "$BASE/api/materials" | python3 scripts/iso-parse.py materials_has "A-SECRET-material")
+check "A sees own material in list"        "$MAT_A" "1"
+
 # --- mailer idempotency ledger (P2) ------------------------------------------
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null
