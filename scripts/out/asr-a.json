@@ -1,0 +1,14 @@
+{
+  "created": 1792659457,
+  "id": "20261022165737994f3aee8dad48d0",
+  "request_id": "20261022165737994f3aee8dad48d0",
+  "text": "I would like to reserve a table for two people at eight in the evening.",
+  "usage": {
+    "completion_tokens": 17,
+    "prompt_tokens": 114,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 131
+  }
+}

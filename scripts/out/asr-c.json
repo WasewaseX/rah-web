@@ -1,0 +1,14 @@
+{
+  "created": 1792659484,
+  "id": "20261022165804e093139e4adb461e",
+  "request_id": "20261022165804e093139e4adb461e",
+  "text": "We went to see a very wide river in the west on a windy Wednesday.",
+  "usage": {
+    "completion_tokens": 18,
+    "prompt_tokens": 116,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 134
+  }
+}
