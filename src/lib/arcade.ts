@@ -445,6 +445,59 @@ export async function awardXp(amount: number, opts?: { chainHit?: boolean; perkX
   };
 }
 
+// ---------- Anti-farming: daily XP caps per game mode ----------
+
+// The audit's polish row: "anti-farming pass". Game modes are replayable by
+// design (a Speed Round is a game), so a determined player could sit on one
+// mode all day minting XP. Reviews and exams stay uncapped - they ARE the
+// learning work; the games are seasoning. Each mode gets a daily BASE-XP
+// budget: full payout until the cap, then 25% (engagement still pays, farming
+// stops paying). Heat/talent/shop multipliers still apply AFTER the cap on
+// the allowed amount, exactly as before. Quest payouts are untouched (they
+// are one-shot rewards, not loops).
+export const GAME_XP_CAPS: Record<string, number> = {
+  speed: 150,
+  duel: 120,
+  dungeon: 160,
+  gauntlet: 120,
+  boss: 120,
+  flow: 100,
+  pairs: 80,
+};
+
+async function addGameXpEarned(mode: string, amount: number): Promise<number> {
+  const u = await uid();
+  const key = `xpdaily:${mode}:${dayIndex()}`;
+  const row = await db.gameStat.upsert({
+    where: { userId_key: { userId: u, key } },
+    create: { userId: u, key, best: amount, plays: 0 },
+    update: { best: { increment: amount } },
+  });
+  return row.best;
+}
+
+export async function gameXpEarnedToday(mode: string): Promise<number> {
+  const u = await uid();
+  const row = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: `xpdaily:${mode}:${dayIndex()}` } } });
+  return row?.best ?? 0;
+}
+
+export interface GameXpResult extends XpResult {
+  paid: number; // base amount actually paid (after the cap, before multipliers)
+  capped: boolean; // true when the daily budget for this mode was already spent
+  cap: number;
+}
+
+export async function awardGameXp(mode: string, base: number, opts?: { chainHit?: boolean }): Promise<GameXpResult> {
+  const cap = GAME_XP_CAPS[mode] ?? 100;
+  const earned = await gameXpEarnedToday(mode);
+  const safeBase = Math.max(0, Math.round(base));
+  const paid = earned >= cap ? Math.round(safeBase * 0.25) : Math.min(safeBase, cap - earned);
+  const res = await awardXp(paid, opts);
+  if (paid > 0) await addGameXpEarned(mode, paid);
+  return { ...res, paid, capped: paid < safeBase, cap };
+}
+
 // ---------- Daily quests ----------
 
 interface QuestTemplate {

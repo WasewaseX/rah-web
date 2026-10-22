@@ -209,9 +209,27 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
                 <span className="text-sm font-black text-[#9dc0ff]">{Math.round(gap * 100)} pts</span>
               </div>
               <p className="mt-1.5 text-xs leading-relaxed text-[#7d889c]">
-                {lagging.map((s) => `${s.skill} (${Math.round(s.score * 100)})`).join(" and ")} drag the average. Close the gap with roughly {itemsNeeded} graded items in those two -
+                {lagging.map((s) => `${s.skill} (${Math.round(s.score * 100)}, ${s.samples} graded item${s.samples === 1 ? "" : "s"})`).join(" and ")} drag the average. Close the gap with roughly {itemsNeeded} graded items in those two -
                 {daysOut !== null && daysOut < 400 ? ` at your current pace that lands in ~${daysOut} days.` : " keep feeding the coach daily and the estimate sharpens."}
               </p>
+              {/* Placement confidence (audit polish #6): bands carry their
+                  evidence size. Under 10 samples a band is an estimate, and
+                  the UI says so instead of letting it read as a verdict. */}
+              {(() => {
+                const thin = measured.filter((s) => s.samples < 10);
+                if (thin.length === 0) {
+                  return (
+                    <p className="mt-2 text-[11px] leading-relaxed text-[#5d6879]">
+                      All measured bands stand on 10+ graded items - confident estimates, still tightening with every review.
+                    </p>
+                  );
+                }
+                return (
+                  <p className="mt-2 text-[11px] leading-relaxed text-[#5d6879]">
+                    {thin.map((s) => s.skill).join(", ")} {thin.length === 1 ? "is" : "are"} measured on fewer than 10 graded items - treat that band as a rough estimate that firms up with practice, not a verdict.
+                  </p>
+                );
+              })()}
             </div>
           );
         })()}

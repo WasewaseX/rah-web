@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
 import { ladderFor } from "@/lib/ladder";
-import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
 import { buildDungeonFloors, normalizeAnswer, type ArcadeItem, type DungeonFloor } from "@/lib/arcade-items";
 import type { XpResult } from "@/lib/arcade";
 import { contentUserId } from "@/lib/scope";
@@ -79,6 +79,7 @@ interface GradeOut {
   cleared: number;
   perfect: boolean;
   xp?: number;
+  capped?: boolean;
   xpResult?: Pick<XpResult, "total" | "leveledUp" | "unlocked">;
 }
 
@@ -116,8 +117,9 @@ export async function POST(req: Request) {
     const table = [0, 40, 90, 160];
     const gain = (table[state.cleared] ?? 0) + (out.perfect ? 50 : 0);
     if (gain > 0) {
-      const xp = await awardXp(gain, { chainHit: state.hits >= 6 });
-      out.xp = gain;
+      const xp = await awardGameXp("dungeon", gain, { chainHit: state.hits >= 6 });
+      out.xp = xp.paid;
+      out.capped = xp.capped;
       out.xpResult = { total: xp.total, leveledUp: xp.leveledUp, unlocked: xp.unlocked };
     }
     if (state.cleared >= 1) await progressQuest("dungeon_1", 1);

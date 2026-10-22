@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
-import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
 import { buildSpeedPool, duelPar } from "@/lib/arcade-items";
 import { contentUserId } from "@/lib/scope";
 
@@ -63,12 +63,13 @@ export async function POST(req: Request) {
     await registerMiss();
   }
   await bumpStat("duel:plays");
-  const xp = await awardXp(win ? 60 : 25, { chainHit: win });
+  const xp = await awardGameXp("duel", win ? 60 : 25, { chainHit: win });
   return NextResponse.json({
     win,
     youScore,
     rivalScore,
-    xpGain: win ? 60 : 25,
+    xpGain: xp.paid,
+    capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     unlocked: xp.unlocked,

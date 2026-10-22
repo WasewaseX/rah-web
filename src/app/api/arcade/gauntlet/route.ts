@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { awardXp, bumpStat, progressQuest, registerHit, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerHit, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
 import { buildGauntletItem, normalizeAnswer } from "@/lib/arcade-items";
 import { contentUserId } from "@/lib/scope";
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
   await bumpStat("gauntlet:runs");
   await progressQuest("gauntlet_10", streak);
   let xpResult;
-  if (gain > 0) xpResult = await awardXp(gain, { chainHit: false });
+  if (gain > 0) xpResult = await awardGameXp("gauntlet", gain, { chainHit: false });
   await registerMiss();
-  return NextResponse.json({ correct: false, saved: false, streak, xpGain: gain, totalXp: xpResult?.total, unlocked: xpResult?.unlocked ?? [] });
+  return NextResponse.json({ correct: false, saved: false, streak, xpGain: xpResult?.paid ?? 0, capped: xpResult?.capped ?? false, totalXp: xpResult?.total, unlocked: xpResult?.unlocked ?? [] });
 }

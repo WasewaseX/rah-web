@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, type FsrsState } from "@/lib/fsrs";
-import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { touchStreak } from "@/lib/server";
 import { buildPairs } from "@/lib/pairs";
 import { contentUserId } from "@/lib/scope";
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   const graded = matched.length;
   const clean = graded > 0 && missteps === 0;
   const xpAmount = graded * 2 + (clean ? 10 : 0);
-  const xp = xpAmount > 0 ? await awardXp(xpAmount, { chainHit: clean }) : null;
+  const xp = xpAmount > 0 ? await awardGameXp("pairs", xpAmount, { chainHit: clean }) : null;
 
   await bumpStat("pairs:plays");
   if (clean) await bumpStat("pairs:clean", graded);
@@ -86,7 +86,8 @@ export async function POST(req: Request) {
   return NextResponse.json({
     graded,
     clean,
-    xpGain: xpAmount,
+    xpGain: xp?.paid ?? 0,
+    capped: xp?.capped ?? false,
     totalXp: xp?.total ?? 0,
     leveledUp: xp?.leveledUp ?? false,
     level: xp?.level ?? 0,

@@ -11,8 +11,8 @@ import { startDaily, clearMode } from "./mode-flow";
 import { updateSkillLevels, getSkillLevels, buildAssessment, spreadLine } from "./levels";
 import { parseThemeRequest, presetById, PRESETS } from "./theme";
 import { topMistakes } from "@/lib/mistakes";
-import { EXAM_TRACKS } from "@/lib/agent/exam-tracks";
 import { contentUserId } from "@/lib/scope";
+import { EXAM_TRACKS } from "@/lib/agent/exam-tracks";
 import { basePersona } from "./skills-util";
 
 const TAG_TO_SKILL: Record<string, string> = {
@@ -612,14 +612,17 @@ Output ONE JSON object, no em dash.`,
       // not a 7-second token stream. Every pass below does real work; the
       // minimum window at the end guarantees the promised depth of attention.
       const MIN_ANALYSIS_MS = 25000;
-      // 1. Evidence gathering: everything the app has measured.
+      // 1. Evidence gathering: everything the app has measured FOR THIS USER.
+      // Scoped (Task 67 straggler): essays, transcripts and coach turns are
+      // learner content - the coach must never quote another account's rows.
+      const evidenceUser = await contentUserId().catch(() => "me");
       steps.push({ label: "Collecting evidence", detail: "reviews, lapses, writing, speaking, chats" });
       const [reviewCount, lapseRows, writes, speaks, corrections, quizItems, levels] = await Promise.all([
-        db.reviewLog.count(),
-        db.reviewLog.findMany({ where: { grade: 1 }, orderBy: { id: "desc" }, take: 20 }),
-        db.writingSub.findMany({ orderBy: { id: "desc" }, take: 3 }),
-        db.speakSession.findMany({ orderBy: { id: "desc" }, take: 3 }),
-        db.chatMsg.findMany({ where: { role: "coach" }, orderBy: { id: "desc" }, take: 25 }),
+        db.reviewLog.count({ where: { userId: evidenceUser } }),
+        db.reviewLog.findMany({ where: { userId: evidenceUser, grade: 1 }, orderBy: { id: "desc" }, take: 20 }),
+        db.writingSub.findMany({ where: { userId: evidenceUser }, orderBy: { id: "desc" }, take: 3 }),
+        db.speakSession.findMany({ where: { userId: evidenceUser }, orderBy: { id: "desc" }, take: 3 }),
+        db.chatMsg.findMany({ where: { userId: evidenceUser, role: "coach" }, orderBy: { id: "desc" }, take: 25 }),
         db.quizItem.count(),
         getSkillLevels(),
       ]);

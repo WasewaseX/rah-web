@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
-import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { buildSpeedPool } from "@/lib/arcade-items";
 
 import { aiRateLimit } from "@/lib/rate-limit";
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
   const ms = Math.min(3_600_000, Math.max(30_000, Math.round(Number(b.ms ?? 900_000))));
   const gain = correct * 10 + (total >= 8 && correct / Math.max(1, total) >= 0.8 ? 30 : 0);
-  const xp = gain > 0 ? await awardXp(gain, { chainHit: correct / Math.max(1, total) >= 0.8 }) : null;
+  const xp = gain > 0 ? await awardGameXp("flow", gain, { chainHit: correct / Math.max(1, total) >= 0.8 }) : null;
 
   // Flow streak: consecutive days with at least one completed flow.
   const today = dayIndex();
@@ -46,7 +46,8 @@ export async function POST(req: Request) {
   await bumpStat("flow:plays");
   await progressQuest("flow_1", 1);
   return NextResponse.json({
-    xpGain: gain,
+    xpGain: xp?.paid ?? 0,
+    capped: xp?.capped ?? false,
     totalXp: xp?.total,
     leveledUp: xp?.leveledUp ?? false,
     unlocked: xp?.unlocked ?? [],
