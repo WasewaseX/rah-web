@@ -44,7 +44,8 @@ export async function GET(req: Request) {
       cur = await db.writingSub.findFirst({ where: { id: cur.parentId, ...scope } });
     }
     if (chain.length === 0) return NextResponse.json({ error: "Submission not found." }, { status: 404 });
-    return NextResponse.json({ chain: chain.reverse() });
+    const ordered = chain.reverse();
+    return NextResponse.json({ chain: ordered, rubric: rubricHistory(ordered) });
   }
   const rows = await db.writingSub.findMany({ where: scope, orderBy: { id: "desc" }, take: 10 });
   return NextResponse.json({
@@ -119,6 +120,28 @@ export async function POST(req: Request) {
     await Promise.allSettled(errs.map((e) => noteTagOutcome(e.tag, false)));
   }
   return NextResponse.json({ ...result, ruleChecks });
+}
+
+// Rubric history (audit: writing-revision workspace - criterion-level deltas
+// across a revision chain). The grader stores four criterion scores on every
+// graded submission; the chain view compares the FIRST and LAST graded ends
+// so the learner sees WHERE the revision moved the needle - and an honest
+// null when a chain has fewer than two graded ends (no invented numbers).
+export function rubricHistory(chain: { result: WritingResult | null }[]): {
+  criteria: { key: string; first: number; last: number; delta: number }[];
+  note: string;
+} | null {
+  const graded = chain.filter((c) => c.result && c.result.scores);
+  if (graded.length < 2) {
+    return { criteria: [], note: "Revise once more to unlock criterion deltas - two graded drafts make a comparison." };
+  }
+  const first = graded[0].result!.scores;
+  const last = graded[graded.length - 1].result!.scores;
+  const keys = ["task", "organization", "range", "accuracy"] as const;
+  return {
+    criteria: keys.map((k) => ({ key: k, first: first[k], last: last[k], delta: Math.round((last[k] - first[k]) * 10) / 10 })),
+    note: "Deltas compare the first and last graded drafts of this chain.",
+  };
 }
 
 function safeParse(s: string): WritingResult | null {

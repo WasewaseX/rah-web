@@ -175,7 +175,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - 🟡 Exam tracks (IELTS/TOEFL/C1A) — format-faithful tracks shipped (Task 66); **scores are practice estimates** until grading is validated against expert-reviewed responses and exam-specific rubrics
 - 🟡 Acoustic pronunciation assessment — **word-level measured tier shipped (Task 64)**; NOT a complete phonetic/accent assessment until the Azure phoneme adapter is configured AND validated
 - 🟡 Offline sync — **the daily-habit write loop is offline now (Task 68)**: gid-receipt grade idempotency (replays return the original response, nothing double-counts), client outbox, reconnect flush, honest badge + PWA offline shell/reads; honest residual: chats/writings/arcade scores still refuse offline (by design, honestly labeled) and physical-device spot-check beyond emulation pending
-- 🟡 Writing-revision workspace — revision chain + revise flow shipped (Task 63); comprehensive revision-and-rubric system pending
+- 🟡 Writing-revision workspace — revision chain + revise flow (Task 63) + criterion-level rubric history (Task 77: per-criterion deltas across the chain, honest unlock note under two graded ends); remaining: per-revision criterion-level edit suggestions
 - 🟡 Evidence-backed reference · 🟡 Content quality console (regression tests per flag pending)
 
 ### Polish (8 done, 2 partial — the parallel wave closed transparency/placement/reports/anti-farming)

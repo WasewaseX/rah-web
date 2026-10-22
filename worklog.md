@@ -1248,3 +1248,19 @@ Work Log:
 
 Stage Summary:
 - All three evaluator criticals now have shipped artifacts: #1 PostgreSQL path validated end-to-end (Task 74), #2 the sweep with evidence + purge template (Task 75), #3 the pilot protocol + instrument with the Week-0 baseline (Task 76). The remaining work on all three is either a single human action (file the Support request) or time (run the cutover on the real deployment; accumulate pilot weeks).
+
+---
+Task ID: 77
+Agent: Super Z (main)
+Task: Continue the backlog - writing rubric history (criterion-level deltas), the audit's remaining writing-workspace gap; also close the CI failure the Task-74 push caused (76-bis hotfix, verified in this wave).
+
+Work Log:
+- 76-bis FIRST (CI red): the Task-74 push failed the CI check job - scripts/pg-validate.ts imports the generated PG client (gitignored), which a fresh CI checkout cannot resolve. Fixed by excluding the instrument (and prisma/pg-client) from tsconfig; tsc verified green WITH the client removed from the tree (the CI condition). Lesson recorded: CI is the fresh-checkout truth - sandbox-generated imports must be excluded or stubbed.
+- SCOPED the writing grader first: every graded submission already stores criterion scores (task/organization/range/accuracy) in its result JSON - the rubric-history layer is a chain-level view, not a new grader.
+- API: GET /api/writing?id=N now returns `rubric` - rubricHistory(chain) compares the FIRST and LAST graded ends per criterion (one-decimal deltas, declines render honestly negative, fewer than two graded ends -> an explicit unlock note, never invented numbers). Middle submissions cannot distort the end-to-end delta (pinned).
+- UI: the revising banner in Write.tsx shows the delta chips (green up / rose down / neutral flat) with first->last in the tooltip and the honesty note inline; rubric state cleared with the revising cancel.
+- BATTERY CATCH: my own first assertion contradicted the intended rounding contract (compared against unrounded floats) - the instrument was right, the test was wrong; fixed the assertion and pinned the rounding as deliberate.
+- GATES: writing-rubric unit battery 11/11, main battery 425/425 (route change additive), tsc 0, eslint 0 on touched files.
+
+Stage Summary:
+- The writing-workspace PARTIAL narrowed to its honest residual (per-revision criterion-level edit suggestions). The pilot's writing track now has its quality-delta instrument ready for when the learner's chains accumulate.
