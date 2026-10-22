@@ -180,7 +180,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 
 ### Polish (8 done, 2 partial — the parallel wave closed transparency/placement/reports/anti-farming)
 - ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier) · ✅ Mistake memory/mastery (Task 65) · ✅ Coach transparency — verified already-shipped (Task 72: next-best actions carry per-action measured reasons) · ✅ Placement confidence (Task 72: per-skill sample counts + stated uncertainty) · ✅ Progress reports (Task 70: first-try recall curve + standing proxy-metric caveat) · ✅ XP/gems/quests anti-farming (Task 72: per-mode daily XP budgets, 25% engagement floor, ledger==sum-of-paids invariant)
-- 🟡 Exam generation/grading (item-bank validation + distractor quality pass pending) · 🟡 Onboarding/naming (full plain-language naming audit pending)
+- ✅ Exam generation/grading (Task 81: distractor quality gate + repair closed the last clause) · 🟡 Onboarding/naming (full plain-language naming audit pending)
 
 ### Reverse-engineering targets (3 done, 1 partial)
 - ✅ Anki · ✅ Duolingo · ✅ LingQ (Task 71: RE study + MaterialReader imported-reading workflow — tap-to-lookup in context, grades through the same FSRS queue, offline-safe via the outbox; per-token known-word ledger deliberately not copied, honest reason recorded) · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key)
@@ -223,7 +223,7 @@ The evaluator's third re-review replaced the flat 39-item count with per-categor
 |----------|------|---------|---------|
 | Original critical fixes | 10 | 0 | 0 |
 | Critical feature additions (10) | 6 | 4 | 0 |
-| Existing-feature polish (10) | 8 | 2 | 0 |
+| Existing-feature polish (10) | 9 | 1 | 0 |
 | Reverse-engineering benchmarks | 3 | 1 | 0 |
 | Three recommended data stores | 0 | 0 | 3 |
 | Three recommended API integrations | 2 | 1 | 0 |

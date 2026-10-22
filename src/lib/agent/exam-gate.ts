@@ -109,6 +109,47 @@ export function itemAnswerable(r: GateInput): GateVerdict {
   return { ok: true, reason: "" };
 }
 
+/**
+ * Distractor quality gate (Task 81, polish #5): an MCQ with duplicate,
+ * empty or key-identical distractors is not a question - it is a giveaway.
+ * Deterministic: same choices in, same verdict out.
+ */
+export function distractorQuality(choices: string[], a: string): GateVerdict {
+  const key = norm(String(a ?? ""));
+  const cleaned = choices.map((c) => String(c).trim()).filter(Boolean);
+  if (cleaned.length !== choices.length) return { ok: false, reason: "empty distractor" };
+  const normed = cleaned.map(norm);
+  if (new Set(normed).size !== normed.length) return { ok: false, reason: "duplicate choices" };
+  const distractors = normed.filter((c) => c !== key);
+  if (distractors.length < 2) return { ok: false, reason: "fewer than 2 real distractors" };
+  // Plausibility heuristic: at least one distractor should look like the key
+  // (within a broad length band or sharing a word) - a 30-char distractor
+  // against a 3-char key is a shape giveaway a test-taker spots instantly.
+  const keyLen = key.length;
+  const plausible = distractors.some((d) => {
+    const lenOk = d.length >= keyLen * 0.4 && d.length <= keyLen * 2.5;
+    const sharesWord = d.split(/\s+/).some((w) => key.split(/\s+/).includes(w));
+    return lenOk || sharesWord;
+  });
+  if (!plausible) return { ok: false, reason: "distractors are not length/shape plausible vs the key" };
+  return { ok: true, reason: "" };
+}
+
+/** Deterministic repair: trim + drop empties; keeps order and the key intact. */
+export function repairChoices(choices: string[]): string[] {
+  const cleaned = choices.map((c) => String(c).trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const key = out; // order-preserving dedupe below
+  for (const c of cleaned) {
+    const n = norm(c);
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(c);
+  }
+  return out;
+}
+
 // ---------- Quota enforcement: the evidence item ----------
 //
 // The gate does not only reject - when the weakness quota collapses (the

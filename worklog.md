@@ -1322,3 +1322,18 @@ Work Log:
 
 Stage Summary:
 - Feature #10 closed. Remaining partials: exam gen/grading item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 81
+Agent: Super Z (main)
+Task: Polish #5 residual - exam item-bank validation + distractor quality pass.
+
+Work Log:
+- exam-gate.ts gained distractorQuality(choices, a): duplicates, empties and key-clones fail; a shape-plausibility heuristic (at least one distractor within a broad length band of the key OR sharing a word) catches giveaway sets; repairChoices does the one deterministic repair (trim, drop empties, order-preserving dedupe) BEFORE the verdict - still-weak items die exactly like answerability failures (dropped with the reason logged).
+- Wired into exam.ts's generation loop right after the answerability gate: every generated mcq passes both gates; the dropped-reasons list carries the distractor verdicts.
+- BATTERY CATCH (mine): the shape-giveaway test fixture shared the word "has" with the key, so the shared-word rule (correctly) passed it - the fixture was wrong, not the gate; fixed the fixture.
+- GATES: distractor gate battery 8/8, exam-track battery 42/42 (the C1A track's key-word transformations survive the gate), main battery 433/433, tsc 0, eslint 0.
+- Ledger: polish #5 -> DONE; category table polish 8/2 -> 9/1.
+
+Stage Summary:
+- The exam engine now enforces: fairly asked + answerable + key present + distractors real, distinct, and shape-plausible - with a repair attempt in between. Remaining partials after this: onboarding/naming audit (polish #10), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.

@@ -14,7 +14,7 @@ import { noteExamAnswer } from "@/lib/mistakes";
 import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
 import { contentUserId } from "@/lib/scope";
 import { arbitrateMisses, vetItems } from "./exam-ai";
-import { itemAnswerable, evidenceItem } from "./exam-gate";
+import { distractorQuality, repairChoices, itemAnswerable, evidenceItem } from "./exam-gate";
 import { resolveExamCardTargets, scheduleExamOutcomes } from "@/lib/exam-cards";
 
 function newId(): string {
@@ -215,6 +215,19 @@ export async function generateExam(
         dropped.push(`[${gate.reason}] ${q.slice(0, 70)}`);
         continue;
       }
+      // DISTRACTOR QUALITY GATE (Task 81, polish #5): duplicates, empties and
+      // key-identical choices get one deterministic repair (trim/dedupe), then
+      // the quality verdict - still weak means dead, like any gate failure.
+      let choicesOut = type === "mcq" ? r.choices!.map(String) : undefined;
+      if (type === "mcq" && choicesOut) {
+        const repaired = repairChoices(choicesOut);
+        if (repaired.length !== choicesOut.length) choicesOut = repaired;
+        const dq = distractorQuality(choicesOut, a);
+        if (!dq.ok) {
+          dropped.push(`[${dq.reason}] ${q.slice(0, 70)}`);
+          continue;
+        }
+      }
       // Weakness tags are validated against the exam's family list so the
       // model can never invent a tag and poison the healing loop.
       const weakTag = spec.weakTags.includes(String(r.tag ?? "").trim().toLowerCase()) ? String(r.tag).trim().toLowerCase() : undefined;
@@ -224,7 +237,7 @@ export async function generateExam(
         type,
         skill,
         q,
-        choices: type === "mcq" ? r.choices!.map(String) : undefined,
+        choices: choicesOut,
         a,
         accept: Array.isArray(r.accept) ? r.accept.map(String).filter(Boolean).slice(0, 6) : [],
         mustInclude: Array.isArray(r.mustInclude) ? r.mustInclude.map(String).filter(Boolean) : [],
