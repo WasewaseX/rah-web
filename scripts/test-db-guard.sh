@@ -162,6 +162,102 @@ run boot
 assert "8a garbage newest skipped, older restored" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute('SELECT xp FROM Learner').fetchone()[0]==4210"
 ok "8 probe never restores a torn file"
 
+# ===========================================================================
+# Integrity repair (Task 86): the 2026-10-23 scheduling-loss incident.
+# A live-but-damaged DB (ReviewLog present, CardState gone) passes
+# restore-if-missing AND the fresh/used heuristic. The repair restores the
+# FSRS schedule INSERT-ONLY from the verified snapshot chain.
+# ===========================================================================
+REPAIR="$(cd "$(dirname "$0")" && pwd)/db-integrity-repair.sh"
+runrepair() {
+  GUARD_ROOT="$T" GUARD_DB="$T/db/custom.db" GUARD_SYNC="$T/db/sync/rah-latest.db" \
+  GUARD_VAULT="$T/db/vault-work/rah-web/rah-latest.db" GUARD_LOCAL="$T/db/backups" \
+  GUARD_OFFSITE="$T/upload/rah-backups" GUARD_LOG="$T/db/guard.log" bash "$REPAIR" >>"$T/db/guard.log" 2>&1
+}
+
+# Real-shape fixture: review history present, scheduling rows GONE.
+damaged_db() { # damaged_db <path>
+  python3 - "$1" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.executescript('''
+CREATE TABLE "Learner" (id TEXT PRIMARY KEY, xp INTEGER, streak INTEGER, lastActiveDay INTEGER, gems INTEGER, sp INTEGER);
+CREATE TABLE "ReviewLog" (id INTEGER PRIMARY KEY, userId TEXT, cardId TEXT, grade INTEGER, day INTEGER);
+CREATE TABLE "CardState" (userId TEXT, cardId TEXT, due INTEGER, reps INTEGER, PRIMARY KEY (userId, cardId));
+CREATE TABLE "DailyStat" (userId TEXT, day INTEGER, reviews INTEGER, PRIMARY KEY (userId, day));
+''')
+c.execute('INSERT INTO Learner VALUES ("me", 220, 2, 20747, 70, 0)')
+c.executemany('INSERT INTO ReviewLog (userId, cardId, grade, day) VALUES (?,?,?,?)',
+              [("me", "phr080", 2, 20746), ("me", "phr086", 3, 20746), ("me", "awl114", 3, 20747)])
+c.commit(); c.close()
+PY
+}
+
+# Snapshot fixture: the schedule the live DB lost (+ DailyStat).
+snapshot_db() { # snapshot_db <path>
+  mkdir -p "$(dirname "$1")"
+  python3 - "$1" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.executescript('''
+CREATE TABLE "Learner" (id TEXT PRIMARY KEY, xp INTEGER, streak INTEGER, lastActiveDay INTEGER, gems INTEGER, sp INTEGER);
+CREATE TABLE "ReviewLog" (id INTEGER PRIMARY KEY, userId TEXT, cardId TEXT, grade INTEGER, day INTEGER);
+CREATE TABLE "CardState" (userId TEXT, cardId TEXT, due INTEGER, reps INTEGER, PRIMARY KEY (userId, cardId));
+CREATE TABLE "DailyStat" (userId TEXT, day INTEGER, reviews INTEGER, PRIMARY KEY (userId, day));
+''')
+c.execute('INSERT INTO Learner VALUES ("me", 210, 2, 20746, 70, 0)')
+c.executemany('INSERT INTO CardState VALUES (?,?,?,?)',
+              [("me", "phr080", 20749, 1), ("me", "phr086", 20750, 1), ("me", "awl114", 20749, 1)])
+c.execute('INSERT INTO DailyStat VALUES ("me", 20746, 2)')
+c.commit(); c.close()
+PY
+}
+
+# --- 9. scheduling loss is repaired insert-only ----------------------------
+newenv
+damaged_db "$T/db/custom.db"
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+assert "9a lost CardState rows restored" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
+assert "9b lost DailyStat restored"      python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM DailyStat WHERE userId='me'\").fetchone()[0]==1"
+assert "9c ReviewLog untouched"          python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM ReviewLog WHERE userId='me'\").fetchone()[0]==3"
+assert "9d schedule values from snapshot" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20749"
+ok "9 scheduling-loss repair restores the FSRS schedule"
+
+# --- 10. healthy DB is a no-op ---------------------------------------------
+newenv
+damaged_db "$T/db/custom.db"
+python3 - "$T/db/custom.db" <<'PY'   # give the live DB its own CardState row
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1]); c.execute('INSERT INTO CardState VALUES ("me","phr080",20751,2)'); c.commit(); c.close()
+PY
+cp "$T/db/custom.db" "$T/before.db"
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+assert "10a existing row not duplicated" python3 -c "import sqlite3; a=sqlite3.connect('$T/before.db'); b=sqlite3.connect('$T/db/custom.db'); assert a.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0] == b.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0]"
+assert "10b live value wins (no clobber)" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20751"
+ok "10 repair never clobbers an existing schedule"
+
+# --- 11. post-snapshot learner progress survives ----------------------------
+newenv
+damaged_db "$T/db/custom.db"
+python3 - "$T/db/custom.db" <<'PY'   # learner reviewed a NEW card after the snapshot was taken
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1]); c.execute('INSERT INTO ReviewLog (userId, cardId, grade, day) VALUES ("me","new001",3,20749)'); c.commit(); c.close()
+PY
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+assert "11a newer history kept" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM ReviewLog\").fetchone()[0]==4"
+assert "11b schedule still restored" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
+ok "11 insert-only: post-snapshot progress survives the repair"
+
+# --- 12. no verified source -> graceful no-op -------------------------------
+newenv
+damaged_db "$T/db/custom.db"
+runrepair
+assert "12a no source, DB untouched" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM ReviewLog\").fetchone()[0]==3 and c.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0]==0"
+ok "12 missing source never blocks boot"
+
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

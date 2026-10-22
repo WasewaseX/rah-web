@@ -37,6 +37,9 @@ while true; do
     echo "$now" > "$LAST_TS_FILE" 2>/dev/null || true
     {
       echo "$(date -Is) watchdog: daily data snapshot"
+      # Task 86: daily scheduling-loss check (insert-only repair; a no-op on
+      # a healthy DB) before snapshotting so the offsite copies stay whole.
+      bash scripts/db-integrity-repair.sh
       bash scripts/db-snapshot.sh
       # REG-2: the public repo never sees learner data - offsite = private vault
       bash scripts/vault-sync.sh

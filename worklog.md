@@ -1433,3 +1433,19 @@ Work Log:
 Stage Summary:
 - The writing editor is now a live revision-and-rubric surface: chain + criterion deltas + change summaries (63/83) + live pre-flight with deterministic accept-splice + register goals + practice-estimate strip (85). Audit residual closed.
 - RE category: Duolingo/Anki/LingQ/Grammarly DONE, ELSA PARTIAL (blocked on Azure credentials only). Roadmap tables + audit ledger updated (RE 4/1/0), gate line at 441/441.
+
+---
+Task ID: 86
+Agent: Super Z (main)
+Task: Close the Task-84 contamination class - scheduling-loss integrity repair in the boot path (the Task-84 follow-up promise).
+
+Work Log:
+- Root wiring gap found: db-guard.sh (Task 57) is invoked by NOTHING at boot - only its own test calls it. The real boot path is ensure-server.sh -> db-restore.sh, which is restore-if-MISSING only; a live-but-DAMAGED DB (review history present, FSRS schedule rows gone - exactly the Task-84 incident) sails through both the restore guard and the fresh/used heuristic.
+- scripts/db-integrity-repair.sh: the scheduling-loss signature (users with ReviewLog rows but zero CardState rows) is repaired INSERT-ONLY from the verified snapshot chain (db/sync -> vault clone -> newest probe-verified custom-*.db). CardState + DailyStat restored for the affected user; never clobbers (existing PKs win), never blocks boot (exit 0 on every path), same GUARD_* env convention + single-flight lock + log as db-guard.sh. Junk purge deliberately NOT codified (destructive; stays manual/audited).
+- Wired: ensure-server.sh runs it after db-restore + migrations and BEFORE the server accepts writes; the watchdog's daily tick runs it before snapshotting so offsite copies stay whole.
+- Guard battery: 4 new case groups (27 -> 40/40): 9 scheduling-loss repair (rows+values restored, ReviewLog untouched), 10 no-clobber (live value wins, no duplication), 11 insert-only (post-snapshot learner progress survives), 12 missing source = graceful no-op. One harness bug fixed en route (fixture dir missing).
+- Live validation: repair run against the real db/custom.db -> "integrity OK - no scheduling loss detected" (the Task-84 manual restoration holds).
+
+Stage Summary:
+- The contamination class is closed: any future boot now self-heals a live-but-damaged DB from the snapshot chain before the app accepts writes.
+- Data-protection chain today: db-restore (missing) -> db-integrity-repair (damaged) -> migrations -> server; watchdog hourly db-sync + daily integrity check + snapshot + vault push.

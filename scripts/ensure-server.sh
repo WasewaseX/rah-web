@@ -13,6 +13,11 @@ cd /home/z/my-project || exit 1
 
 bash scripts/db-restore.sh || true
 bash scripts/db-migrate-safe.sh || echo "(migrate skipped/failed - see /tmp/db-migrate.log)"
+# Task 86: scheduling-loss repair - a live-but-damaged DB (review history
+# present, FSRS schedule rows gone) sails through restore-if-missing and the
+# schema canary. Insert-only repair from the verified snapshot chain, BEFORE
+# the server accepts writes. Never blocks boot.
+bash scripts/db-integrity-repair.sh || true
 
 if curl -sf -o /dev/null --max-time 5 http://localhost:3000/api/version; then
   bash scripts/db-snapshot.sh || true
