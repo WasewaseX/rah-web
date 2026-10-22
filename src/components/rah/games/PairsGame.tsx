@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Grid2x2Check, Undo2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "../ui";
+import { submitReviewGrade } from "@/lib/offline-queue";
 
 interface PairSide {
   id: string;
@@ -77,11 +78,8 @@ export default function PairsGame({ onExit }: { onExit: () => void }) {
         setSelRight(null);
         lockRef.current = false;
         try {
-          await fetch("/api/review/grade", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cardId: leftId, grade: 3, dir: "pairs" }),
-          });
+          // Offline-safe (Task 69): a match graded offline queues and replays.
+          await submitReviewGrade({ cardId: leftId, grade: 3, dir: "pairs" });
         } catch {
           // grade route hiccup: the board still completes; state refreshes on exit
         }

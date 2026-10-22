@@ -7,9 +7,23 @@
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
-import { contentUserId } from "@/lib/scope";
+import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 import { bumpDaily, getLearner } from "@/lib/server";
 import { GEMS, awardGems, boostActive } from "@/lib/shop";
+
+// Per-user isolation seam (Task 72, reconstructed): every arcade function
+// accepts an optional explicit userId and otherwise auto-resolves the session
+// user (cookie-based), exactly like the memory/mastery seam from Task 65.
+// Under the deployment lock this degrades to the singleton "me" - it must
+// never break a learner flow - while the columns are already load-bearing.
+async function uid(explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+  try {
+    return await contentUserId();
+  } catch {
+    return SINGLE_USER_ID;
+  }
+}
 
 // ---------- Momentum (cross-surface combo chains) ----------
 
@@ -56,7 +70,8 @@ export async function registerHit(): Promise<{ chain: number; mult: number; labe
   return { chain, ...heat };
 }
 
-export async function registerMiss(): Promise<void> {
+export async function registerMiss(userId?: string): Promise<void> {
+  const u = await uid(userId);
   const l = await getLearner();
   const today = dayIndex();
   const base = await freshChain(l);
@@ -64,9 +79,9 @@ export async function registerMiss(): Promise<void> {
   const shielded = hasPerk(l.perks, "chain_shield");
   if (shielded) {
     const key = `shield:${today}`;
-    const used = await db.gameStat.findUnique({ where: { key } });
+    const used = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key } } });
     if (!used) {
-      await db.gameStat.create({ data: { key, best: 1, plays: 0 } });
+      await db.gameStat.create({ data: { userId: u, key, best: 1, plays: 0 } });
       return; // shield ate the miss; chain keeps running
     }
   }
@@ -121,17 +136,18 @@ export interface PerksView {
 }
 
 export async function getPerksView(): Promise<PerksView> {
+  const u = await uid();
   const l = await getLearner();
   // Retroactive catch-up: the tree arrives when the learner is already deep
   // in the ladder, so their earned SP is granted once on first open.
-  const init = await db.gameStat.findUnique({ where: { key: "talents:init" } });
+  const init = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "talents:init" } } });
   let sp = l.sp;
   let leveled = false;
   if (!init) {
     const level = levelFromXp(l.xp);
     sp += Math.max(0, level - 1);
     await db.learner.update({ where: { id: "me" }, data: { sp } });
-    await db.gameStat.create({ data: { key: "talents:init", best: level, plays: 0 } });
+    await db.gameStat.create({ data: { userId: u, key: "talents:init", best: level, plays: 0 } });
     leveled = true;
   }
   const skills = await db.skillLevel.findMany();
@@ -278,25 +294,26 @@ interface AchCtx {
   flowStreak: number;
 }
 
-async function achCtx(): Promise<AchCtx> {
+async function achCtx(userId?: string): Promise<AchCtx> {
+  const u = await uid(userId);
   const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival, chainBest, leagueProm, dungeonBest, dungeonPerfect, duelWins, gauntletBest, flowStreak] = await Promise.all([
-    db.reviewLog.count(),
-    db.writingSub.count(),
-    db.speakSession.count(),
+    db.reviewLog.count({ where: { userId: u } }),
+    db.writingSub.count({ where: { userId: u } }),
+    db.speakSession.count({ where: { userId: u } }),
     db.learner.findUnique({ where: { id: "me" } }),
-    db.gameStat.findUnique({ where: { key: "speed:best" } }),
-    db.gameStat.findUnique({ where: { key: "speed:combo" } }),
-    db.gameStat.findUnique({ where: { key: "boss:wins" } }),
-    db.gameStat.findUnique({ where: { key: "boss:flawless" } }),
-    db.quest.count({ where: { day: dayIndex(), done: true } }),
-    db.rival.findUnique({ where: { id: "me" } }),
-    db.gameStat.findUnique({ where: { key: "chain:best" } }),
-    db.gameStat.findUnique({ where: { key: "league:promotions" } }),
-    db.gameStat.findUnique({ where: { key: "dungeon:best" } }),
-    db.gameStat.findUnique({ where: { key: "dungeon:perfect" } }),
-    db.gameStat.findUnique({ where: { key: "duel:wins" } }),
-    db.gameStat.findUnique({ where: { key: "gauntlet:best" } }),
-    db.gameStat.findUnique({ where: { key: "flow:streak" } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:best" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:combo" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "boss:wins" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "boss:flawless" } } }),
+    db.quest.count({ where: { userId: u, day: dayIndex(), done: true } }),
+    db.rival.findUnique({ where: { userId_id: { userId: u, id: "me" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "chain:best" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "league:promotions" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "dungeon:best" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "dungeon:perfect" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "duel:wins" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "gauntlet:best" } } }),
+    db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "flow:streak" } } }),
   ]);
   const fams = await topMistakes(200).catch(() => []);
   return {
@@ -358,15 +375,16 @@ function ctxUnlocks(c: AchCtx): string[] {
 // check and race the createMany. key is @id, so the loser used to throw
 // P2002 and 500 a legit grade route. A unique violation now means "another
 // request already awarded it" - swallowed; any other error still throws.
-export async function evaluateAchievements(): Promise<{ key: string; title: string; desc: string; icon: string }[]> {
-  const ctx = await achCtx();
+export async function evaluateAchievements(userId?: string): Promise<{ key: string; title: string; desc: string; icon: string }[]> {
+  const u = await uid(userId);
+  const ctx = await achCtx(u);
   const should = new Set(ctxUnlocks(ctx));
-  const have = await db.achievement.findMany({ where: { key: { in: [...should] } } });
+  const have = await db.achievement.findMany({ where: { userId: u, key: { in: [...should] } } });
   const haveKeys = new Set(have.map((a) => a.key));
   const fresh = [...should].filter((k) => !haveKeys.has(k));
   if (fresh.length === 0) return [];
   try {
-    await db.achievement.createMany({ data: fresh.map((key) => ({ key })) });
+    await db.achievement.createMany({ data: fresh.map((key) => ({ userId: u, key })) });
   } catch (e: unknown) {
     if ((e as { code?: string })?.code !== "P2002") throw e;
     return [];
@@ -465,9 +483,10 @@ export const QUEST_TEMPLATES: QuestTemplate[] = [
 
 // Seeded pick of 3 quests per day, biased by active mistake families so the
 // day's missions always point at the leaks. Deterministic per day.
-export async function ensureQuests(): Promise<void> {
+export async function ensureQuests(userId?: string): Promise<void> {
+  const u = await uid(userId);
   const day = dayIndex();
-  const existing = await db.quest.count({ where: { day } });
+  const existing = await db.quest.count({ where: { userId: u, day } });
   if (existing > 0) return;
   let famTags: string[] = [];
   try {
@@ -479,7 +498,7 @@ export async function ensureQuests(): Promise<void> {
   await db.quest.createMany({
     data: pick.map((key, i) => {
       const t = QUEST_TEMPLATES.find((q) => q.key === key)!;
-      return { id: `${day}:${key}`, day, key, title: t.title, fa: t.fa, target: t.target, xp: t.xp, progress: 0, done: false, ...(i === -1 ? {} : {}) };
+      return { userId: u, id: `${day}:${key}`, day, key, title: t.title, fa: t.fa, target: t.target, xp: t.xp, progress: 0, done: false, ...(i === -1 ? {} : {}) };
     }),
   });
   void famTags; // biasing hook reserved: templates already cover every surface
@@ -501,19 +520,20 @@ function seededPick<T>(arr: T[], n: number, seed: number): T[] {
 
 // Progress a quest by key. kind "sum" accumulates, "max" keeps the best.
 // Finishing pays the quest XP through the same awardXp faucet.
-export async function progressQuest(key: string, amount: number): Promise<void> {
+export async function progressQuest(key: string, amount: number, userId?: string): Promise<void> {
+  const u = await uid(userId);
   const day = dayIndex();
-  const q = await db.quest.findUnique({ where: { id: `${day}:${key}` } });
+  const q = await db.quest.findUnique({ where: { userId_id: { userId: u, id: `${day}:${key}` } } });
   if (!q || q.done) return;
   const t = QUEST_TEMPLATES.find((x) => x.key === key);
   const progress = t?.kind === "max" ? Math.max(q.progress, amount) : q.progress + amount;
   if (progress >= q.target) {
-    await db.quest.update({ where: { id: q.id }, data: { progress: q.target, done: true } });
+    await db.quest.update({ where: { userId_id: { userId: u, id: q.id } }, data: { progress: q.target, done: true } });
     await awardXp(q.xp, { perkXp: "quest" });
     await awardGems(GEMS.questDone).catch(() => undefined);
-    await evaluateAchievements();
+    await evaluateAchievements(u);
   } else {
-    await db.quest.update({ where: { id: q.id }, data: { progress } });
+    await db.quest.update({ where: { userId_id: { userId: u, id: q.id } }, data: { progress } });
   }
 }
 
@@ -553,20 +573,20 @@ function ghostXp(week: number, slot: number, dailyTarget: number, dayOfWeek: num
 }
 
 export async function getLeagueView(): Promise<LeagueView> {
+  const u = await uid();
   const day = dayIndex();
   const wk = weekOf(day);
   const dayOfWeek = day - wk * 7;
-  const u = await contentUserId().catch(() => "me");
   const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: day - 7, lt: day } } });
   const avg = recent.reduce((s, r) => s + r.xp, 0) / 7;
   const dailyTarget = Math.max(70, Math.round(avg * 0.8));
 
-  let row = await db.league.findUnique({ where: { id: "me" } });
+  let row = await db.league.findUnique({ where: { userId_id: { userId: u, id: "me" } } });
   if (!row) {
     const l = await getLearner();
     const lvl = levelFromXp(l.xp);
     const startDivision = lvl >= 25 ? 3 : lvl >= 15 ? 2 : lvl >= 8 ? 1 : 0;
-    row = await db.league.create({ data: { id: "me", weekKey: wk, division: startDivision } });
+    row = await db.league.create({ data: { userId: u, id: "me", weekKey: wk, division: startDivision } });
   }
 
   if (row.weekKey !== wk) {
@@ -585,11 +605,11 @@ export async function getLeagueView(): Promise<LeagueView> {
     const history = JSON.parse(settled.history || "[]") as LeagueView["history"];
     history.push({ week: settled.weekKey, division: settled.division, place, promoted, demoted });
     if (promoted) {
-      const prev = (await db.gameStat.findUnique({ where: { key: "league:promotions" } }))?.best ?? 0;
-      await bumpStat("league:promotions", prev + 1);
+      const prev = (await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "league:promotions" } } }))?.best ?? 0;
+      await bumpStat("league:promotions", prev + 1, u);
       await awardXp(150);
     }
-    row = await db.league.update({ where: { id: "me" }, data: { weekKey: wk, division, history: JSON.stringify(history.slice(-12)) } });
+    row = await db.league.update({ where: { userId_id: { userId: u, id: "me" } }, data: { weekKey: wk, division, history: JSON.stringify(history.slice(-12)) } });
   }
 
   const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
@@ -620,19 +640,20 @@ export async function getLeagueView(): Promise<LeagueView> {
 
 // ---------- GameStat ----------
 
-export async function bumpStat(key: string, best?: number): Promise<{ best: number; isNew: boolean }> {
-  const row = await db.gameStat.findUnique({ where: { key } });
+export async function bumpStat(key: string, best?: number, userId?: string): Promise<{ best: number; isNew: boolean }> {
+  const u = await uid(userId);
+  const row = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key } } });
   if (!row) {
-    await db.gameStat.create({ data: { key, best: best ?? 0, plays: key.includes(":") && !best ? 1 : 0 } });
+    await db.gameStat.create({ data: { userId: u, key, best: best ?? 0, plays: key.includes(":") && !best ? 1 : 0 } });
     if (best !== undefined) return { best, isNew: best > 0 };
     return { best: 0, isNew: false };
   }
   if (best !== undefined && best > row.best) {
-    await db.gameStat.update({ where: { key }, data: { best, plays: { increment: 1 } } });
+    await db.gameStat.update({ where: { userId_key: { userId: u, key } }, data: { best, plays: { increment: 1 } } });
     return { best, isNew: true };
   }
   if (best === undefined) {
-    await db.gameStat.update({ where: { key }, data: { plays: { increment: 1 } } });
+    await db.gameStat.update({ where: { userId_key: { userId: u, key } }, data: { plays: { increment: 1 } } });
   }
   return { best: row.best, isNew: false };
 }
@@ -680,16 +701,17 @@ export interface RivalView {
 // deterministically day by day from a rubber-banded daily target (80% of the
 // learner's trailing 7-day average, clamped), so the race is tense but fair.
 export async function getRivalView(): Promise<RivalView> {
+  const u = await uid();
   const day = dayIndex();
   const wk = weekOf(day);
-  let rival = await db.rival.findUnique({ where: { id: "me" } });
+  let rival = await db.rival.findUnique({ where: { userId_id: { userId: u, id: "me" } } });
   if (!rival) {
     const seedName = RIVAL_NAMES[seededUnit(wk) === 0 ? 0 : Math.floor(seededUnit(wk + 7) * RIVAL_NAMES.length)];
-    rival = await db.rival.create({ data: { id: "me", name: seedName, weekKey: wk, taunt: RIVAL_TAUNTS[Math.floor(seededUnit(wk + 3) * RIVAL_TAUNTS.length)] } });
+    rival = await db.rival.create({ data: { userId: u, id: "me", name: seedName, weekKey: wk, taunt: RIVAL_TAUNTS[Math.floor(seededUnit(wk + 3) * RIVAL_TAUNTS.length)] } });
   }
 
   // Trailing 7-day learner XP average (yesterday backwards).
-  const uR = await contentUserId().catch(() => "me");
+  const uR = u;
   const recent = await db.dailyStat.findMany({ where: { userId: uR, day: { gte: day - 7, lt: day } } });
   const weekSum = recent.reduce((s, r) => s + r.xp, 0);
   const avg = weekSum / 7;
@@ -704,7 +726,7 @@ export async function getRivalView(): Promise<RivalView> {
     const wins = rival.wins + (youXp >= rival.weekXp ? 1 : 0);
     const losses = rival.losses + (youXp < rival.weekXp ? 1 : 0);
     rival = await db.rival.update({
-      where: { id: "me" },
+      where: { userId_id: { userId: uR, id: "me" } },
       data: {
         lastWeekXp: rival.weekXp,
         weekXp: 0,
@@ -725,7 +747,7 @@ export async function getRivalView(): Promise<RivalView> {
     expected += Math.round(dailyTarget * jitter);
   }
   if (rival.weekXp < expected) {
-    rival = await db.rival.update({ where: { id: "me" }, data: { weekXp: expected } });
+    rival = await db.rival.update({ where: { userId_id: { userId: uR, id: "me" } }, data: { weekXp: expected } });
   }
 
   const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
@@ -757,11 +779,12 @@ export interface GameView {
 }
 
 export async function getGameView(): Promise<GameView> {
+  const u = await uid();
   const l = await db.learner.findUnique({ where: { id: "me" } });
   const xp = l?.xp ?? 0;
   const [ach, stats] = await Promise.all([
-    db.achievement.findMany({ orderBy: { at: "desc" } }),
-    db.gameStat.findMany(),
+    db.achievement.findMany({ where: { userId: u }, orderBy: { at: "desc" } }),
+    db.gameStat.findMany({ where: { userId: u } }),
   ]);
   const cutoff = new Date(Date.now() - 90_000);
   const recent = ach

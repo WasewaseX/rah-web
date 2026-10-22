@@ -11,6 +11,7 @@ import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
 import { setCoachActivity } from "@/lib/activity-store";
+import { submitReviewGrade } from "@/lib/offline-queue";
 import BlitzDeck from "./games/BlitzDeck";
 import PairsGame from "./games/PairsGame";
 
@@ -182,6 +183,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const [revealed, setRevealed] = useState(false);
   const [wasRight, setWasRight] = useState(false);
   const [session, setSession] = useState({ done: 0, again: 0 });
+  const [queuedHint, setQueuedHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -354,11 +356,11 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const grade = async (g: number) => {
     if (!q || busy) return;
     setBusy(true);
-    await fetch("/api/review/grade", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId: q.card.id, grade: g, dir }),
-    });
+    // Offline-safe (Task 69): when the network is down the grade lands in the
+    // IndexedDB queue and syncs automatically on reconnect; the server stays
+    // the FSRS source of truth either way.
+    const res = await submitReviewGrade({ cardId: q.card.id, grade: g, dir });
+    if (res.applied === "queued") setQueuedHint(true);
     setSession((s) => ({ done: s.done + 1, again: s.again + (g === 1 ? 1 : 0) }));
     setBusy(false);
     setInput("");
@@ -512,6 +514,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           Card {idx + 1} of {queue.length}
         </span>
         <div className="flex items-center gap-2">
+          {queuedHint && <Chip tone="amber">Offline: saved to sync queue</Chip>}
           <Chip tone="blue">{DIR_LABEL[dir] ?? dir}</Chip>
           <Chip tone="emerald">{q.card.level}</Chip>
           <Chip>{q.card.skill}</Chip>

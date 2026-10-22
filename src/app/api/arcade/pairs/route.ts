@@ -13,13 +13,15 @@ import { cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, type FsrsState } from "@/lib/fsrs";
 import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { touchStreak } from "@/lib/server";
+import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 import { buildPairs } from "@/lib/pairs";
 
 export const dynamic = "force-dynamic";
 
 async function dueCardsForPairs(): Promise<Card[]> {
   const today = dayIndex();
-  const all = await db.cardState.findMany();
+  const u = await contentUserId().catch(() => SINGLE_USER_ID);
+  const all = await db.cardState.findMany({ where: { userId: u } });
   const due = all
     .filter((s) => !s.suspended && s.state !== "new" && s.due <= today)
     .sort((a, b) => cardR(a as unknown as FsrsState, today) - cardR(b as unknown as FsrsState, today))
@@ -37,7 +39,7 @@ async function dueCardsForPairs(): Promise<Card[]> {
 export async function GET() {
   const cards = await dueCardsForPairs();
   const board = buildPairs(cards, dayIndex());
-  const best = await db.gameStat.findUnique({ where: { key: "pairs:clean" } });
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "pairs:clean" } } });
   return NextResponse.json({
     left: board.left,
     right: board.right,

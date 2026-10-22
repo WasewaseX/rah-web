@@ -723,6 +723,9 @@ try {
 
     const { PrismaClient: PC6 } = await import("@prisma/client");
     const prM = new PC6();
+    // Per-user isolation (Task 72): fixtures must stamp the BATTERY USER's id
+    // (routes resolve the session user, not the singleton).
+    const buidM = (await prM.user.findUnique({ where: { email: EMAIL } }))!.id;
     // Fresh budget: earlier sections may have spent today's introductions.
     await prM.learner.update({ where: { id: "me" }, data: { newPerDay: 10 } });
     await prM.cardState.deleteMany({ where: { last: Math.floor(Date.now() / 86400000), reps: 1 } });
@@ -733,6 +736,7 @@ try {
     const todayM = Math.floor(Date.now() / 86400000);
     await prM.material.create({
       data: {
+        userId: buidM,
         id: matId,
         title: "battery material",
         source: "battery",
@@ -742,8 +746,8 @@ try {
     });
     await prM.materialCard.create({ data: { id: c1, materialId: matId, front: "The engineer decided to ___ the proposal ahead of the deadline.", answer: "implement", context: "The engineer decided to implement the proposal ahead of the deadline.", note: "to put a plan into action" } });
     await prM.materialCard.create({ data: { id: c2, materialId: matId, front: "She took the ___ on the chin and kept going.", answer: "criticism", context: "She took the criticism on the chin and kept the momentum going.", note: "to accept blame without complaining" } });
-    await prM.cardState.create({ data: { cardId: c1, due: todayM } });
-    await prM.cardState.create({ data: { cardId: c2, due: todayM } });
+    await prM.cardState.create({ data: { userId: buidM, cardId: c1, due: todayM } });
+    await prM.cardState.create({ data: { userId: buidM, cardId: c2, due: todayM } });
     await prM.$disconnect();
 
     const q1 = await api("/api/review/queue");
@@ -872,11 +876,12 @@ try {
     {
       const { PrismaClient: PC7 } = await import("@prisma/client");
       const prS = new PC7();
+      const buidS = (await prS.user.findUnique({ where: { email: EMAIL } }))!.id;
       const todayS = Math.floor(Date.now() / 86400000);
       const sid = "col001";
       await prS.cardState.upsert({
-        where: { cardId: sid },
-        create: { cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
+        where: { userId_cardId: { userId: buidS, cardId: sid } },
+        create: { userId: buidS, cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
         update: { suspended: false, due: todayS, state: "review" },
       });
       await prS.$disconnect();
@@ -993,6 +998,34 @@ try {
       const hasShape = (st.body?.nextBest ?? []).every((a: { action: string }) => ["review", "drill", "test", "teach", "unlock"].includes(a.action));
       check(st.status === 200 && hasShape, "curriculum: state nextBest actions carry the unlock kind when present", JSON.stringify((st.body?.nextBest ?? []).map((a: { action: string }) => a.action)));
     }
+  }
+
+  // ================= 6g. OFFLINE QUEUE IDEMPOTENCY (Task 69) =================
+  console.log("\n--- offline sync: clientRef dedupe on the grade route ---");
+  {
+    // The offline queue replays grades with a stable clientRef; a network that
+    // dies AFTER the server committed must never double-apply FSRS/XP/streak.
+    const { v4: uuid } = await import("uuid");
+    const { PrismaClient: PC69 } = await import("@prisma/client");
+    const pr69 = new PC69();
+    const ref = uuid();
+    const { DECK: deckForAck } = await import("@/lib/content");
+    const ackCard = deckForAck[0];
+    const logsBefore = await pr69.reviewLog.count();
+    const g1 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: ackCard.id, grade: 3, dir: "cloze" }), headers: { "x-rah-client-ref": ref } });
+    check(g1.status === 200 && !g1.body?.deduped, "first grade with a clientRef applies normally", `status=${g1.status}`);
+    const xpAfterFirst = (await api("/api/state")).body?.learner?.xp;
+    const g2 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: ackCard.id, grade: 3, dir: "cloze" }), headers: { "x-rah-client-ref": ref } });
+    check(g2.status === 200 && g2.body?.deduped === true, "replayed grade with the SAME ref is deduped (deduped:true)", JSON.stringify(g2.body?.deduped));
+    const xpAfterReplay = (await api("/api/state")).body?.learner?.xp;
+    check(xpAfterReplay === xpAfterFirst, "dedupe does not pay XP twice", `before=${xpAfterFirst} after=${xpAfterReplay}`);
+    check((await pr69.reviewLog.count()) === logsBefore + 1, "exactly one ReviewLog row for the pair of calls", `delta=${(await pr69.reviewLog.count()) - logsBefore}`);
+    const g3 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: ackCard.id, grade: 4, dir: "cloze" }) });
+    check(g3.status === 200 && !g3.body?.deduped, "grades WITHOUT a clientRef behave as before (no dedupe)", `status=${g3.status}`);
+    // Cross-user safety: another user's ref is never a dedupe hit for me.
+    const g4 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: ackCard.id, grade: 3, dir: "cloze" }), headers: { "x-rah-client-ref": "never-seen-before-ref" } });
+    check(g4.status === 200 && !g4.body?.deduped, "an unseen ref applies normally", `status=${g4.status}`);
+    await pr69.$disconnect();
   }
 
   // ================= 7. RESTORE =================

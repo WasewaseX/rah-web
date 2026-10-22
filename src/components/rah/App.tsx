@@ -25,6 +25,7 @@ import {
 import { Chip } from "./ui";
 import HomeView from "./Home";
 import PwaBootstrap from "./PwaBootstrap";
+import OfflineStatusBar from "./OfflineStatusBar";
 import ReviewView from "./Review";
 import PlacementView from "./Placement";
 import WriteView from "./Write";
@@ -181,12 +182,17 @@ export default function RahApp() {
     const t1 = setTimeout(refresh, 0);
     window.addEventListener("hashchange", applyHash);
     window.addEventListener("popstate", applyHash);
+    // Offline queue finished replaying (Task 69): refetch server truth so
+    // xp/streak/due counts reflect the grades that just synced.
+    const onSynced = () => void refresh();
+    window.addEventListener("rah:synced", onSynced);
     const t = setInterval(refresh, 60000);
     return () => {
       clearTimeout(t0);
       clearTimeout(t1);
       window.removeEventListener("hashchange", applyHash);
       window.removeEventListener("popstate", applyHash);
+      window.removeEventListener("rah:synced", onSynced);
       clearInterval(t);
     };
   }, [refresh]);
@@ -211,6 +217,7 @@ export default function RahApp() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--rah-bg)] md:flex-row">
       <PwaBootstrap />
+      <OfflineStatusBar />
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0e1421] via-[#101725] to-[#0d1119] px-4 py-6 md:flex">
         <div className="mb-9 flex items-center gap-3 px-2">

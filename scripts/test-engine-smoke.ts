@@ -24,7 +24,7 @@ async function main() {
   const freezes0 = learner?.freezes ?? 0;
   const day = Math.floor(Date.now() / 86400000); // dayIndex() is UTC epoch days; mirror it
   const stat0 = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day } } });
-  const card0 = await db.cardState.findUnique({ where: { cardId: CARD } });
+  const card0 = await db.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId: CARD } } });
   const quests0 = await db.quest.findMany();
   const logs0 = await db.reviewLog.count();
   const ach0 = await db.achievement.findMany();
@@ -67,17 +67,17 @@ async function main() {
   if (stat0) await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
   else await db.dailyStat.deleteMany({ where: { userId: "me", day } });
   if (card0) {
-    await db.cardState.update({ where: { cardId: CARD }, data: { ...card0 } });
+    await db.cardState.update({ where: { userId_cardId: { userId: "me", cardId: CARD } }, data: { ...card0 } });
   } else {
     await db.cardState.deleteMany({ where: { cardId: CARD } });
   }
   const logsNow = await db.reviewLog.findMany({ orderBy: { id: "desc" }, take: logs2 - logs0 });
   for (const row of logsNow) await db.reviewLog.delete({ where: { id: row.id } });
   for (const q of quests0) {
-    await db.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
+    await db.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
   }
   const achNow = await db.achievement.findMany();
-  for (const a of achNow) if (!ach0.find((x) => x.key === a.key)) await db.achievement.delete({ where: { key: a.key } });
+  for (const a of achNow) if (!ach0.find((x) => x.key === a.key)) await db.achievement.delete({ where: { userId_key: { userId: "me", key: a.key } } });
 
   console.log(`\nENGINE SMOKE ${pass} pass, ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);

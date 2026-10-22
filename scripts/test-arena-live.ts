@@ -61,7 +61,7 @@ async function main() {
   await db.learner.update({ where: { id: "me" }, data: { xp: learner0?.xp ?? 0 } });
   if (stat0) await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
   else await db.dailyStat.deleteMany({ where: { userId: "me", day } });
-  for (const q of quests0) await db.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
+  for (const q of quests0) await db.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
   const logs = await db.speakSession.findMany({ orderBy: { id: "desc" }, take: sess1 - sess0 });
   for (const row of logs) await db.speakSession.delete({ where: { id: row.id } }).catch(() => undefined);
 

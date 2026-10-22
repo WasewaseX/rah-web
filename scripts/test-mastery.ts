@@ -204,14 +204,14 @@ try {
   // quests: the graded exam advances exam_1 and may award XP/trophies
   const questNow = await prisma.quest.findMany();
   for (const q of questNow) {
-    if (!questsBefore.some((b) => b.id === q.id)) await prisma.quest.delete({ where: { id: q.id } });
+    if (!questsBefore.some((b) => b.id === q.id)) await prisma.quest.delete({ where: { userId_id: { userId: "me", id: q.id } } });
   }
   for (const q of questsBefore) {
-    await prisma.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } });
+    await prisma.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } });
   }
   const achNow = await prisma.achievement.findMany();
   for (const a of achNow) {
-    if (!achievementsBefore.some((b) => b.key === a.key)) await prisma.achievement.delete({ where: { key: a.key } });
+    if (!achievementsBefore.some((b) => b.key === a.key)) await prisma.achievement.delete({ where: { userId_key: { userId: "me", key: a.key } } });
   }
   if (statBefore) {
     await prisma.dailyStat.upsert({

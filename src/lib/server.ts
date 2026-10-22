@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { DECK, cardById } from "@/lib/content";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
-import { contentUserId } from "@/lib/scope";
+import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 import type { ProfileJson } from "@/lib/ai";
 
 export async function getLearner() {
@@ -68,7 +68,10 @@ export interface QueueCounts {
 export async function queueCounts(): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
-  const all = await db.cardState.findMany();
+  // Per-user isolation (Task 72): counts are the CALLER's queue, never the
+  // whole table (the singleton default keeps the legacy flows intact).
+  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
+  const all = await db.cardState.findMany({ where: { userId } });
   // BYO-material cards (cardId "mat:<id>") share the SAME queue, budget and
   // badge truth as deck cards - the Task-44 lesson: one source of truth.
   const deckStates = all.filter((s) => !s.cardId.startsWith("mat:"));

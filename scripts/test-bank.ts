@@ -107,7 +107,7 @@ try {
   forcedBefore = await prisma.cardState.findMany({ where: { cardId: { in: FORCED } } });
   for (const id of FORCED) {
     await prisma.cardState.upsert({
-      where: { cardId: id },
+      where: { userId_cardId: { userId: "me", cardId: id } },
       create: { cardId: id, s: 0.1, d: 5, due: today, last: today - 365, lapses: 1, reps: 5, state: "review", lastivl: 1, dir: "audio" },
       update: { s: 0.1, d: 5, due: today, last: today - 365, lapses: 1, reps: 5, state: "review", lastivl: 1, dir: "audio" },
     });
@@ -146,7 +146,7 @@ try {
   } else {
     const cardId: string = pick.card.id;
     gradedCardId = cardId;
-    gradedStateBefore = await prisma.cardState.findUnique({ where: { cardId } });
+    gradedStateBefore = await prisma.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId } } });
     gradedLogIdsBefore = (
       await prisma.reviewLog.findMany({ where: { cardId }, select: { id: true } })
     ).map((r) => r.id);
@@ -160,7 +160,7 @@ try {
     const gj = await gr.json();
     check(typeof gj.ivl === "number", "FSRS interval returned");
 
-    const st = await prisma.cardState.findUnique({ where: { cardId } });
+    const st = await prisma.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId } } });
     check(st?.dir === "bank", "CardState.dir persisted as bank", `dir=${st?.dir}`);
     check((st?.reps ?? 0) === (((gradedStateBefore as any)?.reps ?? 0) + 1), "FSRS reps advanced");
     const newLogs = await prisma.reviewLog.findMany({ where: { cardId } });
@@ -188,7 +188,7 @@ try {
       const snap = forcedBefore.find((r) => (r as any).cardId === gradedCardId) ?? gradedStateBefore;
       if (snap) {
         const s = snap as Record<string, never>;
-        await prisma.cardState.upsert({ where: { cardId: gradedCardId }, create: { ...s } as never, update: { ...s } as never });
+        await prisma.cardState.upsert({ where: { userId_cardId: { userId: "me", cardId: gradedCardId } }, create: { ...s } as never, update: { ...s } as never });
       } else {
         await prisma.cardState.deleteMany({ where: { cardId: gradedCardId } });
       }
@@ -203,7 +203,7 @@ try {
       const snap = forcedBefore.find((r) => (r as any).cardId === id);
       if (snap) {
         const s = snap as Record<string, never>;
-        await prisma.cardState.upsert({ where: { cardId: id }, create: { ...s } as never, update: { ...s } as never });
+        await prisma.cardState.upsert({ where: { userId_cardId: { userId: "me", cardId: id } }, create: { ...s } as never, update: { ...s } as never });
       } else {
         await prisma.cardState.deleteMany({ where: { cardId: id } });
       }

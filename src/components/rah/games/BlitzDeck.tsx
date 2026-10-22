@@ -11,6 +11,7 @@ import { Btn, Card, Chip, FA } from "../ui";
 import type { AppState } from "../App";
 import { dayIndex, fmtIvl, preview as fsrsPreview, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
+import { submitReviewGrade } from "@/lib/offline-queue";
 
 interface QueueCard {
   card: {
@@ -122,11 +123,8 @@ export default function BlitzDeck({ state, onChange, onExit }: { state: AppState
     busy.current = true;
     stopDrain();
     const took = Date.now() - flipAt.current;
-    await fetch("/api/review/grade", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId: q.card.id, grade: g, dir }),
-    });
+    // Offline-safe (Task 69): grades queue in IndexedDB when the network is down.
+    await submitReviewGrade({ cardId: q.card.id, grade: g, dir });
     setSession((s) => ({ done: s.done + 1, again: s.again + (g === 1 ? 1 : 0), fastest: s.fastest === 0 ? took : Math.min(s.fastest, took) }));
     setDrag({ x: 0, y: 0 });
     setFlipped(false);

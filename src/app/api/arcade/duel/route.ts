@@ -4,7 +4,7 @@ import { dayIndex } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
 import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
 import { buildSpeedPool, duelPar } from "@/lib/arcade-items";
-import { contentUserId } from "@/lib/scope";
+import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +28,8 @@ export async function GET() {
     parHits,
     rivalScore: parHits * 10 + 20, // + flat time bonus: the rival is quick
     timer,
-    wins: (await db.gameStat.findUnique({ where: { key: "duel:wins" } }))?.best ?? 0,
-    streak: (await db.gameStat.findUnique({ where: { key: "duel:streak" } }))?.best ?? 0,
+    wins: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "duel:wins" } } }))?.best ?? 0,
+    streak: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "duel:streak" } } }))?.best ?? 0,
   });
 }
 
@@ -51,8 +51,9 @@ export async function POST(req: Request) {
   const win = youScore > rivalScore;
 
   if (win) {
-    const w = (await db.gameStat.findUnique({ where: { key: "duel:wins" } }))?.best ?? 0;
-    const s = (await db.gameStat.findUnique({ where: { key: "duel:streak" } }))?.best ?? 0;
+    const uP = await contentUserId().catch(() => SINGLE_USER_ID);
+    const w = (await db.gameStat.findUnique({ where: { userId_key: { userId: uP, key: "duel:wins" } } }))?.best ?? 0;
+    const s = (await db.gameStat.findUnique({ where: { userId_key: { userId: uP, key: "duel:streak" } } }))?.best ?? 0;
     await bumpStat("duel:wins", w + 1);
     await bumpStat("duel:streak", s + 1);
     await progressQuest("duel_1", 1);

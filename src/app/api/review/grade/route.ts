@@ -16,7 +16,22 @@ export async function POST(req: Request) {
 
   const l = await getLearner();
   const today = dayIndex();
-  const row = await db.cardState.findUnique({ where: { cardId } });
+
+  // Offline-sync idempotency (Task 69): the client replays queued grades with
+  // a stable clientRef. If THIS user already logged this exact ref, the grade
+  // was applied before the network dropped - return the card's CURRENT state
+  // and skip every write (FSRS, XP, streak, quests must not double-apply).
+  const scope = await contentScope(req);
+  const clientRef = req.headers.get("x-rah-client-ref") || "";
+  if (clientRef) {
+    const seen = await db.reviewLog.findFirst({ where: { clientRef, userId: scope.userId } });
+    if (seen) {
+      const state = await db.cardState.findUnique({ where: { userId_cardId: { userId: scope.userId, cardId } } });
+      return NextResponse.json({ deduped: true, ivl: seen.ivl, state });
+    }
+  }
+
+  const row = await db.cardState.findUnique({ where: { userId_cardId: { userId: scope.userId, cardId } } });
   const st: FsrsState = row
     ? {
         s: row.s,
@@ -33,8 +48,9 @@ export async function POST(req: Request) {
   const out = review(st, grade, today, l.retention);
 
   await db.cardState.upsert({
-    where: { cardId },
+    where: { userId_cardId: { userId: scope.userId, cardId } },
     create: {
+      userId: scope.userId,
       cardId,
       s: out.fsrs.s,
       d: out.fsrs.d,
@@ -59,7 +75,7 @@ export async function POST(req: Request) {
     },
   });
 
-  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today, ...(await contentScope(req)) } });
+  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today, clientRef: clientRef || null, ...(await contentScope(req)) } });
   await bumpDaily("reviews");
   await awardXp(grade >= 3 ? 10 : 5, { chainHit: grade >= 3, perkXp: "review" });
   if (grade < 2) await registerMiss();
@@ -69,7 +85,7 @@ export async function POST(req: Request) {
   await progressQuest("reviews_35", 1);
   if (grade >= 3) await progressQuest("correct_15", 1);
 
-  const next = await db.cardState.findUnique({ where: { cardId } });
+  const next = await db.cardState.findUnique({ where: { userId_cardId: { userId: scope.userId, cardId } } });
   return NextResponse.json({
     ivl: out.ivl,
     due: out.due,

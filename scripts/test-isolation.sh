@@ -176,6 +176,56 @@ print(c.execute(\"SELECT COUNT(*) FROM ChatMsg WHERE userId=?\", (b,)).fetchone(
 check "A's delete removes only A's chats" "$A_LEFT" "0"
 check "B's chats survive A's delete"      "$B_LEFT" "1"
 
+# --- Task 72: aggregate-state isolation (CardState + arcade meta) ------------
+# The FSRS deck queue, GameStat records, achievements and the league row are
+# per-user keyed now; a grade or game played by A must be invisible to B.
+GRADE_CARD="col012"
+AG=$(curl -s -b "$JA" -X POST "$BASE/api/review/grade" -H 'content-type: application/json' -d "{\"cardId\":\"$GRADE_CARD\",\"grade\":3,\"dir\":\"cloze\"}")
+echo "$AG" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ivl") is not None' && ok "A grades a deck card (FSRS applies)" || bad "A grades a deck card"
+CS_A=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
+rows = c.execute(\"SELECT userId FROM CardState WHERE cardId=?\", ('$GRADE_CARD',)).fetchall()
+print('a-only' if len(rows)==1 and rows[0][0]==a else 'leak:'+repr(rows))")
+check "A's grade creates exactly ONE CardState row stamped with A's id" "$CS_A" "a-only"
+BQ_STATE=$(curl -s -b "$JB" "$BASE/api/review/queue" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+e=[x for x in d.get('batch',[]) if x.get('card',{}).get('id')=='$GRADE_CARD']
+# 'absent' is clean too: the card is not in B's round at all (budget/skill mix).
+print('clean' if not e else ('new' if e[0].get('state',{}).get('state')=='new' else 'LEAK:'+json.dumps(e[0].get('state'))))")
+check "B's queue never sees A's schedule for that card" "$BQ_STATE" "clean"
+curl -s -b "$JA" -X POST "$BASE/api/flow" -H 'content-type: application/json' -d '{"correct":10,"total":12,"ms":600000}' > /dev/null
+GS_A=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
+rows = c.execute(\"SELECT userId, best FROM GameStat WHERE key='flow:best'\").fetchall()
+print('a-only' if len(rows)==1 and rows[0][0]==a and rows[0][1]==10 else 'leak:'+repr(rows))")
+check "A's flow run stamps GameStat with A's id (one row)" "$GS_A" "a-only"
+BFLOW=$(curl -s -b "$JB" "$BASE/api/flow" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("clean" if d.get("best")==0 and d.get("streak")==0 else "leak")')
+check "B's flow view reads zero (A's run invisible)" "$BFLOW" "clean"
+ACH_A=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
+rows = c.execute(\"SELECT userId FROM Achievement WHERE key='first_words'\").fetchall()
+print('a-only' if len(rows)==1 and rows[0][0]==a else 'leak:'+repr(rows))")
+check "first_words awarded to A only (one row, A's id)" "$ACH_A" "a-only"
+BACH=$(curl -s -b "$JB" "$BASE/api/state" | python3 -c 'import json,sys; d=json.load(sys.stdin); u=d.get("game",{}).get("unlocked",[]); print("clean" if "first_words" not in u else "leak")')
+check "B's trophy case does not show A's trophy" "$BACH" "clean"
+curl -s -b "$JA" "$BASE/api/arcade/league" > /dev/null; curl -s -b "$JB" "$BASE/api/arcade/league" > /dev/null
+LGE=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+rows = c.execute(\"SELECT userId FROM League\").fetchall()
+ids={r[0] for r in rows}
+a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
+b = c.execute(\"SELECT id FROM User WHERE email='iso-b@rah.test'\").fetchone()[0]
+print('per-user' if len(rows)==2 and ids=={a,b} else 'leak:'+repr(rows))")
+check "league rows are per-user (A and B each own one)" "$LGE" "per-user"
+
 # --- mailer idempotency ledger (P2) ------------------------------------------
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null

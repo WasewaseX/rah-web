@@ -1,6 +1,6 @@
 # ROADMAP AUDIT — checklist, incidents, and open items
 
-**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-22 (REG-1/REG-2 waves: third wipe forensics, db-guard, and the public-repo privacy purge) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
+**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-23 (Task-67 reconciliation wave: this file and ROADMAP-STATUS.md re-derived from code + task log; the offline/goal-planner/pronunciation disagreements are resolved — see §1 checklist and §3 table) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
 
 Purpose: one place that tracks (a) incident post-mortems with acceptance tests, (b) the standing audit checklist, (c) what an external evaluator praised vs. what actually broke. Update it every wave; do not let "DONE" claims outrun the drills that prove them.
 
@@ -148,22 +148,28 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - ✅ Agent permissions + prompt-injection defenses (Task 51)
 - ✅ Account deletion + privacy cleanup (Task 49)
 - ✅ Isolated automated tests (Task 52)
-- 🟡 Learner data isolation — deployment lock in place (Task 48); per-user scoping + two-user tests still pending (multi-user mega-update). The evaluator's 2026-10-22 P0-architecture row — unchanged in priority.
+- 🟡 Learner data isolation — **content surfaces CLOSED (Tasks 63+65)**: chats, essays, transcripts, review logs, mistake memory (+ corrections/tombstones), mastery ledger, daily stats, goals — all userId-stamped, scoped, and proven by the 29-check two-account battery. Residual: CardState (FSRS queue) + arcade meta (Quest/GameStat/League/Rival/Achievement/RunState) remain global aggregate keys — no learner prose, safe only while the deployment lock holds; scoped with the PostgreSQL/multi-user push.
 
-### Critical features (3 done, 5 partial, 2 pending)
-- ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59)
-- 🟡 Exam tracks (IELTS/TOEFL/C1A) · 🟡 Acoustic pronunciation assessment · 🟡 Evidence-backed reference · 🟡 Writing-revision workspace · 🟡 Content quality console
-- ❌ Offline sync · ❌ Goal-based weekly planner
+### Critical features (5 done, 5 partial, 0 pending)
+- ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59) · ✅ Goal-based weekly planner (Task 65: deterministic plan from due-load forecast + rhythm + danger tags; honest feasibility) · ✅ Exam tracks at honest scope (Task 66: IELTS/TOEFL/C1A format practice, generated — not licensed papers)
+- 🟡 Acoustic pronunciation (measured word-level tier shipped, Task 64; phoneme tier awaits a configured AND validated Azure key — claim-precision rule below) · 🟡 Evidence-backed reference (provenance surfacing pending) · 🟡 Writing-revision workspace (revision chain shipped, Task 63; rubric history view pending) · 🟡 Content quality console (flag lifecycle shipped; per-flag regression tests pending) · 🟡 Offline sync (PWA shell + read-only grace reads shipped; offline write queue + reconciliation = the active P1 workstream)
 
-### Polish (3 done, 7 partial)
-- ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier)
-- 🟡 Coach transparency · exam generation/grading · placement confidence · mistake memory · XP/gems/quests · progress reports · onboarding naming
+> **Reconciliation note (Task 67, 2026-10-23):** earlier editions of this checklist said "❌ Offline sync · ❌ Goal-based weekly planner" and "🟡 Exam tracks / 🟡 Acoustic pronunciation" — that drift against the shipped code is what the external assessment flagged. Rows above are now re-derived from the code; ROADMAP-STATUS.md §2 carries the matching per-item evidence. The two documents agree from this revision on.
+
+### Polish (4 done, 6 partial)
+- ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier) · ✅ Mistake memory v1 incl. learner corrections (Task 65)
+- 🟡 Coach transparency · exam generation/grading · placement confidence · XP/gems/quests · progress reports (pilot protocol pending) · onboarding naming
 
 ### Reverse-engineering targets
 - ✅ Anki · ✅ Duolingo · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key) · ❌ LingQ (imported-reading workflow study)
 
 ### External stores / APIs (deliberately deferred, single-user era)
-- ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · 🟡 Transactional email delivery guarantees
+- ❌ PostgreSQL (decision + migration plan = §4 decision 4, tracked) · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · ✅ Transactional email delivery ledger + idempotency (Task 63: MailLog, SMTP messageId reporting)
+
+### Claim-precision rules (Task 67, binding on every doc and UI surface)
+1. **Pronunciation:** the shipped score is WORD-level accuracy from the learner's real recording. Until the Azure phoneme-assessment adapter is configured AND validated against real learner audio, nothing may present it as a complete phonetic or accent assessment.
+2. **Exam scores:** IELTS/TOEFL/C1A track scores are PRACTICE ESTIMATES with rough range band references until grading is validated against expert-reviewed responses and exam-specific rubrics. Official-score language is forbidden; disclaimers ship in every track and coach reply.
+3. From the same assessment: PostgreSQL + public multi-user registration are separate launch requirements; the critical-fix 10/10 count is valid for the locked single-learner deployment only; category counts are not additive.
 
 ---
 
@@ -172,9 +178,9 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 | Stage | Scope | Status |
 |-------|-------|--------|
 | 01 Stabilize and isolate | CI green, learner data isolation, auth hardening, safe migrations, **data survival across updates** | **CLOSED** — Tasks 45–48 + 57. The audit's 5 P0s plus the REG-1 data guard. Residual: true per-user scoping = mega-update (see stage 01→03 bridge below). |
-| 02 Make the learning system trustworthy | Account deletion, abuse limits, tool permissions, test isolation, degraded-result honesty | **4/5 closed** (Tasks 49–52). Remaining: model-provider failure recovery = durable task recovery + "degraded result" labeling. |
-| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **IN PROGRESS** — BYO materials shipped (Task 54, source-validated extraction), CSV/TSV import shipped (Task 55), measured acoustic pronunciation tier shipped (Task 64: real-audio ASR + word alignment; Azure phoneme adapter config-gated). Pending: full CEFR B2–C1 graph with mastery gates. |
-| 04 Dependable daily product | Anki binary import, offline sync, reminders, longitudinal effectiveness evidence | PENDING. `.apkg` binary import is the nearest item. |
+| 02 Make the learning system trustworthy | Account deletion, abuse limits, tool permissions, test isolation, degraded-result honesty | **5/5 CLOSED** (Tasks 49–52 + 57: honest degraded states on every AI surface). |
+| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **CLOSED** — BYO materials (Task 54), CSV/TSV import (Task 55), CEFR graph (Task 58), .apkg import (Task 59), measured acoustic tier + config-gated Azure adapter (Task 64), exam format tracks (Task 66). |
+| 04 Dependable daily product | Anki binary import, offline sync, reminders, longitudinal effectiveness evidence | **IN PROGRESS** — .apkg import DONE (Task 59); local reminders DONE (PWA, best-effort); offline sync PARTIAL (read-only grace; offline write queue + reconciliation = the active P1 workstream); longitudinal effectiveness evidence = learner-pilot protocol (§4 decision 3). |
 
 **Audit's score-lift doctrine (binding):** the next score increase must come from *validated teaching + real speech assessment*, NOT another batch of unrelated features. Passing CI proves engineering behavior, not educational effectiveness.
 
@@ -188,7 +194,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 | P0 — architecture | Real per-user data isolation before public multi-user | **PARTIAL — content surfaces complete (Tasks 63+65)**: chats, essays, transcripts, review logs, the mistake memory (families + corrections + tombstones), the mastery ledger, daily activity stats, goals and all state-route counts are stamped + filtered per user, proven by the two-account battery. Residual for the next wave: CardState (the FSRS deck queue) and arcade meta tables (Quest/GameStat/League/Rival/Achievement/RunState) are still global keys — aggregate state, no learner prose, safe only while the deployment lock holds |
 | P1 — learning quality | Genuine acoustic pronunciation assessment | **DONE (Task 64) — decision shipped in code**: built-in measured word-level tier (server ASR → deterministic alignment, TTS→ASR roundtrip-validated, real-clip E2E at 100/100) + Azure phoneme-assessment adapter dormant until the learner sets AZURE_SPEECH_KEY/REGION; no phoneme claims anywhere until then |
 | P1 — curriculum | Authentic IELTS/TOEFL/C1A tracks | **PARTIAL — format tracks shipped (Task 66)**: IELTS/TOEFL/C1 Advanced-style practice built on the existing exam engine (per-track task-type mix + rubric in the generation prompt, deterministic rough band reference on grading, not-affiliated disclaimers everywhere, skill routing in the coach). Honest limit: format-faithful GENERATED practice, not licensed past papers - those stay out of scope for a zero-licensing app |
-| P1 — reliability | Offline sync + real mobile-browser testing | OPEN |
+| P1 — reliability | Offline sync + real mobile-browser testing | **OPEN — precisely scoped (Task 67 survey)**: EXISTS today = PWA manifest, SHA-keyed service worker with self-evicting caches, network-first GET grace reads for offline opens, install prompt, local reminders. MISSING = every write (grade/chat/writing/speak POST) requires the network; no IndexedDB store, no offline write queue, no reconciliation layer, no offline UI banner. The active workstream closes exactly that gap: offline review queue + replay + reconciliation, offline affordances in the UI, then a real mobile-browser pass (mobile viewport, touch targets, overflow) |
 | P2 — depth | Learner-memory corrections, goal planner | **DONE (Task 65)** — memory corrections: Mind Reader correct (edit quoted evidence/label, editedAt provenance) + forget with a tombstone (the exact rejected pair never re-aggregates; new evidence still reopens the family); goal planner: deterministic weekly plan from FSRS due-load forecast + observed 14-day rhythm + mastery danger tags, honest feasibility (on_track/tight/overcommitted with numbers), archive-never-delete. Writing revision history DONE (Task 63) |
 | P2 — operations | Transactional email delivery reporting + idempotency | **DONE (Task 63)** — MailLog ledger (one row per recipient+kind = the delivery report), sliding-window idempotency, SMTP messageId reporting |
 
@@ -205,4 +211,6 @@ Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-c
 
 1. **Single vs multi-user** — the deployment lock is the sanctioned interim; the real decision (multi-tenant Postgres with per-user scoping vs staying single-learner) gates the data-store stage. No date promised; the lock keeps either path safe.
 2. **Azure AI Speech** — RESOLVED as a two-tier decision (Task 64): the measured word-level acoustic tier ships NOW on the built-in SDK ASR (zero new credentials, validated by roundtrip + real-clip E2E), and the Azure pronunciation-assessment adapter (HundredMark/Phoneme/Comprehensive, miscue on) ships config-gated — it activates the moment the learner sets AZURE_SPEECH_KEY + AZURE_SPEECH_REGION, no code changes, with the route degrading honestly to the word tier if Azure errors. Until a key exists, no phoneme-level claims are made anywhere in the UI.
-3. **Learning-effectiveness measurement** — the audit's warning: proxy metrics (XP, streaks) prove engagement, not learning. The effectiveness ledger exists (zero-AI numbers); next step is retention-curve evidence tied to FSRS, surfaced to the learner without AI gloss.
+3. **Learning-effectiveness measurement (P1, protocol now tracked)** — the audit's warning: proxy metrics (XP, streaks) prove engagement, not learning; passing tests ≠ learning gains. The 2026-10-23 assessment makes this P1: run a STRUCTURED LEARNER PILOT over several weeks tracking retention (FSRS recall curves), writing quality (rubric deltas on the revision chain), listening comprehension, and speaking improvement. Protocol tracked in §3; instrumentation task owns the in-app outcome ledger.
+4. **Production database (P0 before public multi-user)** — the app stays SQLite + versioned migrations for the locked single-learner deployment. The decision to open to multiple public users REQUIRES: migrate to PostgreSQL, validate concurrent writes and migrations on it, and test isolation + recovery on the real deployment architecture. The migration plan + compatibility work is a tracked task; the deployment lock keeps the interim safe.
+5. **Privacy-incident residue (P0)** — REG-2 closed the repo itself, but the 2026-10-23 assessment keeps two follow-ups open: (a) third-party caches of pre-scrub commits may survive (GitHub Support purge, search-engine cache removal requests — tracked task owns the runbook); (b) the previously published email address is PERMANENTLY treated as exposed (re-registration with a fresh address recommended; no expectation of privacy on it again). All future backup copies stay in the private vault (and stay encrypted there — the opt-in AES-256-CBC/PBKDF2 path from Task 63 is the doctrine).

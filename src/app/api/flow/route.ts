@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { buildSpeedPool } from "@/lib/arcade-items";
+import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 
@@ -14,9 +15,10 @@ const ITEMS = 12;
 // for local grading, the server clamps the submitted aggregate.
 export async function GET() {
   const items = await buildSpeedPool(ITEMS);
-  const streak = (await db.gameStat.findUnique({ where: { key: "flow:streak" } }))?.best ?? 0;
-  const best = (await db.gameStat.findUnique({ where: { key: "flow:best" } }))?.best ?? 0;
-  const due = await db.cardState.count({ where: { state: { not: "new" }, due: { lte: dayIndex() }, suspended: false } });
+  const u = await contentUserId().catch(() => SINGLE_USER_ID);
+  const streak = (await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "flow:streak" } } }))?.best ?? 0;
+  const best = (await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "flow:best" } } }))?.best ?? 0;
+  const due = await db.cardState.count({ where: { userId: u, state: { not: "new" }, due: { lte: dayIndex() }, suspended: false } });
   return NextResponse.json({ items, streak, best, due });
 }
 
@@ -33,11 +35,12 @@ export async function POST(req: Request) {
   const xp = gain > 0 ? await awardXp(gain, { chainHit: correct / Math.max(1, total) >= 0.8 }) : null;
 
   // Flow streak: consecutive days with at least one completed flow.
+  const u = await contentUserId().catch(() => SINGLE_USER_ID);
   const today = dayIndex();
-  const last = await db.gameStat.findUnique({ where: { key: "flow:last" } });
-  const cur = await db.gameStat.findUnique({ where: { key: "flow:streak" } });
+  const last = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "flow:last" } } });
+  const cur = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "flow:streak" } } });
   const streak = last?.best === today ? (cur?.best ?? 1) : last?.best === today - 1 ? (cur?.best ?? 0) + 1 : 1;
-  await db.gameStat.upsert({ where: { key: "flow:last" }, create: { key: "flow:last", best: today }, update: { best: today } });
+  await db.gameStat.upsert({ where: { userId_key: { userId: u, key: "flow:last" } }, create: { userId: u, key: "flow:last", best: today }, update: { best: today } });
   await bumpStat("flow:streak", streak);
   await bumpStat("flow:best", correct);
   await bumpStat("flow:plays");

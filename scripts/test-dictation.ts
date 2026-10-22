@@ -89,7 +89,7 @@ try {
     check(j.results.length === 2 && j.results[0].score < 1 && j.results[1].score === 1, "route: two rounds scored independently", JSON.stringify(j.results.map((r) => r.score)));
     check(j.scheduled.length === 1 && j.scheduled[0].cardId === `${LISTEN_CARD_PREFIX}${TOKEN}` && j.scheduled[0].via === "family", "route: the slip scheduled as a healing card", JSON.stringify(j.scheduled));
 
-    const card = await prisma.cardState.findUnique({ where: { cardId: `${LISTEN_CARD_PREFIX}${TOKEN}` } });
+    const card = await prisma.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId: `${LISTEN_CARD_PREFIX}${TOKEN}` } } });
     const today = dayIndex();
     check(!!card && card.lapses === 1 && card.due <= today + 1 && card.due > today - 1, "schedule: grade-1 outcome at post-lapse minimum", JSON.stringify(card));
 
@@ -100,7 +100,7 @@ try {
     check(!!fam && fam.kind === "listen" && fam.evidence.includes("->"), "memory: listen family recorded with evidence", JSON.stringify(fam?.evidence)?.slice(0, 90));
 
     // ---------- 4) queue surfacing on the real timeline ----------
-    await prisma.cardState.update({ where: { cardId: `${LISTEN_CARD_PREFIX}${TOKEN}` }, data: { due: today } });
+    await prisma.cardState.update({ where: { userId_cardId: { userId: "me", cardId: `${LISTEN_CARD_PREFIX}${TOKEN}` } }, data: { due: today } });
     const q = await fetch(`${BASE}/api/review/queue`);
     const qj = (await q.json()) as { batch?: { card: { id: string; prompt: string; answer: string; unit: string; note: string } }[] };
     const healing = (qj.batch ?? []).map((b) => b.card).find((c) => c.id === `${LISTEN_CARD_PREFIX}${TOKEN}`);
