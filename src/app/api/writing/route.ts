@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { aiJson, writingSystem } from "@/lib/ai";
+import { aiJson, writingSystem, WRITING_GOALS, type WritingGoal } from "@/lib/ai";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
@@ -59,9 +59,13 @@ export async function POST(req: Request) {
   const rl = aiRateLimit(req);
   if (!rl.ok) return rl.response!;
 
-  const { prompt, text, revisingId } = await req.json();
+  const { prompt, text, revisingId, goal } = await req.json();
   const body = String(text ?? "").trim();
   if (body.length < 60) return NextResponse.json({ error: "Write at least 60 characters so there is something to grade." }, { status: 400 });
+  // Grammarly RE (Task 85): register goal is a declared prompt input. An
+  // invalid value is dropped silently (undefined = the neutral examiner),
+  // never an error - the essay is the point, the goal is a dial.
+  const goalUsed = WRITING_GOALS.includes(goal as WritingGoal) ? (goal as WritingGoal) : undefined;
 
   // Revision chain (audit P2): a submission may revise an earlier one of the
   // SAME user - the chain (parentId/revision) is the writing revision history.
@@ -86,7 +90,7 @@ export async function POST(req: Request) {
 
   let result: WritingResult;
   try {
-    result = await aiJson<WritingResult>(writingSystem(profile), [
+    result = await aiJson<WritingResult>(writingSystem(profile, goalUsed), [
       { role: "user", content: `Prompt: ${prompt}\n\nEssay:\n${body}\n\n${findingsBlock(ruleReport)}` },
     ]);
   } catch (e) {
@@ -106,7 +110,9 @@ export async function POST(req: Request) {
       }
     : null;
 
-  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify({ ...result, ruleChecks }), ...scope, parentId, revision } });
+  // Provenance: the register goal the grader was given travels inside the
+  // stored result JSON (zero-migration, same envelope as ruleChecks).
+  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify({ ...result, ruleChecks, goal: goalUsed ?? null }), ...scope, parentId, revision } });
   await bumpDaily("written");
   await awardXp(15, { chainHit: true });
   await progressQuest("write_1", 1);
@@ -119,7 +125,7 @@ export async function POST(req: Request) {
     await recordMistakes(errs);
     await Promise.allSettled(errs.map((e) => noteTagOutcome(e.tag, false)));
   }
-  return NextResponse.json({ ...result, ruleChecks });
+  return NextResponse.json({ ...result, ruleChecks, goal: goalUsed ?? null });
 }
 
 // Rubric history (audit: writing-revision workspace - criterion-level deltas

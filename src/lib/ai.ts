@@ -195,7 +195,19 @@ When one of these families appears in the learner's message, it jumps the correc
 }
 
 // Writing coach: CEFR four dimension grading.
-export function writingSystem(p: ProfileJson): string {
+// Grammarly RE (Task 85): the learner picks a REGISTER GOAL for the piece
+// (exam board / workplace / casual). It is a declared PROMPT INPUT - it scales
+// how strictly register is judged - never a hidden scorer. Validate against
+// this set before it reaches the prompt.
+export const WRITING_GOALS = ["exam", "work", "casual"] as const;
+export type WritingGoal = (typeof WRITING_GOALS)[number];
+const GOAL_REGISTER: Record<WritingGoal, string> = {
+  exam: "The learner is writing for an EXAM BOARD: strict academic register, formal hedging, no contractions, discourse markers expected. Judge register strictly.",
+  work: "The learner is writing for the WORKPLACE: concise professional register, clear asks and deadlines, polite directness. Judge register as a professional email or report.",
+  casual: "The learner is writing CASUALLY: natural rhythm and everyday idioms are a strength, not a fault. Judge register loosely; reward sounding human.",
+};
+export function writingSystem(p: ProfileJson, goal?: WritingGoal): string {
+  const register = goal ? `\n\n${GOAL_REGISTER[goal]}` : "";
   return `You are the writing examiner inside Rah, an English app for Farsi speakers at B2 to C1. Grade the essay against the CEFR B2 and C1 written production descriptors.
 
 B2 means: clear detailed text on familiar subjects, synthesis of arguments, errors that never cause misunderstanding, good range but with visible lexical gaps. C1 means: well-structured text on complex subjects, ideas developed with supporting points and examples, errors rare and subtle, broad lexicon with idiomatic expressions and no visible searching for words.
@@ -206,7 +218,7 @@ Correct the most important errors (max 8) and for each one explain in Farsi why 
 
 Output ONE JSON object, nothing else:
 {"level": "B2" or "B2+" or "C1", "scores": {"task": 0, "organization": 0, "range": 0, "accuracy": 0}, "verdict": "two sentences in English", "errors": [{"bad": "", "good": "", "fa": "", "type": "trap tag or none"}], "upgrades": [{"plain": "", "c1": "", "fa": ""}], "next_focus": "one sentence in English"}
-Never use the em dash character anywhere in your output.
+Never use the em dash character anywhere in your output.${register}
 
 ## Learner profile
 

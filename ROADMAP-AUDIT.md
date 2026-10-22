@@ -224,11 +224,11 @@ The evaluator's third re-review replaced the flat 39-item count with per-categor
 | Original critical fixes | 10 | 0 | 0 |
 | Critical feature additions (10) | 7 | 3 | 0 |
 | Existing-feature polish (10) | 10 | 0 | 0 |
-| Reverse-engineering benchmarks | 3 | 1 | 0 |
+| Reverse-engineering benchmarks | 4 | 1 | 0 |
 | Three recommended data stores | 0 | 0 | 3 |
 | Three recommended API integrations | 2 | 1 | 0 |
 
-Notes: (a) the critical-fix row is for the currently LOCKED single-learner deployment with documented security controls — PostgreSQL and the public-registration decision remain separate launch requirements; (b) category totals are not additive (features support more than one recommendation); (c) deltas vs the evaluator's snapshot (features 4/6, polish 3/7, RE 2/1/1): Task 65 closed memory corrections, Tasks 70+72 closed progress reports / placement confidence / coach transparency / anti-farming, Task 71 closed LingQ — offline stays PARTIAL because the shipped offline loop covers grades, not every write surface; (d) the evaluator's earlier 17/15/7 flat ledger is superseded by this table. CI note kept for the record: pushes to main never triggered CI until Task 57-bis fixed the `on.push.branches` corruption.
+Notes: (a) the critical-fix row is for the currently LOCKED single-learner deployment with documented security controls — PostgreSQL and the public-registration decision remain separate launch requirements; (b) category totals are not additive (features support more than one recommendation); (c) deltas vs the evaluator's snapshot (features 4/6, polish 3/7, RE 2/1/1): Task 65 closed memory corrections, Tasks 70+72 closed progress reports / placement confidence / coach transparency / anti-farming, Task 71 closed LingQ, Task 85 closed Grammarly (writing editor now a live revision-and-rubric surface: offset-anchored pre-flight, deterministic accept-splice, register goals, practice-estimate strip) — offline stays PARTIAL because the shipped offline loop covers grades, not every write surface; (d) the evaluator's earlier 17/15/7 flat ledger is superseded by this table. CI note kept for the record: pushes to main never triggered CI until Task 57-bis fixed the `on.push.branches` corruption.
 
 ### Open critical list (evaluator 2026-10-22, third re-review — reconciled)
 

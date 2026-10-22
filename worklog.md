@@ -1415,3 +1415,21 @@ Work Log:
 Stage Summary:
 - App fully restored for the learner: loading screen gone, Coach reachable, SRS state (17 cards) + DailyStat back, junk purged, offsite chain re-armed.
 - Open follow-up: the exact deletion step that wiped CardState(me)/DailyStat(me) post-restore is unproven (account-deletion last-user branch + a battery run against the live server is the consistent theory); boot did NOT run db-guard today (log's last entry is yesterday). Next: codify the insert-only repair into db-guard (scheduling-loss signature) and find/forbid the live-DB writer.
+
+---
+Task ID: 85
+Agent: Super Z (main)
+Task: "Continue reverse engineering never stop" - benchmark #5: Grammarly (the writing editor), closing the audit's "not yet a comprehensive revision-and-rubric system" residual.
+
+Work Log:
+- GRAMMARLY-RE.md: the loop stripped to mechanics (offset-anchored rule pass while typing -> per-finding accept/dismiss = deterministic splice -> score + category split -> goals scale the feedback -> revision telemetry); shipped-vs-not-copied with the epistemic lines (no proprietary 0-100 score with unknown weights, no tone detector, no plagiarism, no silent keystroke capture - the revision history stays the explicit submission chain).
+- API: /api/grammar-check now returns offset/length on every finding (additive). BATTERY CAUGHT BUG #1: the route trimmed the text before screening -> offsets relative to the trimmed string. Fixed: screen the RAW text (length guard still trims).
+- Second trim layer caught by the same splice-contract check: screenText() itself trimmed internally -> fixed the same way. Consumers that match by excerpt (findingsBlock, mergeRuleErrors) unaffected.
+- /api/writing POST accepts a register goal (exam|work|casual) - validated against WRITING_GOALS, folded into writingSystem(p, goal) as a declared prompt-input register line, stored in the result JSON as provenance, echoed in the response. Zero migrations.
+- Write.tsx: "Check as I write" (default on, toggleable) - debounced 1.2s LanguageTool pre-flight; mirrored highlight layer behind the textarea (identical metrics, scrollTop-synced; error=rose, style=cyan underlines; overlap-guarded, sequence-guarded against stale responses); findings cards (category chip, excerpt, message, up to 2 replacement chips, per-finding ignore session-local, 12-render cap); accept = deterministic splice at [offset, offset+length); register-goal chips row; result card carries the "practice estimate" average chip + the standing claim-precision Note (not an official CEFR grade).
+- Battery section (test-api-battery.ts): splice contract text.slice(offset, offset+length) === excerpt pinned on a text with LEADING WHITESPACE (the trim-bug replay), numeric offset/length on every finding, replacements present, WRITING_GOALS set pin, exam/casual prompt divergence pin (no AI call in battery). 433 -> 441/441.
+- Browser E2E (agent-browser): exam goal chip set, essay with "dont" typed, live check fired, "don't" replacement clicked -> text spliced at the exact offset with leading whitespace preserved, re-screen triggered; screenshots saved.
+
+Stage Summary:
+- The writing editor is now a live revision-and-rubric surface: chain + criterion deltas + change summaries (63/83) + live pre-flight with deterministic accept-splice + register goals + practice-estimate strip (85). Audit residual closed.
+- RE category: Duolingo/Anki/LingQ/Grammarly DONE, ELSA PARTIAL (blocked on Azure credentials only). Roadmap tables + audit ledger updated (RE 4/1/0), gate line at 441/441.

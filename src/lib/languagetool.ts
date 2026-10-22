@@ -163,11 +163,15 @@ async function callLt(text: string): Promise<LtReport | null> {
 }
 
 /** Screen text through the LanguageTool rule engine. Returns null on any
- *  failure - callers must degrade gracefully to the LLM-only path. */
+ *  failure - callers must degrade gracefully to the LLM-only path.
+ *  Offset fidelity (Grammarly RE, Task 85): the text is screened AS-IS - the
+ *  old internal .trim() made every LT offset relative to the trimmed string,
+ *  so editor splices landed leading-whitespace widths off. The length guard
+ *  still trims; the screened text does not. */
 export async function screenText(text: string): Promise<LtReport | null> {
-  const trimmed = String(text ?? "").trim();
-  if (trimmed.length < 20) return null;
-  return callLt(trimmed);
+  const raw = String(text ?? "");
+  if (raw.trim().length < 20) return null;
+  return callLt(raw);
 }
 
 // ---------------------------------------------------------------------------
