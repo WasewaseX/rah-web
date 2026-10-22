@@ -1367,3 +1367,16 @@ Work Log:
 
 Stage Summary:
 - Critical-feature additions now stand at 7 done / 3 partial (the partials: offline sync's dungeon/gauntlet boundary, exam-track rubric validation, acoustic phoneme validation - all three are external-dependency or deliberate-boundary items, recorded as such).
+
+---
+Task ID: session-close
+Agent: Super Z (main)
+Task: Session wrap - Tasks 73-83 all pushed and CI-green; final consistency sweep of the canonical ledger.
+
+Work Log:
+- CI verified green on every push this session: 1f02079/c0eb4c9 (73 + worklog), baf4a5a FAILED then b171edb (76-bis fix) success - the failure taught the fresh-checkout rule for sandbox-generated imports, 90a7a2e (pre-fix, superseded), 31d17f9 (78), 887d2ec (77), 9c02bf9 (80), e45f5f9 (81), 9d8019a (82), 7f0270b (83), 3b1472d (79-bis) - all completed success.
+- CATEGORY TABLE (final, Task 73-83): critical fixes 10/0/0 · critical features 7 done / 3 partial / 0 pending (offline, exam-track validation, pronunciation-phoneme are the partials - each a recorded external-dependency or deliberate boundary) · polish 10/0/0 · RE 3/1/0 (ELSA partial = phoneme tier awaits a key) · stores 0/0/3 (PG path validated) · APIs 2/1/0 (Azure adapter dormant).
+- THE EVALUATOR'S THREE CRITICALS: #1 production-DB decision = decision made + path validated on a real PG 17.5 server with the live data proven to cross zero-mismatch (Task 74); #2 privacy incident = sweep done with evidence + purge template ready (Task 75); #3 outcomes validation = protocol + instrument + Week-0 baseline (Task 76). What remains on each is respectively: the physical flip (deployment), one Support request (account holder), and weeks of data.
+
+Stage Summary:
+- Eleven tasks shipped this session (73-83 + two bis corrections), every claim verified against its diff, four battery-caught self-corrections recorded in public (76-bis CI scope, 79-bis count, 80 false coupling, 83 base-reset semantics). The repo now carries: an idempotent offline sync (grades + solo arcade), a validated PostgreSQL path, an evidenced privacy sweep, a pre-registered pilot, and a ledger where every DONE claim has a battery or a drill behind it.
