@@ -1296,3 +1296,14 @@ Work Log:
 
 Stage Summary:
 - Feature #8 closed with the honest epistemics intact: the learner can now see WHERE every example comes from. Remaining partials: content console regression tests (#10), exam item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 79-bis
+Agent: Super Z (main)
+Task: Claims-vs-diff self-correction - Task 79's commit message and STATUS said "provenance battery 8/8"; the actual run printed 7 passed / 0 failed (7 checks exist).
+
+Work Log:
+- The standing gate applies to my own commit messages: the count was wrong (8 vs 7). STATUS corrected to 7/7; this entry is the public correction. No code change - the checks and the component are correct as shipped.
+
+Stage Summary:
+- Task 62-bis's lesson (a commit message is not a diff) applies to battery counts too. Verify-then-claim, and when a claim slips, correct forward in the ledger - never silently.
