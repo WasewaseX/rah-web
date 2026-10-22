@@ -1396,3 +1396,22 @@ Work Log:
 
 Stage Summary:
 - Both waves' work is now one tree: the canonical offline protocol is the GradeAck-gid outbox (grades + arcade aggregates), isolation is fully scoped (45-check battery), the roadmaps are the parallel wave's final ledger (fixes 10/0/0, features 7/3/0, polish 10/0/0, RE 3/1/0, stores 0/0/3 with PG validated, APIs 2/1/0). Lesson recorded: session-start sync doctrine exists because of exactly this race - the stale tree cost this session a re-derivation of Tasks 67/68/72; the claims-vs-diff habit is what caught the drift (live db ahead of local HEAD) before it was misdiagnosed as a "lost wave".
+
+---
+Task ID: 84
+Agent: Super Z (main)
+Task: P0 live-incident fix - eternal loading screen + unreachable Coach + contaminated live DB (user report: "Coach unreachable / only see a loading screen").
+
+Work Log:
+- Reproduced: GET / -> 200 but GET /api/state -> 500 (PrismaClientValidationError: unknown arg `userId` on cardState.findMany at src/lib/server.ts:72). The UI's initial fetch never resolved -> eternal loading screen; every authed surface (coach-agent) crashed the same way.
+- Root cause: the dev server booted at 18:44 with a STALE pre-Task-67 Prisma client (CardState without userId) - on-disk client/schema/DB were all correct (node_modules/.prisma schema HAS userId; db/custom.db has the column + migrations 0001-0009). Fixed: killed server, `rm -rf .next` (stale Turbopack module graph), `npx prisma generate`, restart. /api/state -> 200.
+- Data forensics: boot-guard restored the learner DB from upload/rah-backups/rah-latest.db, but the live db had LOST CardState(me) 17->0 and DailyStat(me) 2->0 while ReviewLog(me)=17/ChatMsg(me)=6 survived, AND gained battery junk (u1/u2 rows in CardState/DailyStat/Goal/MistakeFamily/MistakeForgiven). The OSS snapshot rah-latest.db (Oct 22 12:40) still held the clean state: CardState(me)=17 (reps=17), DailyStat(me)=2, zero junk, Session/LoginCode scrubbed.
+- Restored via scripts/restore-learner-rows.py (insert-only for missing 'me' rows, junk purge for userIds absent from the User table, real-user rows kept): CardState(me)=17 back, DailyStat(me)=2 back, 19 junk rows purged. Level='?' + empty Placement predates all snapshots (lost in an earlier wipe) - UI degrades honestly to a "Start placement" CTA.
+- Coach verified with a REAL session: request-code -> devCode -> verify -> cookie -> POST /api/coach-agent -> 200, streamed a state-aware reply ("17 due vocabulary cards... you're at 3 days").
+- Browser E2E (agent-browser): sign-in via UI -> home renders (Review 17 due) -> coach sidebar replies with live state -> review view renders card 1/17 -> typed "keep" -> Check -> grade buttons -> graded Good: NEW ReviewLog row stamped userId=cmvh5chsg... (authenticated isolation seam working), xp 236->246, queue advances. Console clean.
+- Protection chain was dead in the recycled environment: restarted watchdog via ensure-watchdog.sh; ran vault-sync once by hand -> fresh scrubbed snapshot pushed to the PRIVATE vault (db/sync/rah-latest.db recreated too).
+- Batteries after the fix: db-guard 27/27, isolation 45/45, isolated API battery 433/433 ("real db untouched").
+
+Stage Summary:
+- App fully restored for the learner: loading screen gone, Coach reachable, SRS state (17 cards) + DailyStat back, junk purged, offsite chain re-armed.
+- Open follow-up: the exact deletion step that wiped CardState(me)/DailyStat(me) post-restore is unproven (account-deletion last-user branch + a battery run against the live server is the consistent theory); boot did NOT run db-guard today (log's last entry is yesterday). Next: codify the insert-only repair into db-guard (scheduling-loss signature) and find/forbid the live-DB writer.
