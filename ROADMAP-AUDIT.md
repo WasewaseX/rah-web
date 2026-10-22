@@ -160,10 +160,10 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - 🟡 Coach transparency · exam generation/grading · placement confidence · mistake memory · XP/gems/quests · progress reports · onboarding naming
 
 ### Reverse-engineering targets
-- ✅ Anki · ✅ Duolingo · 🟡 ELSA (acoustic tier missing) · ❌ LingQ (imported-reading workflow study)
+- ✅ Anki · ✅ Duolingo · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key) · ❌ LingQ (imported-reading workflow study)
 
 ### External stores / APIs (deliberately deferred, single-user era)
-- ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · ❌ Azure Speech · 🟡 Transactional email delivery guarantees
+- ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · 🟡 Transactional email delivery guarantees
 
 ---
 
@@ -173,7 +173,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 |-------|-------|--------|
 | 01 Stabilize and isolate | CI green, learner data isolation, auth hardening, safe migrations, **data survival across updates** | **CLOSED** — Tasks 45–48 + 57. The audit's 5 P0s plus the REG-1 data guard. Residual: true per-user scoping = mega-update (see stage 01→03 bridge below). |
 | 02 Make the learning system trustworthy | Account deletion, abuse limits, tool permissions, test isolation, degraded-result honesty | **4/5 closed** (Tasks 49–52). Remaining: model-provider failure recovery = durable task recovery + "degraded result" labeling. |
-| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **IN PROGRESS** — BYO materials shipped (Task 54, source-validated extraction), CSV/TSV import shipped (Task 55). Pending: full CEFR B2–C1 graph with mastery gates; Azure Speech acoustic tier. |
+| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **IN PROGRESS** — BYO materials shipped (Task 54, source-validated extraction), CSV/TSV import shipped (Task 55), measured acoustic pronunciation tier shipped (Task 64: real-audio ASR + word alignment; Azure phoneme adapter config-gated). Pending: full CEFR B2–C1 graph with mastery gates. |
 | 04 Dependable daily product | Anki binary import, offline sync, reminders, longitudinal effectiveness evidence | PENDING. `.apkg` binary import is the nearest item. |
 
 **Audit's score-lift doctrine (binding):** the next score increase must come from *validated teaching + real speech assessment*, NOT another batch of unrelated features. Passing CI proves engineering behavior, not educational effectiveness.
@@ -186,11 +186,11 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 |----------|----------------|--------|
 | P0 — privacy | **Stop publishing live learner DB snapshots; private backups only** | **CLOSED (Task 62)** — vault repo + history scrub; email treated as exposed |
 | P0 — architecture | Real per-user data isolation before public multi-user | OPEN — deployment lock holds the line |
-| P1 — learning quality | Genuine acoustic pronunciation assessment | OPEN — Azure Speech decision gate |
+| P1 — learning quality | Genuine acoustic pronunciation assessment | **DONE (Task 64) — decision shipped in code**: built-in measured word-level tier (server ASR → deterministic alignment, TTS→ASR roundtrip-validated, real-clip E2E at 100/100) + Azure phoneme-assessment adapter dormant until the learner sets AZURE_SPEECH_KEY/REGION; no phoneme claims anywhere until then |
 | P1 — curriculum | Authentic IELTS/TOEFL/C1A tracks | OPEN |
 | P1 — reliability | Offline sync + real mobile-browser testing | OPEN |
-| P2 — depth | Writing revision history, learner-memory corrections, goal planner | OPEN |
-| P2 — operations | Transactional email delivery reporting + idempotency | OPEN |
+| P2 — depth | Learner-memory corrections, goal planner | **PARTIAL** — writing revision history DONE (Task 63: parentId/revision chain + UI revise flow); learner-memory corrections + goal planner OPEN |
+| P2 — operations | Transactional email delivery reporting + idempotency | **DONE (Task 63)** — MailLog ledger (one row per recipient+kind = the delivery report), sliding-window idempotency, SMTP messageId reporting |
 
 Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-counts two separately-listed items against the original 39 recommendations — the true ledger stays 17 done / 15 partial / 7 pending, and this wave's REG-2 closure is a privacy fix, not a new feature. CI note: the newest visible run (Oct 20) pre-dates 57-bis because `on.push.branches` was corrupted — pushes to main never triggered CI until Task 57-bis; the force-push after the history scrub is the first run under the fixed selector.
 
@@ -204,5 +204,5 @@ Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-c
 ## 4. Decisions pending (the audit's "before more features" list)
 
 1. **Single vs multi-user** — the deployment lock is the sanctioned interim; the real decision (multi-tenant Postgres with per-user scoping vs staying single-learner) gates the data-store stage. No date promised; the lock keeps either path safe.
-2. **Azure AI Speech** — the only validated acoustic scoring path; gates Sound Lab v2 and items 15/33. Decision needed before "pronunciation" claims move from honest-inference to measured.
+2. **Azure AI Speech** — RESOLVED as a two-tier decision (Task 64): the measured word-level acoustic tier ships NOW on the built-in SDK ASR (zero new credentials, validated by roundtrip + real-clip E2E), and the Azure pronunciation-assessment adapter (HundredMark/Phoneme/Comprehensive, miscue on) ships config-gated — it activates the moment the learner sets AZURE_SPEECH_KEY + AZURE_SPEECH_REGION, no code changes, with the route degrading honestly to the word tier if Azure errors. Until a key exists, no phoneme-level claims are made anywhere in the UI.
 3. **Learning-effectiveness measurement** — the audit's warning: proxy metrics (XP, streaks) prove engagement, not learning. The effectiveness ledger exists (zero-AI numbers); next step is retention-curve evidence tied to FSRS, surfaced to the learner without AI gloss.

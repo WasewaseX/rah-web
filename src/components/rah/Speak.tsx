@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Square, RotateCcw, Clock, Volume2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, ScoreRow, Spinner } from "./ui";
+import ReadAloud from "./ReadAloud";
 import type { AppState } from "./App";
 
 interface Result {
@@ -378,7 +379,7 @@ function ConversationDrill({ onChange }: { onChange: () => void }) {
 }
 
 export default function SpeakView({ state, onChange }: { state: AppState; onChange: () => void }) {
-  const [mode, setMode] = useState<"mono" | "talk">("mono");
+  const [mode, setMode] = useState<"mono" | "talk" | "read">("mono");
   const [prompts, setPrompts] = useState<string[]>([]);
   const [prompt, setPrompt] = useState(0);
   const [recording, setRecording] = useState(false);
@@ -510,10 +511,20 @@ export default function SpeakView({ state, onChange }: { state: AppState; onChan
         >
           Talk: conversation
         </button>
+        <button
+          onClick={() => setMode("read")}
+          className={`rounded-full border px-3.5 py-1.5 text-xs font-bold transition-all ${
+            mode === "read" ? "border-[#ffb02e]/60 bg-[#ffb02e]/[0.12] text-[#ffd08a]" : "border-[#2a3242] text-[#8b96a9] hover:text-[#dbe3f0]"
+          }`}
+        >
+          Read aloud
+        </button>
       </div>
 
       {mode === "talk" ? (
         <ConversationDrill onChange={onChange} />
+      ) : mode === "read" ? (
+        <ReadAloud onChange={onChange} />
       ) : (
       <>
       <Card>

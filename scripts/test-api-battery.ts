@@ -100,6 +100,7 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/shop", methods: ["GET", "POST"] },
   { path: "/api/speak", methods: ["GET", "POST"] },
   { path: "/api/speak/analytics", methods: ["GET"] },
+  { path: "/api/speak/assess", methods: ["GET", "POST"] },
   { path: "/api/speak/conversation", methods: ["GET", "POST"] },
   { path: "/api/state", methods: ["GET"] },
   { path: "/api/theme", methods: ["GET", "POST"] },
@@ -560,6 +561,23 @@ try {
   check(cvEmpty.status === 400, "empty transcript is 400 with a speakable error", JSON.stringify(cvEmpty.body));
   const cvOver = await api("/api/speak/conversation", { method: "POST", body: JSON.stringify({ scenarioId: "complain", turns: Array.from({ length: 20 }, (_, i) => ({ you: "line " + i, coach: "ok" })) }) });
   check(cvOver.status === 400 || cvOver.status === 502, "oversized history is clamped/400, never 500", `status=${cvOver.status}`);
+
+  // ================= 6f. READ-ALOUD ASSESS (Task 64, measured acoustic tier) =================
+  console.log("\n--- read-aloud assess: measured tier gates ---");
+  const ra0 = await api("/api/speak/assess");
+  check(ra0.status === 200 && Array.isArray(ra0.body?.targets) && ra0.body.targets.length >= 8, "read-aloud target bank ships 8+ sentences", JSON.stringify(ra0.body).slice(0, 120));
+  const ra0b = await api("/api/speak/assess");
+  check(JSON.stringify(ra0.body?.targets) === JSON.stringify(ra0b.body?.targets), "read-aloud targets are deterministic", "order moved between GETs");
+  check(ra0.body?.azure === false, "azure tier reports dormant without env keys (honest chip)", String(ra0.body?.azure));
+  const raAnon = await noCookie("/api/speak/assess");
+  check(raAnon.status !== 500, "assess never 500s to anonymous", `status=${raAnon.status}`);
+  // NOTE: every POST below must fail VALIDATION - the battery never spends a real ASR call.
+  const raNoAudio = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "Hello world today" }) });
+  check(raNoAudio.status === 400, "assess without audio is 400 with a speakable error", JSON.stringify(raNoAudio.body));
+  const raBadTarget = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "x" }) });
+  check(raBadTarget.status === 400, "assess with junk target is 400 before any audio work", JSON.stringify(raBadTarget.body));
+  const raBig = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "Hello world today", audio: "A".repeat(14_500_000) }) });
+  check(raBig.status === 413, "oversized audio is 413, never 500", `status=${raBig.status}`);
 
   // ================= 6e. INTEROP + TRIAGE (7.4 wave C follow) =================
   console.log("\n--- anki tsv export + flag triage tool ---");
