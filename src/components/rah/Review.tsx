@@ -14,6 +14,7 @@ import { setCoachActivity } from "@/lib/activity-store";
 import { submitGrade, count as outboxCount } from "@/lib/offline";
 import BlitzDeck from "./games/BlitzDeck";
 import PairsGame from "./games/PairsGame";
+import { provenanceOf } from "@/lib/provenance";
 
 interface QueueCard {
   card: {
@@ -96,7 +97,14 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
     return (
       <div className="text-center">
         <div className="text-[26px] font-extrabold leading-snug tracking-tight text-[#f2f5fa]">{card.en}</div>
-        {revealed && <div className="mt-4 text-sm text-[#8b96a9]">{card.note}</div>}
+        {revealed && (
+          <>
+            <div className="mt-4 text-sm text-[#8b96a9]">{card.note}</div>
+            <div className="mt-1 text-[11px] text-white/30">
+              {provenanceOf(card.id).label} — {provenanceOf(card.id).detail}
+            </div>
+          </>
+        )}
       </div>
     );
   }

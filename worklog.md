@@ -1280,3 +1280,19 @@ Work Log:
 
 Stage Summary:
 - The offline story is now: grades + solo arcade aggregates survive disconnects with idempotent replay; AI surfaces and server-dealt state machines refuse offline honestly; the PWA shell + reads already worked. The residual is precisely bounded (dungeon/gauntlet redesign if wanted, physical-device spot-check).
+
+---
+Task ID: 79
+Agent: Super Z (main)
+Task: Continue the backlog - evidence-backed reference provenance (audit feature #8), CI green on Tasks 77/78 verified first.
+
+Work Log:
+- CI verified: 31d17f9 (Task 78) completed success; 887d2ec (Task 77) pushed earlier; b171edb (76-bis) success.
+- SCOPED the card pipeline: three card sources reach the Review face (authored bank via cardById, coach-mined exam:/listen: cards derived from mistake families, mat: cards extracted from learner materials with the exact source sentence as context->en). The client could not tell them apart - the audit's provenance gap.
+- src/lib/provenance.ts (pure, client-safe): provenanceOf(cardId) -> three honest branches ("from your own misses" + Mind Reader pointer / "from your material" + exact-source promise / "Rah course bank (v1) — authored, not generated at read time"); unknown ids default to the bank honestly.
+- Review.tsx reveal face now renders the provenance line under the note (prompt faces untouched - provenance belongs where the learner reads the answer).
+- Unit battery scripts/test-provenance.ts 8/8 (three branches + default + wording pins).
+- Ledger: feature #8 -> DONE; category table features 4/6 -> 5/5. Gates: tsc 0, eslint 0.
+
+Stage Summary:
+- Feature #8 closed with the honest epistemics intact: the learner can now see WHERE every example comes from. Remaining partials: content console regression tests (#10), exam item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
