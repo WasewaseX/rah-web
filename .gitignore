@@ -94,8 +94,10 @@ data/coach-workspace/
 # isolated-battery stack (Task 52) + isolation battery dist (Task 63)
 .next-battery/
 .next-isolation/
+.next-mobile/
 db/battery-isolated.db*
 db/battery-isolation.db*
+db/battery-mobile.db*
 
 # deploy-pipeline artifacts - never commit or package these (Task 60)
 db/admin-token

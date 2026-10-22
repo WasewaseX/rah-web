@@ -527,12 +527,12 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           {q.ahead && <Chip tone="amber">Extra practice</Chip>}
           <button
             onClick={() => setFlagOpen((o) => !o)}
-            className={`rounded-full border p-1.5 transition-colors ${
+            className={`rounded-full border p-2 transition-colors ${
               flagOpen ? "border-[#ff6b81]/50 bg-[#ff6b81]/[0.12] text-[#ff8ba0]" : "border-[#2a3242] text-[#7d889c] hover:border-[#3f4c63] hover:text-[#b7c1d3]"
             }`}
             aria-label="Report a problem with this item"
           >
-            <Flag className="h-3.5 w-3.5" />
+            <Flag className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -583,7 +583,10 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
         <div className="text-center text-[11px] font-medium text-[#5c6678]">First meeting. Rah schedules it from here.</div>
       )}
 
-      <Card key={idx} className="rah-pop min-h-72">
+      {/* pb clears the mobile bottom nav (fixed, 62px): the 2x2 grade grid
+          wraps on phones and its second row must be scrollable ABOVE the nav,
+          never trapped underneath (Task 69 mobile audit finding). */}
+      <Card key={idx} className="rah-pop min-h-72 pb-24 md:pb-5">
         <PromptBody q={q} dir={dir} revealed={revealed} correct={wasRight} />
 
         {/* mcq choices */}
@@ -764,7 +767,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
             onClick={() => void suspendCard()}
             disabled={busy}
             title="Stops this card coming back - it keeps its schedule if you change your mind"
-            className="text-[11px] font-semibold text-[#5d6879] transition-colors hover:text-[#ff8ba0] disabled:opacity-50"
+            className="min-h-[36px] px-2 py-2 text-[11px] font-semibold text-[#5d6879] transition-colors hover:text-[#ff8ba0] disabled:opacity-50"
           >
             Suspend this card
           </button>
