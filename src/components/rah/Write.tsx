@@ -20,17 +20,46 @@ interface Result {
 
 export default function WriteView({ state, onChange }: { state: AppState; onChange: () => void }) {
   const [prompts, setPrompts] = useState<string[]>([]);
+  const [recent, setRecent] = useState<{ id: number; revision: number; at: string }[]>([]);
   const [prompt, setPrompt] = useState(0);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Writing revision history (audit P2): revising an earlier submission links
+  // the new one to it (parentId) and bumps the revision number server-side.
+  const [revisingId, setRevisingId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const loadRecent = useCallback(() => {
     fetch("/api/writing", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setPrompts(j.prompts ?? []))
+      .then((j) => {
+        setPrompts(j.prompts ?? []);
+        setRecent(j.recent ?? []);
+      })
       .catch(() => setPrompts([]));
+  }, []);
+
+  useEffect(() => {
+    loadRecent();
+  }, [loadRecent]);
+
+  const startRevision = useCallback(async (id: number) => {
+    setError(null);
+    try {
+      const r = await fetch(`/api/writing?id=${id}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Could not load the submission.");
+      const chain = j.chain ?? [];
+      const last = chain.at(-1);
+      if (!last) throw new Error("The submission has no text to revise.");
+      setText(last.text ?? "");
+      setRevisingId(last.id);
+      setResult(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }, []);
 
   const submit = useCallback(async () => {
@@ -41,23 +70,35 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
       const r = await fetch("/api/writing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompts[prompt] ?? "", text }),
+        body: JSON.stringify({ prompt: prompts[prompt] ?? "", text, revisingId: revisingId ?? undefined }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Grading failed.");
       setResult(j);
+      setRevisingId(null);
       onChange();
+      loadRecent();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [prompt, prompts, text, onChange]);
+  }, [prompt, prompts, text, onChange, revisingId, loadRecent]);
 
   const words = text.trim().split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="flex flex-col gap-4">
+      {revisingId !== null && (
+        <Note tone="blue">
+          <div className="flex items-center justify-between gap-3">
+            <span>Revising submission #{revisingId} - the new grade joins its revision history.</span>
+            <button onClick={() => setRevisingId(null)} className="text-xs font-bold text-[#9dc0ff] hover:underline">
+              cancel
+            </button>
+          </div>
+        </Note>
+      )}
       <Card>
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--rah-accent)]/[0.14] text-[#9de6fb]">
@@ -97,9 +138,25 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
         <div className="mt-4 flex items-center justify-between">
           <span className="text-xs font-semibold text-[#7d889c]">{words} words</span>
           <Btn onClick={submit} disabled={busy || words < 12}>
-            {busy ? "Grading" : "Grade my essay"}
+            {busy ? "Grading" : revisingId !== null ? "Grade this revision" : "Grade my essay"}
           </Btn>
         </div>
+        {recent.length > 0 && (
+          <div className="mt-4 border-t border-[#2a3242] pt-3">
+            <span className="text-xs font-bold text-[#7d889c]">Revision history - open a past submission to improve it:</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {recent.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => startRevision(r.id)}
+                  className="rounded-full border border-[#2a3242] px-3 py-1 text-xs font-semibold text-[#a9b4c6] transition-colors hover:border-[var(--rah-accent)] hover:text-[#f2f5fa]"
+                >
+                  #{r.id} · rev {r.revision}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       {busy && (

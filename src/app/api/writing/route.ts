@@ -6,6 +6,7 @@ import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
 import { noteTagOutcome } from "@/lib/mastery";
 import { screenText, findingsBlock, mergeRuleErrors } from "@/lib/languagetool";
+import { contentScope } from "@/lib/scope";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 
@@ -28,11 +29,27 @@ export const WRITING_PROMPTS = [
   "Is it better to master one skill or collect many shallow ones? Take a side and defend it with examples.",
 ];
 
-export async function GET() {
-  const rows = await db.writingSub.findMany({ orderBy: { id: "desc" }, take: 10 });
+export async function GET(req: Request) {
+  const scope = await contentScope(req);
+  // Revision history (audit P2): /api/writing?id=N returns the full chain -
+  // the submission, its parent, and every ancestor, oldest first.
+  const id = Number(new URL(req.url).searchParams.get("id") ?? 0);
+  if (id > 0) {
+    const chain: { id: number; prompt: string; revision: number; result: WritingResult | null; at: Date; text?: string }[] = [];
+    let cur = await db.writingSub.findFirst({ where: { id, ...scope } });
+    let guard = 0;
+    while (cur && guard++ < 25) {
+      chain.push({ id: cur.id, prompt: cur.prompt, revision: cur.revision, result: safeParse(cur.result), at: cur.at, text: cur.text });
+      if (!cur.parentId) break;
+      cur = await db.writingSub.findFirst({ where: { id: cur.parentId, ...scope } });
+    }
+    if (chain.length === 0) return NextResponse.json({ error: "Submission not found." }, { status: 404 });
+    return NextResponse.json({ chain: chain.reverse() });
+  }
+  const rows = await db.writingSub.findMany({ where: scope, orderBy: { id: "desc" }, take: 10 });
   return NextResponse.json({
     prompts: WRITING_PROMPTS,
-    recent: rows.map((r) => ({ id: r.id, prompt: r.prompt, result: safeParse(r.result), at: r.at })),
+    recent: rows.map((r) => ({ id: r.id, prompt: r.prompt, revision: r.revision, parentId: r.parentId, result: safeParse(r.result), at: r.at })),
   });
 }
 
@@ -41,9 +58,22 @@ export async function POST(req: Request) {
   const rl = aiRateLimit(req);
   if (!rl.ok) return rl.response!;
 
-  const { prompt, text } = await req.json();
+  const { prompt, text, revisingId } = await req.json();
   const body = String(text ?? "").trim();
   if (body.length < 60) return NextResponse.json({ error: "Write at least 60 characters so there is something to grade." }, { status: 400 });
+
+  // Revision chain (audit P2): a submission may revise an earlier one of the
+  // SAME user - the chain (parentId/revision) is the writing revision history.
+  const scope = await contentScope(req);
+  let parentId: number | null = null;
+  let revision = 1;
+  const rid = Number(revisingId ?? 0);
+  if (rid > 0) {
+    const parent = await db.writingSub.findFirst({ where: { id: rid, ...scope } });
+    if (!parent) return NextResponse.json({ error: "The submission to revise was not found." }, { status: 404 });
+    parentId = parent.id;
+    revision = parent.revision + 1;
+  }
 
   const profile = await buildProfile();
 
@@ -75,7 +105,7 @@ export async function POST(req: Request) {
       }
     : null;
 
-  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify({ ...result, ruleChecks }) } });
+  await db.writingSub.create({ data: { prompt: String(prompt ?? ""), text: body, result: JSON.stringify({ ...result, ruleChecks }), ...scope, parentId, revision } });
   await bumpDaily("written");
   await awardXp(15, { chainHit: true });
   await progressQuest("write_1", 1);

@@ -120,6 +120,21 @@ Purpose: one place that tracks (a) incident post-mortems with acceptance tests, 
 
 ---
 
+### REG-3 (2026-10-22 06:51 UTC, 4th wipe, CONTAINED-BY-DESIGN): stale reprovision from 9b9c360 — the guard held, the freshness window didn't
+
+**What happened:** the platform rebuilt the workspace again (4th wipe), this time from a STALE ref (Task-57-era 9b9c360, not origin/main). Cost: db/sync, db/vault-work, backups/, db/backups and the vault remote config all died (gitignored or local state); the boot guard restored the learner automatically — but from the 21:47 OSS snapshot (xp=10), stale by one evening of learning (the learner had reached xp=220, 17 reviews, 6 chats by 22:57).
+
+**What held:** db-guard booted, probed, restored, snapshotted — the Task-57 fix worked exactly as drilled. The vault held the freshest state (rah-web/history/rah-20261021T225730Z.db) because Task 62-bis pushed it there before the wipe.
+
+**What was missing (closed this wave, Task 63):**
+1. The guard's restore order predated the db-sync snapshot: it ranked the dated OSS copies (stale) over nothing, unaware a fresher fixed-name copy could exist. FIX: db-sync now stages `upload/rah-backups/rah-latest.db` (the rebuild-proof OSS mount) on EVERY sync, and db-guard's boot restore order is db/sync → OSS rah-latest.db → dated backups. A post-rebuild boot is now at most one sync interval behind, not one boot-to-boot gap.
+2. Recovery from the vault: scripts/restore-from-vault.py (column-intersection restore — adapts pre-isolation-schema snapshots into the new schema, keeps live auth + daily bootstrap). The learner's xp=220 state was restored from the vault, then re-synced everywhere.
+3. The stale-ref problem itself (platform reprovisions from an old cached ref) is NOT fully closable from inside the workspace — mitigation is data-side: with the OSS freshest copy + the vault, no rebuild can lose more than an hour.
+
+**Gates:** live DB xp=220/streak=2/6 chats/17 reviews after restore + restart; vault re-clone + push verified remote==local; guard battery 27/27 incl. new ordering micro-tests.
+
+---
+
 ## 1. Standing checklist (evaluator's October 20 + 22 updates, reconciled)
 Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this wave.
 

@@ -4,6 +4,7 @@ import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { runCoach } from "@/lib/agent/run";
 import { recordMistakes } from "@/lib/mistakes";
+import { contentScope } from "@/lib/scope";
 import type { ProfileJson } from "@/lib/ai";
 
 import { aiRateLimit } from "@/lib/rate-limit";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET() {
-  const rows = await db.chatMsg.findMany({ orderBy: { id: "asc" }, take: 200 });
+  const rows = await db.chatMsg.findMany({ where: await contentScope(), orderBy: { id: "asc" }, take: 200 });
   return NextResponse.json({
     messages: rows.map((r) => ({
       id: r.id,
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   if (!text) return NextResponse.json({ error: "message required" }, { status: 400 });
 
   const profile: ProfileJson = await buildProfile();
-  const history = await db.chatMsg.findMany({ orderBy: { id: "desc" }, take: 14 });
+  const history = await db.chatMsg.findMany({ where: await contentScope(req), orderBy: { id: "desc" }, take: 14 });
   const flat = history
     .reverse()
     .map((h) => ({
@@ -48,8 +49,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Coach is unreachable right now: ${(e as Error).message}` }, { status: 502 });
   }
 
-  await db.chatMsg.create({ data: { role: "user", content: text } });
-  await db.chatMsg.create({ data: { role: "coach", content: JSON.stringify(out) } });
+  const uid = await contentScope(req);
+  await db.chatMsg.create({ data: { role: "user", content: text, ...uid } });
+  await db.chatMsg.create({ data: { role: "coach", content: JSON.stringify(out), ...uid } });
 
   // One memory hook at the agent boundary: ANY skill that returns tagged
   // corrections (chat, correct, roleplay, debate, socratic, summarize, ...)
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  await db.chatMsg.deleteMany({});
+  await db.chatMsg.deleteMany({ where: await contentScope() });
   return NextResponse.json({ ok: true });
 }
 

@@ -91,9 +91,11 @@ scripts/duolingo-reference/dl.log
 scripts/duolingo-reference/dl2.log
 data/coach-workspace/
 
-# isolated-battery stack (Task 52)
+# isolated-battery stack (Task 52) + isolation battery dist (Task 63)
 .next-battery/
+.next-isolation/
 db/battery-isolated.db*
+db/battery-isolation.db*
 
 # deploy-pipeline artifacts - never commit or package these (Task 60)
 db/admin-token

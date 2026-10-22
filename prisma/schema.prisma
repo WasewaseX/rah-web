@@ -86,12 +86,30 @@ model CardState {
 
 model ReviewLog {
   id     Int      @id @default(autoincrement())
+  userId String   @default("me") // per-user isolation (audit P0): learning history
   cardId String
   grade  Int
   ivl    Int
   day    Int
   at     DateTime @default(now())
   source String   @default("review") // review | exam | dictation | shadow: where the outcome was earned
+
+  @@index([userId])
+}
+
+// Transactional email ledger (audit P2): every send attempt is recorded with
+// its SMTP result so "did the email go out?" is answerable from the DB, and
+// the unique idemKey makes double-clicks / request retries idempotent - the
+// same key never sends twice.
+model MailLog {
+  id        Int      @id @default(autoincrement())
+  to        String
+  kind      String   @default("login_code")
+  status    String // sent | failed | dev
+  messageId String   @default("") // SMTP provider message id when available
+  error     String   @default("") // delivery failure reason, if any
+  idemKey   String   @unique // sha256(kind|to) - one ledger row per recipient+kind, refreshed per send
+  at        DateTime @default(now())
 }
 
 model Placement {
@@ -105,26 +123,37 @@ model Placement {
 
 model ChatMsg {
   id      Int      @id @default(autoincrement())
+  userId  String   @default("me") // per-user isolation (audit P0): stamped from the session
   role    String
   content String
   at      DateTime @default(now())
+
+  @@index([userId])
 }
 
 model WritingSub {
-  id     Int      @id @default(autoincrement())
-  prompt String
-  text   String
-  result String
-  at     DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  userId   String   @default("me") // per-user isolation (audit P0)
+  prompt   String
+  text     String
+  result   String
+  parentId Int? // revision chain: the graded submission this one revises
+  revision Int      @default(1) // 1 = original, n = nth revision of the chain
+  at       DateTime @default(now())
+
+  @@index([userId])
 }
 
 model SpeakSession {
   id         Int      @id @default(autoincrement())
+  userId     String   @default("me") // per-user isolation (audit P0)
   prompt     String
   transcript String
   round      Int      @default(1)
   result     String
   at         DateTime @default(now())
+
+  @@index([userId])
 }
 
 model DailyStat {

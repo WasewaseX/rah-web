@@ -36,7 +36,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".next-battery/types/**/*.ts",
-    ".next-battery/dev/types/**/*.ts"
+    ".next-battery/dev/types/**/*.ts",
+    ".next-isolation/types/**/*.ts",
+    ".next-isolation/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

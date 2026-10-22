@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { contentScope } from "@/lib/scope";
 import { dayIndex, review, preview, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest, registerMiss } from "@/lib/arcade";
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     },
   });
 
-  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today } });
+  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today, ...(await contentScope(req)) } });
   await bumpDaily("reviews");
   await awardXp(grade >= 3 ? 10 : 5, { chainHit: grade >= 3, perkXp: "review" });
   if (grade < 2) await registerMiss();

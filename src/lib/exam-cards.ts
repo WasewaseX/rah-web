@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 import { DECK, type Card } from "@/lib/content";
 import { dayIndex, defaultState, review, type FsrsState } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
@@ -113,7 +114,7 @@ export async function scheduleExamOutcomes(
       create: { cardId: t.cardId, s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl, dir: "" },
       update: { s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl },
     });
-    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source } });
+    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source, userId: await contentUserId() } });
     out.push({ cardId: t.cardId, due: res.due, grade: t.grade, via: t.via });
   }
   return out;

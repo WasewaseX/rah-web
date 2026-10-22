@@ -30,10 +30,23 @@ if [ -s "db/sync/rah-latest.db" ]; then
   exit 0
 fi
 
-# 2) offsite: the PRIVATE vault clone (REG-2; refresh then restore)
+# 2) offsite: the PRIVATE vault clone (REG-2; refresh then restore).
+# Encryption-aware: when the vault holds .enc blobs (RAH_VAULT_ENC=1 doctrine),
+# decrypt with the OSS-mount key file or the env passphrase, then verify.
 V="db/vault-work/rah-web/rah-latest.db"
 if [ -d db/vault-work/.git ]; then
   git -C db/vault-work pull --ff-only -q origin main 2>/dev/null || true
+fi
+if [ ! -s "$V" ] && [ -s "db/vault-work/rah-web/rah-latest.db.enc" ]; then
+  DEC_ARGS=(-pass "file:upload/rah-backups/.vaultkey")
+  [ -n "${RAH_VAULT_PASSPHRASE:-}" ] && DEC_ARGS=(-pass "env:RAH_VAULT_PASSPHRASE")
+  if openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+       -in db/vault-work/rah-web/rah-latest.db.enc -out "$V.tmp" "${DEC_ARGS[@]}" 2>/dev/null \
+     && mv -f "$V.tmp" "$V"; then
+    echo "restore: decrypted vault blob -> $V"
+  else
+    echo "restore: vault blob is encrypted and no usable key was found - skipping vault source"
+  fi
 fi
 if [ -s "$V" ]; then
   rm -f "$DB-journal" "$DB-wal" "$DB-shm"

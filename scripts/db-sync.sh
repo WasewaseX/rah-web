@@ -44,6 +44,17 @@ src.close()
 PY
 echo "db-sync: local snapshot refreshed -> $SNAP (gitignored; offsite = private vault)"
 
+# Freshest copy onto the rebuild-proof OSS mount (REG-1 lesson, Task 63): a
+# workspace reprovision is a fresh clone - db/sync dies with it, and the
+# guard's dated OSS snapshots can lag by hours. This fixed-name copy is what
+# db-guard restores from FIRST at boot, so a post-rebuild boot is at most one
+# sync interval behind instead of one boot-to-boot gap.
+OSS_DIR="upload/rah-backups"
+if [ -d "$OSS_DIR" ] || mkdir -p "$OSS_DIR" 2>/dev/null; then
+  cp -f "$SNAP" "$OSS_DIR/rah-latest.db.tmp" && mv -f "$OSS_DIR/rah-latest.db.tmp" "$OSS_DIR/rah-latest.db" \
+    && echo "db-sync: freshest copy staged -> $OSS_DIR/rah-latest.db (survives rebuilds)"
+fi
+
 if [ "$NO_GIT" = "--no-git" ]; then
   echo "db-sync: --no-git - local snapshot only, vault push skipped"
   exit 0

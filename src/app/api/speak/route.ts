@@ -5,6 +5,7 @@ import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest } from "@/lib/arcade";
 import { recordMistakes } from "@/lib/mistakes";
 import { ladderFor, ladderBrief } from "@/lib/ladder";
+import { contentScope } from "@/lib/scope";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 
@@ -28,7 +29,7 @@ export const SPEAK_PROMPTS = [
 ];
 
 export async function GET() {
-  const rows = await db.speakSession.findMany({ orderBy: { id: "desc" }, take: 8 });
+  const rows = await db.speakSession.findMany({ where: await contentScope(), orderBy: { id: "desc" }, take: 8 });
   return NextResponse.json({
     prompts: SPEAK_PROMPTS,
     recent: rows.map((r) => ({ id: r.id, prompt: r.prompt, round: r.round, result: safeParse(r.result), at: r.at })),
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Coach is unreachable: ${(e as Error).message}` }, { status: 502 });
   }
 
-  await db.speakSession.create({ data: { prompt: String(prompt ?? ""), transcript: t.slice(0, 5000), round: Number(round ?? 1), result: JSON.stringify(result) } });
+  await db.speakSession.create({ data: { prompt: String(prompt ?? ""), transcript: t.slice(0, 5000), round: Number(round ?? 1), result: JSON.stringify(result), ...(await contentScope(req)) } });
   await bumpDaily("spoken");
   await awardXp(20, { chainHit: true });
   await touchStreak();
