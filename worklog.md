@@ -1233,3 +1233,18 @@ Work Log:
 
 Stage Summary:
 - The privacy incident is now precisely bounded: what the rewrite fixed (listed history, tree, events), what survives (dangling by-hash objects, one anonymously serving the snapshot), and exactly what remains (one Support request by the account holder, template ready). Next: Task 76 - the P1 learner pilot protocol + metrics, then continue the backlog without stopping.
+
+---
+Task ID: 76
+Agent: Super Z (main)
+Task: The evaluator's P1 #3 - validate actual educational outcomes: ship the structured learner pilot (protocol + measurement instrument), not just a promise.
+
+Work Log:
+- PILOT-PROTOCOL.md: pre-registers the pilot BEFORE the data exists - four tracks (retention / writing / listening / speaking) with their exact real-table sources, weekly cadence via the instrument, sample-size honesty rules (>=50 first attempts for a weekly verdict, <20 labeled "a real signal, not a trend", no trend language under 4 cells), pre-registered verdict criteria (flat-or-up recall + interval survival growth + volume hold, etc.), failure handling (a declining track is reported as declining, investigation before features), and an explicit cannot-prove section (one learner, no control - the verdict language is calibrated accordingly).
+- scripts/pilot-metrics.mjs: the zero-AI instrument - reads ReviewLog/CardState/WritingSub/SpeakSession/DailyStat READ-ONLY and prints the weekly snapshot (retention per week + interval survival, revision chains, dictation accuracy, speaking volume + stored-score trend proxy, consistency). No content ever printed.
+- WEEK-0 BASELINE taken on the live DB: 17 first attempts @ 29% recall, 2 active days in 28, 17 cards / 9 lifetime lapses, zero writing/speaking/dictation volume - all small-sample-flagged. Series log seeded at db/pilot/series.md (gitignored: derives from learner data, regenerable from the DB).
+- Ledgers updated (AUDIT open critical #3 = protocol+instrument DONE, pilot itself is time-gated; STATUS velocity rows 74/75/76 + gate line).
+- Wave gates: this task touches docs + a read-only script only; standing gates from Tasks 73/74 unchanged (battery 425/425, isolation 45/45, guard 27/27, PG 16/16, tsc 0, eslint 0).
+
+Stage Summary:
+- All three evaluator criticals now have shipped artifacts: #1 PostgreSQL path validated end-to-end (Task 74), #2 the sweep with evidence + purge template (Task 75), #3 the pilot protocol + instrument with the Week-0 baseline (Task 76). The remaining work on all three is either a single human action (file the Support request) or time (run the cutover on the real deployment; accumulate pilot weeks).

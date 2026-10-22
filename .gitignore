@@ -120,3 +120,6 @@ scripts/out/
 
 # Task 74: generated PG client (sandbox-only; the app client stays sqlite)
 prisma/pg-client/
+
+# Task 76: pilot series derives from learner data - local only, regenerable
+db/pilot/
