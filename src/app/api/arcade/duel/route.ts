@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { getLearner } from "@/lib/server";
-import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
 import { buildSpeedPool, duelPar } from "@/lib/arcade-items";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ const ITEMS = 8;
 export async function GET() {
   const [items, l] = await Promise.all([buildSpeedPool(ITEMS), getLearner()]);
   const seed = Math.floor(Date.now() / 1000) % 2_000_000_000;
-  const recent = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me"), day: { gte: dayIndex() - 14 } } });
+  const u = await contentUserId().catch(() => "me");
+  const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: dayIndex() - 14 } } });
   const tot = recent.reduce((s, r) => s + r.reviews, 0);
   const cor = recent.reduce((s, r) => s + r.correct, 0);
   const accuracy = tot >= 20 ? cor / tot : 0.6;
@@ -28,8 +30,8 @@ export async function GET() {
     parHits,
     rivalScore: parHits * 10 + 20, // + flat time bonus: the rival is quick
     timer,
-    wins: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "duel:wins" } } }))?.best ?? 0,
-    streak: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "duel:streak" } } }))?.best ?? 0,
+    wins: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "duel:wins" } } }))?.best ?? 0,
+    streak: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "duel:streak" } } }))?.best ?? 0,
   });
 }
 
@@ -39,6 +41,11 @@ export async function POST(req: Request) {
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
   const seed = Math.max(0, Math.min(2_000_000_000, Math.round(Number(b.seed ?? 0))));
   const ms = Math.min(300_000, Math.max(5_000, Math.round(Number(b.ms ?? 40_000))));
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
   // Anti-cheat: 10 points per hit plus at most a 20-point speed bonus.
   const youScore = Math.min(correct * 10 + 20, correct * 10 + Math.max(0, 20 - Math.floor(ms / 4000)));
   const l = await getLearner();
@@ -51,9 +58,9 @@ export async function POST(req: Request) {
   const win = youScore > rivalScore;
 
   if (win) {
-    const uP = await contentUserId().catch(() => SINGLE_USER_ID);
-    const w = (await db.gameStat.findUnique({ where: { userId_key: { userId: uP, key: "duel:wins" } } }))?.best ?? 0;
-    const s = (await db.gameStat.findUnique({ where: { userId_key: { userId: uP, key: "duel:streak" } } }))?.best ?? 0;
+    const uW = await contentUserId().catch(() => "me");
+    const w = (await db.gameStat.findUnique({ where: { userId_key: { userId: uW, key: "duel:wins" } } }))?.best ?? 0;
+    const s = (await db.gameStat.findUnique({ where: { userId_key: { userId: uW, key: "duel:streak" } } }))?.best ?? 0;
     await bumpStat("duel:wins", w + 1);
     await bumpStat("duel:streak", s + 1);
     await progressQuest("duel_1", 1);
@@ -62,14 +69,17 @@ export async function POST(req: Request) {
     await registerMiss();
   }
   await bumpStat("duel:plays");
-  const xp = await awardXp(win ? 60 : 25, { chainHit: win });
-  return NextResponse.json({
+  const xp = await awardGameXp("duel", win ? 60 : 25, { chainHit: win });
+  const payload = {
     win,
     youScore,
     rivalScore,
-    xpGain: win ? 60 : 25,
+    xpGain: xp.paid,
+    capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     unlocked: xp.unlocked,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

@@ -375,7 +375,7 @@ export default function CoachSidebar({
                 <button
                   onClick={() => setConfirmDelete(false)}
                   title="Keep my account"
-                  className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
+                  className="rounded-lg p-2 min-h-[40px] min-w-[40px] text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -384,7 +384,7 @@ export default function CoachSidebar({
               <button
                 onClick={() => setConfirmDelete(true)}
                 title="Delete account - wipes everything for good"
-                className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-[#ff6b6b]/10 hover:text-[#ff6b6b]"
+                className="rounded-lg p-2 min-h-[40px] min-w-[40px] text-[#7d889c] transition-colors hover:bg-[#ff6b6b]/10 hover:text-[#ff6b6b]"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -397,14 +397,14 @@ export default function CoachSidebar({
                 });
               }}
               title="Sign out"
-              className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
+              className="rounded-lg p-2 min-h-[40px] min-w-[40px] text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
             >
               <LogOut className="h-4 w-4" />
             </button>
             <button
               onClick={() => onOpenChange(false)}
               title="Close"
-              className="rounded-lg p-2 text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
+              className="rounded-lg p-2 min-h-[40px] min-w-[40px] text-[#7d889c] transition-colors hover:bg-white/[0.06] hover:text-[#f2f5fa]"
             >
               <X className="h-4 w-4" />
             </button>

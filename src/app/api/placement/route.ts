@@ -4,6 +4,7 @@ import { PLACEMENT_ITEMS, type PlacementItem } from "@/lib/content";
 import { aiJson, placementWritingSystem } from "@/lib/ai";
 import { getLearner, bumpDaily } from "@/lib/server";
 import { tagLabel, foldPlacementMisses } from "@/lib/mistakes";
+import { contentUserId } from "@/lib/scope";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 
@@ -81,7 +82,8 @@ function pctToLevel(p: number): string {
 }
 
 async function loadSession(): Promise<Session> {
-  const row = await db.placement.findUnique({ where: { id: "main" } });
+  const u = await contentUserId().catch(() => "me");
+  const row = await db.placement.findUnique({ where: { userId_id: { userId: u, id: "main" } } });
   if (!row) return freshSession();
   try {
     return JSON.parse(row.answers) as Session;
@@ -91,15 +93,17 @@ async function loadSession(): Promise<Session> {
 }
 
 async function saveSession(s: Session, phase: string) {
+  const u = await contentUserId().catch(() => "me");
   await db.placement.upsert({
-    where: { id: "main" },
-    create: { id: "main", answers: JSON.stringify(s), phase },
+    where: { userId_id: { userId: u, id: "main" } },
+    create: { userId: u, id: "main", answers: JSON.stringify(s), phase },
     update: { answers: JSON.stringify(s), phase },
   });
 }
 
 async function readRow() {
-  return db.placement.findUnique({ where: { id: "main" } });
+  const u = await contentUserId().catch(() => "me");
+  return db.placement.findUnique({ where: { userId_id: { userId: u, id: "main" } } });
 }
 
 export async function GET() {
@@ -248,8 +252,8 @@ export async function POST(req: Request) {
     }
     const finalLevel = RUNGS.indexOf(res.level) >= 0 ? res.level : mcq;
     await db.placement.upsert({
-      where: { id: "main" },
-      create: { id: "main", answers: JSON.stringify(s), phase: "done", level: finalLevel, writingLevel: res.level },
+      where: { userId_id: { userId: await contentUserId().catch(() => "me"), id: "main" } },
+      create: { userId: await contentUserId().catch(() => "me"), id: "main", answers: JSON.stringify(s), phase: "done", level: finalLevel, writingLevel: res.level },
       update: { answers: JSON.stringify(s), phase: "done", level: finalLevel, writingLevel: res.level },
     });
     await db.learner.update({

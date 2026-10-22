@@ -54,15 +54,19 @@ check(after.active.length === 1 && after.archived.length === 1, "archived goal k
 // 4. plan: deterministic from seeded due load + activity
 const today = dayIndex();
 await prisma.cardState.createMany({
+  // Per-user keys (Task 67 scoping): the plan forecasts for "u1", so the
+  // seeds must carry "u1" - unscoped rows would land on the "me" singleton
+  // and the forecast would honestly read zero (caught re-running the gates
+  // on the merged parallel-wave tree).
   data: [
-    { cardId: "g1", due: today + 1 },
-    { cardId: "g2", due: today + 1 },
-    { cardId: "g3", due: today + 2 },
-    { cardId: "g4", due: today + 2 },
-    { cardId: "g5", due: today + 2 },
-    { cardId: "g6", due: today - 3 },
-    { cardId: "g7", due: today + 30, suspended: false }, // beyond the 7-day window
-    { cardId: "g8", due: today + 1, suspended: true }, // suspended never counts
+    { userId: "u1", cardId: "g1", due: today + 1 },
+    { userId: "u1", cardId: "g2", due: today + 1 },
+    { userId: "u1", cardId: "g3", due: today + 2 },
+    { userId: "u1", cardId: "g4", due: today + 2 },
+    { userId: "u1", cardId: "g5", due: today + 2 },
+    { userId: "u1", cardId: "g6", due: today - 3 },
+    { userId: "u1", cardId: "g7", due: today + 30, suspended: false }, // beyond the 7-day window
+    { userId: "u1", cardId: "g8", due: today + 1, suspended: true }, // suspended never counts
   ],
 });
 await prisma.dailyStat.createMany({

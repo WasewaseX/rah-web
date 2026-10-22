@@ -3,10 +3,10 @@ import { db } from "@/lib/db";
 import { DECK, cardById, type Card } from "@/lib/content";
 import { dayIndex, cardR, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner, queueCounts } from "@/lib/server";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 import { materialCardById } from "@/lib/materials";
 import { derivedExamCard } from "@/lib/exam-cards";
 import { bankTiles } from "@/lib/bank";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const ahead = url.searchParams.get("ahead") === "1";
   const today = dayIndex();
-  const all = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => SINGLE_USER_ID) } });
+  const all = await db.cardState.findMany({ where: { userId: await contentUserId(req).catch(() => "me") } });
   const byId = new Map(all.map((s) => [s.cardId, s]));
   const l = await getLearner();
 

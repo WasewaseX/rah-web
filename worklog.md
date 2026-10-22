@@ -1165,3 +1165,234 @@ Work Log:
 
 Stage Summary:
 - Audit P1 curriculum row: PARTIAL -> format tracks shipped and tested; the honest limit (no licensed papers) is recorded rather than hidden. Remaining audit backlog: P1 offline sync + real mobile-browser testing; isolation residual (CardState + arcade meta) for the next multi-user push.
+
+---
+Task ID: 67-72 (wave)
+Agent: Super Z (main)
+Task: The user demanded "more and a bigger update": the last open P1 (offline sync + real mobile-browser testing), the CardState/arcade isolation residual, and more.
+
+Work Log:
+- Task 67 (73b240e): the recorded isolation residual closed. Migration 0006 keys CardState/Achievement/GameStat/Quest/Rival/League/RunState/SkillLevel/Placement as (userId,...) composites (row-preserving rebuilds); Material gained userId (pasted texts = learner content, found still-global during the sweep - a NEW finding). ~90 call sites scoped (arcade uid() seam, every route); admin/stats deliberately left global (deploy fingerprint, token-guarded, commented). Account deletion restructured: caller's learner rows die in BOTH branches; shared singletons only on last-user wipe. Live DB migrated in place, xp=220/streak=2/17 cards intact. Isolation battery 29->45/45. The battery's own seeds had to move onto the session user id (they were seeding the legacy singleton - the scoping worked, the tests lied).
+- Task 68 (7bcba71): real offline sync. Server: GradeAck receipts (migration 0007) + gid idempotency on /api/review/grade - replays return the ORIGINAL response, touch nothing. Client: lib/offline.ts outbox (network failures only; 4xx drops honestly), flush on online/visibility/mount, OfflineBadge via useSyncExternalStore. The old Review grade() swallowed network errors silently - fixed by routing through submitGrade. Battery 413->421/421 (replay-from-receipt, no double log, no double XP).
+- Task 69 (fa8037b): real mobile-browser testing at iPhone-14 (agent-browser). Zero horizontal overflow on all 8 surfaces; manifest verified PRESENT (the 'missing manifest' impression was a public/ ls artifact - src/app/manifest.ts serves it). FINDING (measured): the 2x2 grade grid's second row sat entirely under the fixed bottom nav with zero scroll room - untappable on a phone; fixed with card-level clearance, re-proved with elementFromPoint. Tap targets raised (flag 28->34, suspend 17->36, sidebar icons 32->40). REAL OFFLINE E2E on-device: offline -> grade awl124 -> badge '1 grade queued' + gid outbox -> online -> flush -> ReviewLog row + GradeAck with the SAME gid. OPS LESSON: N concurrent next dev instances on one tree corrupt Turbopack caches (both stacks 500'd on generated CSS; clean-cache restart + single-throwaway-stack rule); .next-mobile gitignored pre-emptively (the Task-64 eslint trap).
+- Task 70 (610b98f): the Effectiveness ledger now DRAWS the first-try recall curve (per-day bars, samples in tooltips, <5-review days dimmed 'a real signal, not a trend') + the audit's proxy-metric caveat as a standing block (XP/streaks = engagement proxies; spoken fluency stays proxy-labeled until the acoustic tier). Verified live with seeded 2-day evidence (39 bars).
+- Task 71 (303bc9f): LINGQ-RE.md (the imported-reading loop; per-token known-word ledger deliberately deferred until a real dictionary source exists - an AI answer dressed as a dictionary fact would break the measured-vs-inferred epistemics). MaterialReader: 'Read your materials' renders imported texts with extracted answers highlighted in place (boundary-aware, overlap-safe), tap -> inline card -> Got it/Forgot through the SAME /api/review/grade (dir 'read'), offline-safe. Browser E2E both ways incl. offline grade -> flush. AMENDMENT honesty: the first commit claimed 'eslint 0' while lint showed 525 errors - ALL from .next-mobile chunks the running stack had just written; killed the stack, added the dir to eslint ignores, amended the commit.
+- Task 72 (6239f93): anti-farming (daily base-XP caps per game mode, 25% floor after the cap, all 7 routes report the PAID amount; reviews/exams/quests uncapped; battery pins are invariants computed from the pre-state after the first run caught absolute-number assumptions colliding with earlier sections' play); placement confidence (sample counts + 'rough estimate, not a verdict' under 10 samples); coach evidence (polish #4) verified ALREADY shipped (next-best reasons render in the UI); two isolation stragglers scoped (progress lifetime totals; the coach power-skill's essay/transcript/chat evidence reads).
+
+Stage Summary:
+- The audit's P0-architecture row is CLOSED (isolation residual gone), both remaining P1s are CLOSED with on-device proof, the LingQ target is DONE, and three polish rows closed. Battery 413->425, isolation 29->45. Gates green across the wave; live learner untouched (xp=220/streak=2). Honest limits recorded: the offline outbox covers the review loop (model surfaces refuse offline); the known-word ledger waits for a dictionary source; the Postgres move + deployment-lock decision remain the structural multi-user preconditions.
+
+---
+Task ID: 73
+Agent: Super Z (main)
+Task: The evaluator's housekeeping ask - reconcile ROADMAP-STATUS.md with ROADMAP-AUDIT.md (they disagreed on offline, goal planner, pronunciation) - plus the two P0s and P1 from the third re-review, and a mid-flight collision with a parallel wave (Tasks 67-72) that had to be verified and merged.
+
+Work Log:
+- RECONCILIATION: ROADMAP-AUDIT.md made the canonical ledger - category table (from the evaluator's third re-review, updated to post-wave: fixes 10/0/0, features 4/6/0, polish 8/2/0, RE 3/1/0, stores 0/0/3, APIs 2/1/0), open critical list (P0 production-DB decision = PostgreSQL + validation, P0 privacy-incident completion, P1 educational-outcomes pilot), and the two binding precision claims VERIFIED IN SHIPPED CODE (ReadAloud.tsx tier chip: "measured: word-level (ASR alignment)"; exam-tracks.ts disclaimers verbatim). ROADMAP-STATUS.md synced row by row + gained §8: the disagreement table documenting what each file used to say, and the rule that both files move together.
+- STALENESS FOUND AND FIXED in both files: exam tracks (format tracks shipped Task 66), pronunciation (word tier shipped Task 64), goal planner (shipped Task 65), memory corrections (shipped Task 65), email API (ledger shipped Task 63), writing revision chain (shipped Task 63), CEFR stage-03 "pending" note (stale since Task 58), isolation row (content surfaces complete + residual).
+- COLLISION: while this reconciliation was in flight, a parallel session pushed Tasks 67-72 (their 67 = isolation residual CLOSED via migration 0006: CardState/arcade meta/SkillLevel/Placement/Material per-user; 68 = offline grade outbox via GradeAck receipts migration 0007 with gid idempotency; 69 = real mobile-browser E2E at iPhone-14 emulation incl. the nav-trapped grade-grid fix + offline E2E; 70 = first-try recall curve; 71 = LingQ study + MaterialReader; 72 = anti-farming XP caps + placement confidence + 2 isolation stragglers). Local commit renumbered Task 67 -> 73, then claims-vs-diff verified all six commits (--stat: migrations, schema, lib/offline.ts, OfflineBadge, MaterialReader, LINGQ-RE.md, arcade routes all present) BEFORE merging their doc flips.
+- MERGE: one conflict (AUDIT checklist) + one orphan marker, resolved into the post-wave canonical state. Honest wording kept where the parallel wave overclaimed: offline sync = SUBSTANTIALLY DONE (grade loop offline end-to-end) with the residual recorded (chats/writings/arcade scores refuse offline by design; physical-device spot-check beyond emulation); mobile testing DONE at emulation, caveat stated once.
+- HYGIENE: platform auto-commit 075f0c0 had published scripts/out test artifacts (synthetic TTS/ASR clips, CI JSON, mobile screenshots) - secret-checked (zero tokens/emails; state.json is a zeroed synthetic fixture), then gitignored + untracked.
+- GATES ON THE MERGED TREE (independently re-run, not trusted from messages): tsc 0 (after prisma generate - the client was stale vs migration 0006), eslint 0, guard 27/27, battery 425/425, isolation 45/45. Pushed 1f02079.
+
+Stage Summary:
+- The two roadmap files now agree everywhere; the canonical category ledger lives in ROADMAP-AUDIT.md §3 and both files carry it. The auditor's three criticals are queued: P0 production-DB validation (PostgreSQL), P0 privacy-incident completion (cache sweep), P1 structured learner pilot (first evidence surface already shipped by Task 70). Standing lesson reinforced: a merge is also a claims event - verify the incoming wave against its diffs before letting its doc flips into the canonical ledger.
+
+---
+Task ID: 74
+Agent: Super Z (main)
+Task: The evaluator's P0 #1 - finish the production database decision: validate PostgreSQL for Rah (concurrent writes, migrations, isolation, recovery) as far as the sandbox allows.
+
+Work Log:
+- No root, no docker in the sandbox -> stood up REAL PostgreSQL 17.5 in userspace (Zonky @embedded-postgres/linux-x64 binaries into the gitignored scripts/out/pgsandbox; initdb + pg_ctl on 127.0.0.1:5433).
+- prisma/schema.postgres.prisma: provider switch + separate client output (prisma/pg-client, gitignored) - the app's sqlite client never touched; `prisma migrate diff --from-empty --to-schema-datamodel` produced the PG DDL (30 tables) and it applied cleanly to a fresh "rah" database.
+- scripts/pg-validate.ts (PG VALIDATION BATTERY, 16/16):
+  * the grade route's EXACT transaction shape (cardState.upsert + reviewLog.create + learner xp increment + dailyStat upsert) run by 8 concurrent workers x 25 rounds = 200 transactions in 586ms (~341 tx/s) with ZERO rejections, ZERO lost updates (xp exactly 2000; ReviewLog 200; DailyStat reviews=200/xp=2000; sum(cardState.reps)=200) - Prisma's atomic increments + upserts hold on PG READ COMMITTED;
+  * GradeAck gid race: 12 concurrent creates of the SAME gid -> exactly ONE wins on the PK, 11 fail with P2002 (the Task-68 offline-replay idempotency holds on PG); the receipt holds the original response verbatim; a replay touches nothing;
+  * per-user scoped reads/deletes behave identically (user-a deleteMany never touches user-b rows);
+  * whole-DB logical restore into a second database (rah_restored): per-table row counts identical across ALL 30 tables; restored learner xp matches;
+  * honest negative pinned: the SQLite migration SQL does NOT run on PG (dialect) - the cutover baselines via `migrate diff`, which is exactly what this battery proves works.
+- scripts/sqlite-to-postgres.mjs (the REAL cutover path): opened the LIVE db/custom.db READ-ONLY (mode=ro), column-intersected every table against the PG schema, adapted types (booleans 0/1, epoch-ms INTEGER dates -> ISO, jsonb), bulk-inserted: 58 rows across all 30 tables, ZERO mismatches, ZERO dropped columns; learner xp=220/streak=2 verified on the PG side. The live SQLite DB was never written.
+- What remains (recorded honestly in both ledgers): the PHYSICAL flip on the real deployment (provision managed Postgres, baseline migrations, run the cutover in maintenance mode, make the lock decision) - deployment-architecture work that cannot be done inside this sandbox. The P0's decision + validation halves are DONE; the launch checklist is written into ROADMAP-AUDIT open critical list #1.
+
+Stage Summary:
+- The evaluator's P0 #1 moved from "decision pending" to "decision made + path validated on a real PostgreSQL 17.5 server, with the live learner data proven to cross zero-mismatch". PG battery 16/16 is a new standing gate (scripts/pg-validate.ts). Next: P0 #2 privacy-incident completion (dangling-commit/cache sweep), then P1 #3 the learner pilot protocol.
+
+---
+Task ID: 75
+Agent: Super Z (main)
+Task: The evaluator's P0 #2 - finish the privacy incident response: probe whether pre-scrub commits really survive in third-party/GitHub caches, with evidence.
+
+Work Log:
+- scripts/privacy-sweep.py (re-runnable, exits 1 while human action is pending): probes 16 pre-scrub SHAs harvested from the roadmap velocity logs against the GitHub API, the raw snapshot blob at each, the public events feed, vault privacy, and a zero-learner-data tree sweep.
+- FINDING 1: 15 of 16 pre-scrub SHAs are STILL RETRIEVABLE (dangling objects): 4d4f582, 240100a, 0c02959, 0e9100e, 3b2049f, d1722f7, 161d7cb, f52e593, cd35f15, 3e49329, 6b9fda4, 5156b4b, b02be56, 79ac327, ab9514a (only 9b9c360 gone).
+- FINDING 2 (severity): the leaked snapshot ITSELF is anonymously fetchable at 5156b4b - raw.githubusercontent.com/.../5156b4b/db/sync/rah-latest.db returns HTTP 200 / 217,088 bytes with NO auth, and the full pre-scrub tree downloads via codeload tar.gz. At every other dangling SHA the snapshot paths 404. The auditor's cache warning is now evidence, not assumption.
+- FINDING 3 (clean): events API carries zero pre-scrub SHAs; public tree carries ZERO learner-data paths; vault private=true; nothing is LISTED - every exposure requires knowing a hash.
+- Recorded REG-2 ADDENDUM 3 in ROADMAP-AUDIT.md with the full SHA list and a copy-pasteable GitHub Support sensitive-data-removal template - the purge CANNOT be filed from inside the sandbox (needs the account holder); that is the one remaining human action. STATUS honest-ledger paragraph updated with the confirmed severity.
+- Task 74 wrap (same wave): docs finalized (AUDIT open critical #1 = validation DONE + remaining flip recorded; STATUS rows 1/5 updated: isolation DONE content+state, PG path VALIDATED), worklog entries for 74/75, PG battery 16/16 + cutover zero-mismatch + sweep findings all claims-vs-diff verifiable in the tree.
+
+Stage Summary:
+- The privacy incident is now precisely bounded: what the rewrite fixed (listed history, tree, events), what survives (dangling by-hash objects, one anonymously serving the snapshot), and exactly what remains (one Support request by the account holder, template ready). Next: Task 76 - the P1 learner pilot protocol + metrics, then continue the backlog without stopping.
+
+---
+Task ID: 76
+Agent: Super Z (main)
+Task: The evaluator's P1 #3 - validate actual educational outcomes: ship the structured learner pilot (protocol + measurement instrument), not just a promise.
+
+Work Log:
+- PILOT-PROTOCOL.md: pre-registers the pilot BEFORE the data exists - four tracks (retention / writing / listening / speaking) with their exact real-table sources, weekly cadence via the instrument, sample-size honesty rules (>=50 first attempts for a weekly verdict, <20 labeled "a real signal, not a trend", no trend language under 4 cells), pre-registered verdict criteria (flat-or-up recall + interval survival growth + volume hold, etc.), failure handling (a declining track is reported as declining, investigation before features), and an explicit cannot-prove section (one learner, no control - the verdict language is calibrated accordingly).
+- scripts/pilot-metrics.mjs: the zero-AI instrument - reads ReviewLog/CardState/WritingSub/SpeakSession/DailyStat READ-ONLY and prints the weekly snapshot (retention per week + interval survival, revision chains, dictation accuracy, speaking volume + stored-score trend proxy, consistency). No content ever printed.
+- WEEK-0 BASELINE taken on the live DB: 17 first attempts @ 29% recall, 2 active days in 28, 17 cards / 9 lifetime lapses, zero writing/speaking/dictation volume - all small-sample-flagged. Series log seeded at db/pilot/series.md (gitignored: derives from learner data, regenerable from the DB).
+- Ledgers updated (AUDIT open critical #3 = protocol+instrument DONE, pilot itself is time-gated; STATUS velocity rows 74/75/76 + gate line).
+- Wave gates: this task touches docs + a read-only script only; standing gates from Tasks 73/74 unchanged (battery 425/425, isolation 45/45, guard 27/27, PG 16/16, tsc 0, eslint 0).
+
+Stage Summary:
+- All three evaluator criticals now have shipped artifacts: #1 PostgreSQL path validated end-to-end (Task 74), #2 the sweep with evidence + purge template (Task 75), #3 the pilot protocol + instrument with the Week-0 baseline (Task 76). The remaining work on all three is either a single human action (file the Support request) or time (run the cutover on the real deployment; accumulate pilot weeks).
+
+---
+Task ID: 77
+Agent: Super Z (main)
+Task: Continue the backlog - writing rubric history (criterion-level deltas), the audit's remaining writing-workspace gap; also close the CI failure the Task-74 push caused (76-bis hotfix, verified in this wave).
+
+Work Log:
+- 76-bis FIRST (CI red): the Task-74 push failed the CI check job - scripts/pg-validate.ts imports the generated PG client (gitignored), which a fresh CI checkout cannot resolve. Fixed by excluding the instrument (and prisma/pg-client) from tsconfig; tsc verified green WITH the client removed from the tree (the CI condition). Lesson recorded: CI is the fresh-checkout truth - sandbox-generated imports must be excluded or stubbed.
+- SCOPED the writing grader first: every graded submission already stores criterion scores (task/organization/range/accuracy) in its result JSON - the rubric-history layer is a chain-level view, not a new grader.
+- API: GET /api/writing?id=N now returns `rubric` - rubricHistory(chain) compares the FIRST and LAST graded ends per criterion (one-decimal deltas, declines render honestly negative, fewer than two graded ends -> an explicit unlock note, never invented numbers). Middle submissions cannot distort the end-to-end delta (pinned).
+- UI: the revising banner in Write.tsx shows the delta chips (green up / rose down / neutral flat) with first->last in the tooltip and the honesty note inline; rubric state cleared with the revising cancel.
+- BATTERY CATCH: my own first assertion contradicted the intended rounding contract (compared against unrounded floats) - the instrument was right, the test was wrong; fixed the assertion and pinned the rounding as deliberate.
+- GATES: writing-rubric unit battery 11/11, main battery 425/425 (route change additive), tsc 0, eslint 0 on touched files.
+
+Stage Summary:
+- The writing-workspace PARTIAL narrowed to its honest residual (per-revision criterion-level edit suggestions). The pilot's writing track now has its quality-delta instrument ready for when the learner's chains accumulate.
+
+---
+Task ID: 78
+Agent: Super Z (main)
+Task: Continue the backlog - offline sync beyond grades (the honest residual the reconciliation recorded): the solo arcade aggregates.
+
+Work Log:
+- SCOPED the seven game surfaces first and split them honestly: speed/boss/duel/pairs/flow are fully client-played aggregates (server clamps the POST) -> queue-able; dungeon/gauntlet are SERVER-DEALT state machines (RunState holds the dealt items; the next gauntlet item is built server-side per streak) -> offline play would require faking the deal, so they stay online-only BY DESIGN (recorded, not hidden).
+- Server: src/lib/sync-receipt.ts - the generic gid receipt (parseGid/beginReceipt/endReceipt/receiptReplay) reusing GradeAck (shape-generic since Task 68; every outbox item mints a fresh uuid so grade/game receipts never collide); wired into all five aggregate routes (parse gid -> receipt replay early-return -> endReceipt wrapping the final payload). A concurrent duplicate keeps the FIRST receipt; a torn receipt falls through and serves fresh (same rule as the grade route).
+- Client: the outbox gained a games store (localStorage rah-outbox-games-v1, capped 60, same honesty rules: network failures enqueue, 4xx refusals drop and count, 5xx keeps) drained by the SAME flush; submitGameResult(path, body) stamps the gid into the payload and resolves the server's ORIGINAL clamped response; the badge count now covers grades + games.
+- UI: SpeedRound/BossBattle/Duel/Flow/PairsGame swapped to submitGameResult; the offline path shows "Offline - queued to sync" in the result view (amber, in-context) and the badge announces the sync on reconnect.
+- BATTERY CATCHES (two, both mine): (1) the new section read GameStat under userId "me" - GameStat is per-user since migration 0006, the reads now use the battery session UID; (2) counters live in the `plays` column, not `best`. The battery caught both before any claim was written.
+- GATES: battery 425 -> 433/433 (receipt replay = ORIGINAL payload verbatim, NO second play counted, NO second XP, new gid = exactly one more play, stateful-mode honesty pin), tsc 0, eslint 0, guard 27/27.
+
+Stage Summary:
+- The offline story is now: grades + solo arcade aggregates survive disconnects with idempotent replay; AI surfaces and server-dealt state machines refuse offline honestly; the PWA shell + reads already worked. The residual is precisely bounded (dungeon/gauntlet redesign if wanted, physical-device spot-check).
+
+---
+Task ID: 79
+Agent: Super Z (main)
+Task: Continue the backlog - evidence-backed reference provenance (audit feature #8), CI green on Tasks 77/78 verified first.
+
+Work Log:
+- CI verified: 31d17f9 (Task 78) completed success; 887d2ec (Task 77) pushed earlier; b171edb (76-bis) success.
+- SCOPED the card pipeline: three card sources reach the Review face (authored bank via cardById, coach-mined exam:/listen: cards derived from mistake families, mat: cards extracted from learner materials with the exact source sentence as context->en). The client could not tell them apart - the audit's provenance gap.
+- src/lib/provenance.ts (pure, client-safe): provenanceOf(cardId) -> three honest branches ("from your own misses" + Mind Reader pointer / "from your material" + exact-source promise / "Rah course bank (v1) — authored, not generated at read time"); unknown ids default to the bank honestly.
+- Review.tsx reveal face now renders the provenance line under the note (prompt faces untouched - provenance belongs where the learner reads the answer).
+- Unit battery scripts/test-provenance.ts 8/8 (three branches + default + wording pins).
+- Ledger: feature #8 -> DONE; category table features 4/6 -> 5/5. Gates: tsc 0, eslint 0.
+
+Stage Summary:
+- Feature #8 closed with the honest epistemics intact: the learner can now see WHERE every example comes from. Remaining partials: content console regression tests (#10), exam item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 79-bis
+Agent: Super Z (main)
+Task: Claims-vs-diff self-correction - Task 79's commit message and STATUS said "provenance battery 8/8"; the actual run printed 7 passed / 0 failed (7 checks exist).
+
+Work Log:
+- The standing gate applies to my own commit messages: the count was wrong (8 vs 7). STATUS corrected to 7/7; this entry is the public correction. No code change - the checks and the component are correct as shipped.
+
+Stage Summary:
+- Task 62-bis's lesson (a commit message is not a diff) applies to battery counts too. Verify-then-claim, and when a claim slips, correct forward in the ledger - never silently.
+
+---
+Task ID: 80
+Agent: Super Z (main)
+Task: Content quality console (audit feature #10 residual) - regression tests per flag.
+
+Work Log:
+- lib/flag-regressions.ts (pure): checkCardIntegrity(card, flag) holds EVERY flagged card to one bar (prompt/answer/example non-empty; cloze accepts contain the answer; no distractor equals the answer; wrong-answer flags get a targeted accepts/answer check; a vanished card is an honest failure - a fixed flag on a deleted card cannot fake a pass). regressionLine renders [status] kind card: PASS/FAIL - problems.
+- scripts/flag-regression-run.mjs: the read-only runner over the REAL flag queue (node:sqlite mode=ro): every fixed flag must still pass (exit 1 otherwise), open flags show current state, mat: cards resolve from MaterialCard, bank/dynamic cards reported for the battery path.
+- scripts/test-flag-regressions.ts unit battery 9/9 (healthy card, fixed-stays-green pin, empty answer, distractor==answer, ghost card, wrong-answer mismatch, readable line, taxonomy).
+- SELF-CORRECTION during verification: my first draft asserted "cloze card with no trap tags" as a defect - tracing the real data flow showed review misses feed the ARCADE chain (registerMiss), and the mistake memory is fed by the writing/exam/coach paths (recordMistakes with tags). The rule was a false coupling and was REMOVED before any claim was written; the correction is recorded here and in STATUS.
+- Ledger: feature #10 -> DONE; category table features 5/5 -> 6/4. Gates: tsc 0, eslint 0, battery (main) untouched.
+
+Stage Summary:
+- Feature #10 closed. Remaining partials: exam gen/grading item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 81
+Agent: Super Z (main)
+Task: Polish #5 residual - exam item-bank validation + distractor quality pass.
+
+Work Log:
+- exam-gate.ts gained distractorQuality(choices, a): duplicates, empties and key-clones fail; a shape-plausibility heuristic (at least one distractor within a broad length band of the key OR sharing a word) catches giveaway sets; repairChoices does the one deterministic repair (trim, drop empties, order-preserving dedupe) BEFORE the verdict - still-weak items die exactly like answerability failures (dropped with the reason logged).
+- Wired into exam.ts's generation loop right after the answerability gate: every generated mcq passes both gates; the dropped-reasons list carries the distractor verdicts.
+- BATTERY CATCH (mine): the shape-giveaway test fixture shared the word "has" with the key, so the shared-word rule (correctly) passed it - the fixture was wrong, not the gate; fixed the fixture.
+- GATES: distractor gate battery 8/8, exam-track battery 42/42 (the C1A track's key-word transformations survive the gate), main battery 433/433, tsc 0, eslint 0.
+- Ledger: polish #5 -> DONE; category table polish 8/2 -> 9/1.
+
+Stage Summary:
+- The exam engine now enforces: fairly asked + answerable + key present + distractors real, distinct, and shape-plausible - with a repair attempt in between. Remaining partials after this: onboarding/naming audit (polish #10), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 82
+Agent: Super Z (main)
+Task: The last polish partial - the full plain-language naming audit.
+
+Work Log:
+- src/lib/naming.ts: the canonical registry of every coined name (Speed Round, Boss Battle, Voice Arena, Daily Dungeon, Rival Duel, The Gauntlet, League, Flow, Talents, Trophies, Mind Reader, Sound Lab, Read Aloud, The Examiner, practice bot) each with a plain-language gloss; glossIsPlain enforces the rule that no gloss leans on another coined name.
+- Arcade floor: every tab carries its gloss (screen-reader text on the button + the ACTIVE tab's name+gloss rendered on-screen, so a new learner always knows what the jargon means before entering).
+- Duel + League: the "practice bot(s)" chip (same styling as Home's Task-44 badge) now sits on EVERY surface that shows a rival - no surface implies a real opponent anymore; tooltips spell it out.
+- BATTERY CATCH (mine, again in the fixture class): the examiner gloss itself used "Boss Battle" - the plain-language rule caught MY OWN gloss; fixed the gloss, rule pinned.
+- GATES: naming battery 9/9, tsc 0, eslint 0. Ledger: polish #10 -> DONE; category table polish 9/1 -> 10/0.
+
+Stage Summary:
+- The polish category is 10/10. Remaining PARTIALs anywhere: exam-track rubric validation (external dependency - expert-reviewed responses), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions, the three deferred stores, Azure phoneme validation (needs a key), the physical PG flip + lock decision (deployment), the GitHub Support purge (account holder), and the pilot itself (weeks).
+
+---
+Task ID: 83
+Agent: Super Z (main)
+Task: The writing workspace's last residual - per-revision change summaries (what did each revision actually fix?).
+
+Work Log:
+- Route: revisionChanges(chain) compares consecutive GRADED submissions by their normalized error sets: fixed = flagged before and gone now; remaining = still flagged; introduced = new flags; fixedExamples carry up to 3 of the grader's own GOOD replacements (zero-AI - the evidence is the grader's corrections, not new commentary). GET /api/writing?id=N returns `changes`.
+- SEMANTICS FIX caught by the battery before any claim: ungraded drafts initially RESET the comparison base (an empty error list read as "all clean") - the fix skips result-less entries entirely; the honest base is the previous GRADED submission. Battery-pinned.
+- UI: the revising banner states the last revision's haul in plain words ("The previous revision fixed 2 flagged issues, 1 still flagged, 1 new one appeared. e.g. ...").
+- GATES: writing battery 18/18 (was 11), tsc 0, eslint 0; main battery re-run 433/433.
+- Ledger: writing workspace row -> DONE; category table features 6/4 -> 7/3.
+
+Stage Summary:
+- Critical-feature additions now stand at 7 done / 3 partial (the partials: offline sync's dungeon/gauntlet boundary, exam-track rubric validation, acoustic phoneme validation - all three are external-dependency or deliberate-boundary items, recorded as such).
+
+---
+Task ID: session-close
+Agent: Super Z (main)
+Task: Session wrap - Tasks 73-83 all pushed and CI-green; final consistency sweep of the canonical ledger.
+
+Work Log:
+- CI verified green on every push this session: 1f02079/c0eb4c9 (73 + worklog), baf4a5a FAILED then b171edb (76-bis fix) success - the failure taught the fresh-checkout rule for sandbox-generated imports, 90a7a2e (pre-fix, superseded), 31d17f9 (78), 887d2ec (77), 9c02bf9 (80), e45f5f9 (81), 9d8019a (82), 7f0270b (83), 3b1472d (79-bis) - all completed success.
+- CATEGORY TABLE (final, Task 73-83): critical fixes 10/0/0 · critical features 7 done / 3 partial / 0 pending (offline, exam-track validation, pronunciation-phoneme are the partials - each a recorded external-dependency or deliberate boundary) · polish 10/0/0 · RE 3/1/0 (ELSA partial = phoneme tier awaits a key) · stores 0/0/3 (PG path validated) · APIs 2/1/0 (Azure adapter dormant).
+- THE EVALUATOR'S THREE CRITICALS: #1 production-DB decision = decision made + path validated on a real PG 17.5 server with the live data proven to cross zero-mismatch (Task 74); #2 privacy incident = sweep done with evidence + purge template ready (Task 75); #3 outcomes validation = protocol + instrument + Week-0 baseline (Task 76). What remains on each is respectively: the physical flip (deployment), one Support request (account holder), and weeks of data.
+
+Stage Summary:
+- Eleven tasks shipped this session (73-83 + two bis corrections), every claim verified against its diff, four battery-caught self-corrections recorded in public (76-bis CI scope, 79-bis count, 80 false coupling, 83 base-reset semantics). The repo now carries: an idempotent offline sync (grades + solo arcade), a validated PostgreSQL path, an evidenced privacy sweep, a pre-registered pilot, and a ledger where every DONE claim has a battery or a drill behind it.
+
+---
+Task ID: 67-72-merge
+Agent: Super Z (main)
+Task: The user's batch directive (roadmap reconciliation, offline sync + mobile testing, isolation residual, then the P0/P1 criticals) - executed INDEPENDENTLY and in parallel with another session that shipped Tasks 67-83 on origin; merged both waves with the remote as canonical.
+
+Work Log:
+- Task 67 (docs): reconciled ROADMAP-STATUS.md and ROADMAP-AUDIT.md from code + task log (offline qualified PARTIAL after an in-code survey: SW + manifest + grace reads exist, zero write path; goal planner/pronunciation/exam-track/email rows refreshed; claim-precision rules written into both docs as section 8). Independently reached the same conclusions as the parallel wave's Task 73 reconciliation; remote's docs kept in the merge (they carry the later final ledger).
+- Task 68 survey + Task 69 (offline writes): built an IndexedDB review-grade queue (offline-queue.ts) with ordered replay, classifyOutcome (14/14 unit battery) and ReviewLog.clientRef server dedupe (migration 0006_offline_clientref; battery section 6g proved dedupe/one-row/no-double-XP). The parallel wave shipped the GradeAck-gid design (Task 68) and extended it to the arcade outbox (Task 78) - THEIR design won the merge; my duplicate client (offline-queue.ts, OfflineStatusBar.tsx, test-offline.ts) removed, BlitzDeck switched to the canonical submitGrade seam. 0006_offline_clientref kept (additive nullable column, live db records it; their code ignores it).
+- Task 72 (isolation residual): found the live DB's _prisma_migrations carried 0006_state_isolation + 0007_offline_grade_ack while the local (stale) tree had neither file - forensically reconstructed both SQLs column-by-column from the live schema, re-threaded ~30 call sites, extended the isolation battery by 8 cross-user checks (37/37 locally). The parallel wave's Task 67 did the same scoping with the ORIGINAL files + 45/45 battery - theirs are canonical in the merge; my reconstructions superseded and dropped where they conflicted.
+- COLLISION DAMAGE REPAIR: my local 0008_offline_ack_consolidate had DROPPED GradeAck from the shared live DB - a table the canonical wave's Task 68/78 outbox reads. Fixed with migration 0009_gradeack_restore (DROP IF EXISTS + re-CREATE per the Task-68 DDL; no-op on fresh chains, restores on live) - GradeAck verified back, learner intact (xp=220/streak=2).
+- Latent-bug catch on the merged tree: the remote goal battery seeded CardState without userId (defaulting to the singleton) while planFor("u1") forecasts per-user - dueTotal read 0. Seeds stamped "u1" (matching the battery's own explicit-userId doctrine); 15/15 again.
+- Full gates re-run ON THE MERGED TREE per the repo doctrine: tsc 0, eslint 0, main battery 433/433, isolation 45/45, guard 27/27, memory 15/15, goals 15/15 (fixed seeds), exam-tracks 42/42, pronunciation 19/19. Live db: GradeAck restored, learner xp=220/streak=2 intact.
+
+Stage Summary:
+- Both waves' work is now one tree: the canonical offline protocol is the GradeAck-gid outbox (grades + arcade aggregates), isolation is fully scoped (45-check battery), the roadmaps are the parallel wave's final ledger (fixes 10/0/0, features 7/3/0, polish 10/0/0, RE 3/1/0, stores 0/0/3 with PG validated, APIs 2/1/0). Lesson recorded: session-start sync doctrine exists because of exactly this race - the stale tree cost this session a re-derivation of Tasks 67/68/72; the claims-vs-diff habit is what caught the drift (live db ahead of local HEAD) before it was misdiagnosed as a "lost wave".

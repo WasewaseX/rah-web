@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,10 @@ export async function POST(req: Request) {
   const suspended = body.suspended !== false; // default true; only explicit false unsuspends
   if (!cardId) return NextResponse.json({ error: "cardId required" }, { status: 400 });
 
-  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
-  const row = await db.cardState.findUnique({ where: { userId_cardId: { userId, cardId } } });
+  const u = await contentUserId(req);
+  const row = await db.cardState.findUnique({ where: { userId_cardId: { userId: u, cardId } } });
   if (!row) return NextResponse.json({ error: "Card not found." }, { status: 404 });
 
-  await db.cardState.update({ where: { userId_cardId: { userId, cardId } }, data: { suspended } });
+  await db.cardState.update({ where: { userId_cardId: { userId: u, cardId } }, data: { suspended } });
   return NextResponse.json({ ok: true, cardId, suspended });
 }

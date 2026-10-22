@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { buildSpeedPool, type ArcadeItem } from "@/lib/arcade-items";
-import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 // the submitted aggregate.
 export async function GET() {
   const items = await buildSpeedPool(40);
-  const u = await contentUserId().catch(() => SINGLE_USER_ID);
+  const u = await contentUserId().catch(() => "me");
   const best = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:best" } } });
   const combo = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:combo" } } });
   return NextResponse.json({
@@ -47,20 +48,26 @@ export async function POST(req: Request) {
   const m = Math.min(5, maxCombo);
   const cap = 10 * tri(m) + 50 * Math.max(0, correct - maxCombo);
   const score = Math.min(Math.max(0, Math.round(Number(b.score ?? 0))), cap);
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
 
   const bestRun = await bumpStat("speed:best", score);
   const bestCombo = await bumpStat("speed:combo", maxCombo);
   await bumpStat("speed:plays");
   await bumpDaily("reviews", total);
   await bumpDaily("correct", correct);
-  const xp = await awardXp(Math.min(80, Math.round(score / 12)), { chainHit: correct > 0 });
+  const xp = await awardGameXp("speed", Math.min(80, Math.round(score / 12)), { chainHit: correct > 0 });
   if (correct < total) await registerMiss();
   await touchStreak();
   await progressQuest("speed_play", 1);
   if (maxCombo > 0) await progressQuest("speed_combo_8", maxCombo);
 
-  return NextResponse.json({
-    xpGain: Math.min(80, Math.round(score / 12)),
+  const payload = {
+    xpGain: xp.paid,
+    capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     level: xp.level,
@@ -68,5 +75,7 @@ export async function POST(req: Request) {
     best: bestRun.best,
     isNewBest: bestRun.isNew,
     bestCombo: bestCombo.best,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

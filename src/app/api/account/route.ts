@@ -38,30 +38,41 @@ export async function DELETE(req: Request) {
   };
   let notice: string | undefined;
 
+  // Per-user learner rows: removed in BOTH branches (Task 67). Deleting your
+  // account must never leave your FSRS queue, quests, trophies, runs, bands,
+  // placement history, materials or memory rows behind for anyone else - the
+  // tables are (userId, ...) keyed now, so these deletes are exact.
+  const u = user.id;
+  await db.cardState.deleteMany({ where: { userId: u } });
+  await db.reviewLog.deleteMany({ where: { userId: u } });
+  await db.placement.deleteMany({ where: { userId: u } });
+  await db.chatMsg.deleteMany({ where: { userId: u } });
+  await db.writingSub.deleteMany({ where: { userId: u } });
+  await db.speakSession.deleteMany({ where: { userId: u } });
+  await db.dailyStat.deleteMany({ where: { userId: u } });
+  await db.goal.deleteMany({ where: { userId: u } });
+  await db.skillLevel.deleteMany({ where: { userId: u } });
+  await db.achievement.deleteMany({ where: { userId: u } });
+  await db.gameStat.deleteMany({ where: { userId: u } });
+  await db.quest.deleteMany({ where: { userId: u } });
+  await db.rival.deleteMany({ where: { userId: u } });
+  await db.league.deleteMany({ where: { userId: u } });
+  await db.runState.deleteMany({ where: { userId: u } });
+  await db.mistakeFamily.deleteMany({ where: { userId: u } });
+  await db.mistakeForgiven.deleteMany({ where: { userId: u } });
+  await db.tagMastery.deleteMany({ where: { userId: u } });
+  // The caller's imported materials (pasted texts are learner content) and
+  // their cards. Cards go first: they are referenced by materialId.
+  const myMaterials = await db.material.findMany({ where: { userId: u }, select: { id: true } });
+  await db.materialCard.deleteMany({ where: { materialId: { in: myMaterials.map((m) => m.id) } } });
+  await db.material.deleteMany({ where: { userId: u } });
+
   const remainingUsers = await db.user.count();
   if (remainingUsers === 0) {
-    // Last account out: wipe the singleton learner state completely.
-    await db.cardState.deleteMany();
-    await db.reviewLog.deleteMany();
-    await db.placement.deleteMany();
-    await db.chatMsg.deleteMany();
-    await db.writingSub.deleteMany();
-    await db.speakSession.deleteMany();
-    await db.dailyStat.deleteMany({ where: { userId: user.id } });
-    await db.goal.deleteMany({ where: { userId: user.id } });
+    // Last account out: also wipe the SHARED singleton state (no owner left).
     await db.quizItem.deleteMany();
     await db.exam.deleteMany();
-    await db.skillLevel.deleteMany();
-    await db.achievement.deleteMany();
-    await db.gameStat.deleteMany();
-    await db.quest.deleteMany();
-    await db.rival.deleteMany();
-    await db.league.deleteMany();
-    await db.runState.deleteMany();
     await db.briefing.deleteMany();
-    await db.mistakeFamily.deleteMany({ where: { userId: user.id } });
-    await db.mistakeForgiven.deleteMany({ where: { userId: user.id } });
-    await db.tagMastery.deleteMany({ where: { userId: user.id } });
     await db.contentFlag.deleteMany();
     await db.learner.deleteMany();
     removed.learnerState = true;
@@ -75,7 +86,7 @@ export async function DELETE(req: Request) {
     );
   } else {
     notice =
-      "Other accounts remain on this deployment, so the shared learner state was kept. Ask the owner about a full wipe.";
+      "Your learner rows were deleted; shared deployment state (the singleton learner profile) was kept because other accounts remain. Ask the owner about a full wipe.";
   }
 
   // Kill the caller's auth artifacts: the session is already gone with the

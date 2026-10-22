@@ -48,7 +48,10 @@ export default function League() {
             <Medal className="h-4 w-4" />
           </span>
           <div>
-            <div className="text-sm font-extrabold text-[#f2f5fa]">{data.divisionName} Division</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-[#f2f5fa]">{data.divisionName} Division</span>
+              <span className="rounded-full border border-[#a78bfa]/40 bg-[#a78bfa]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#cfc3fc]" title="A weekly XP race against practice bots - no other learner is on the other side">practice bots</span>
+            </div>
             <div className="text-[11px] text-[#7d889c]">
               Place {data.place} of 8 · {data.daysLeft} day{data.daysLeft === 1 ? "" : "s"} left · top 3 promoted, bottom 3 demoted
             </div>

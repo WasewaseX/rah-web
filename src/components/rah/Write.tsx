@@ -29,6 +29,12 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
   // Writing revision history (audit P2): revising an earlier submission links
   // the new one to it (parentId) and bumps the revision number server-side.
   const [revisingId, setRevisingId] = useState<number | null>(null);
+  // Rubric history (writing-revision workspace): criterion deltas across the
+  // chain being revised - shown in the revising banner, honest when absent.
+  const [rubric, setRubric] = useState<{ criteria: { key: string; first: number; last: number; delta: number }[]; note: string } | null>(null);
+  // What the previous revision actually fixed (Task 83): the honest change
+  // summary between the chain's last two graded submissions.
+  const [changes, setChanges] = useState<{ fixed: number; remaining: number; introduced: number; fixedExamples: string[] }[] | null>(null);
 
   const loadRecent = useCallback(() => {
     fetch("/api/writing", { cache: "no-store" })
@@ -55,6 +61,8 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
       if (!last) throw new Error("The submission has no text to revise.");
       setText(last.text ?? "");
       setRevisingId(last.id);
+      setRubric(j.rubric ?? null);
+      setChanges(j.changes ?? null);
       setResult(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -93,10 +101,53 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
         <Note tone="blue">
           <div className="flex items-center justify-between gap-3">
             <span>Revising submission #{revisingId} - the new grade joins its revision history.</span>
-            <button onClick={() => setRevisingId(null)} className="text-xs font-bold text-[#9dc0ff] hover:underline">
+            <button
+              onClick={() => {
+                setRevisingId(null);
+                setRubric(null);
+                setChanges(null);
+              }}
+              className="text-xs font-bold text-[#9dc0ff] hover:underline"
+            >
               cancel
             </button>
           </div>
+          {rubric && rubric.criteria.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2 border-t border-white/10 pt-2">
+              {rubric.criteria.map((c) => (
+                <span
+                  key={c.key}
+                  className={
+                    "rounded-full px-2 py-0.5 text-[11px] font-bold " +
+                    (c.delta > 0
+                      ? "bg-[#173a26] text-[#7ee2a8]"
+                      : c.delta < 0
+                        ? "bg-[#3a1a1f] text-[#ff9db1]"
+                        : "bg-white/10 text-white/70")
+                  }
+                  title={`${c.key}: ${c.first} -> ${c.last}`}
+                >
+                  {c.key} {c.delta > 0 ? "+" : ""}
+                  {c.delta}
+                </span>
+              ))}
+              <span className="text-[11px] text-white/40">{rubric.note}</span>
+            </div>
+          )}
+          {rubric && rubric.criteria.length === 0 && (
+            <div className="mt-1 text-[11px] text-white/40">{rubric.note}</div>
+          )}
+          {changes && changes.length > 0 && (() => {
+            const last = changes[changes.length - 1];
+            return (
+              <div className="mt-1 text-[11px] text-white/50">
+                The previous revision fixed {last.fixed} flagged issue{last.fixed === 1 ? "" : "s"}
+                {last.remaining > 0 ? `, ${last.remaining} still flagged` : ""}
+                {last.introduced > 0 ? `, ${last.introduced} new one${last.introduced === 1 ? "" : "s"} appeared` : ""}.
+                {last.fixedExamples.length > 0 ? ` e.g. "${last.fixedExamples[0]}"` : ""}
+              </div>
+            );
+          })()}
         </Note>
       )}
       <Card>

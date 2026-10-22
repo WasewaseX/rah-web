@@ -190,7 +190,7 @@ try {
         const s = snap as Record<string, never>;
         await prisma.cardState.upsert({ where: { userId_cardId: { userId: "me", cardId: gradedCardId } }, create: { ...s } as never, update: { ...s } as never });
       } else {
-        await prisma.cardState.deleteMany({ where: { cardId: gradedCardId } });
+        await prisma.cardState.deleteMany({ where: { userId: "me", cardId: gradedCardId } });
       }
       const logs = await prisma.reviewLog.findMany({ where: { cardId: gradedCardId } });
       for (const row of logs) {
@@ -205,7 +205,7 @@ try {
         const s = snap as Record<string, never>;
         await prisma.cardState.upsert({ where: { userId_cardId: { userId: "me", cardId: id } }, create: { ...s } as never, update: { ...s } as never });
       } else {
-        await prisma.cardState.deleteMany({ where: { cardId: id } });
+        await prisma.cardState.deleteMany({ where: { userId: "me", cardId: id } });
       }
     }
     if (learnerBefore) {

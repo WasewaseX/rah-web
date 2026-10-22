@@ -7,22 +7,17 @@
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
 import { bumpDaily, getLearner } from "@/lib/server";
 import { GEMS, awardGems, boostActive } from "@/lib/shop";
 
-// Per-user isolation seam (Task 72, reconstructed): every arcade function
-// accepts an optional explicit userId and otherwise auto-resolves the session
-// user (cookie-based), exactly like the memory/mastery seam from Task 65.
-// Under the deployment lock this degrades to the singleton "me" - it must
-// never break a learner flow - while the columns are already load-bearing.
-async function uid(explicit?: string): Promise<string> {
-  if (explicit) return explicit;
-  try {
-    return await contentUserId();
-  } catch {
-    return SINGLE_USER_ID;
-  }
+// Per-user isolation (Task 67, the recorded residual): every arcade table -
+// the FSRS deck queue, trophies, game records, quests, rival, league, runs,
+// skill bands, placement - is keyed by the session user now. Functions keep
+// their shapes: the user resolves from the request context (cookie ladder)
+// and degrades to the singleton "me" under the deployment lock.
+async function uid(): Promise<string> {
+  return contentUserId().catch(() => "me");
 }
 
 // ---------- Momentum (cross-surface combo chains) ----------
@@ -70,10 +65,10 @@ export async function registerHit(): Promise<{ chain: number; mult: number; labe
   return { chain, ...heat };
 }
 
-export async function registerMiss(userId?: string): Promise<void> {
-  const u = await uid(userId);
+export async function registerMiss(): Promise<void> {
   const l = await getLearner();
   const today = dayIndex();
+  const u = await uid();
   const base = await freshChain(l);
   if (base === 0) return;
   const shielded = hasPerk(l.perks, "chain_shield");
@@ -136,8 +131,8 @@ export interface PerksView {
 }
 
 export async function getPerksView(): Promise<PerksView> {
-  const u = await uid();
   const l = await getLearner();
+  const u = await uid();
   // Retroactive catch-up: the tree arrives when the learner is already deep
   // in the ladder, so their earned SP is granted once on first open.
   const init = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "talents:init" } } });
@@ -150,7 +145,7 @@ export async function getPerksView(): Promise<PerksView> {
     await db.gameStat.create({ data: { userId: u, key: "talents:init", best: level, plays: 0 } });
     leveled = true;
   }
-  const skills = await db.skillLevel.findMany();
+  const skills = await db.skillLevel.findMany({ where: { userId: u } });
   return {
     sp,
     owned: learnerPerksFrom(l.perks),
@@ -294,8 +289,8 @@ interface AchCtx {
   flowStreak: number;
 }
 
-async function achCtx(userId?: string): Promise<AchCtx> {
-  const u = await uid(userId);
+async function achCtx(): Promise<AchCtx> {
+  const u = await uid();
   const [reviews, writes, speaks, learner, speedBest, speedCombo, bossWins, bossFlaw, doneToday, rival, chainBest, leagueProm, dungeonBest, dungeonPerfect, duelWins, gauntletBest, flowStreak] = await Promise.all([
     db.reviewLog.count({ where: { userId: u } }),
     db.writingSub.count({ where: { userId: u } }),
@@ -375,10 +370,10 @@ function ctxUnlocks(c: AchCtx): string[] {
 // check and race the createMany. key is @id, so the loser used to throw
 // P2002 and 500 a legit grade route. A unique violation now means "another
 // request already awarded it" - swallowed; any other error still throws.
-export async function evaluateAchievements(userId?: string): Promise<{ key: string; title: string; desc: string; icon: string }[]> {
-  const u = await uid(userId);
-  const ctx = await achCtx(u);
+export async function evaluateAchievements(): Promise<{ key: string; title: string; desc: string; icon: string }[]> {
+  const ctx = await achCtx();
   const should = new Set(ctxUnlocks(ctx));
+  const u = await uid();
   const have = await db.achievement.findMany({ where: { userId: u, key: { in: [...should] } } });
   const haveKeys = new Set(have.map((a) => a.key));
   const fresh = [...should].filter((k) => !haveKeys.has(k));
@@ -450,6 +445,59 @@ export async function awardXp(amount: number, opts?: { chainHit?: boolean; perkX
   };
 }
 
+// ---------- Anti-farming: daily XP caps per game mode ----------
+
+// The audit's polish row: "anti-farming pass". Game modes are replayable by
+// design (a Speed Round is a game), so a determined player could sit on one
+// mode all day minting XP. Reviews and exams stay uncapped - they ARE the
+// learning work; the games are seasoning. Each mode gets a daily BASE-XP
+// budget: full payout until the cap, then 25% (engagement still pays, farming
+// stops paying). Heat/talent/shop multipliers still apply AFTER the cap on
+// the allowed amount, exactly as before. Quest payouts are untouched (they
+// are one-shot rewards, not loops).
+export const GAME_XP_CAPS: Record<string, number> = {
+  speed: 150,
+  duel: 120,
+  dungeon: 160,
+  gauntlet: 120,
+  boss: 120,
+  flow: 100,
+  pairs: 80,
+};
+
+async function addGameXpEarned(mode: string, amount: number): Promise<number> {
+  const u = await uid();
+  const key = `xpdaily:${mode}:${dayIndex()}`;
+  const row = await db.gameStat.upsert({
+    where: { userId_key: { userId: u, key } },
+    create: { userId: u, key, best: amount, plays: 0 },
+    update: { best: { increment: amount } },
+  });
+  return row.best;
+}
+
+export async function gameXpEarnedToday(mode: string): Promise<number> {
+  const u = await uid();
+  const row = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: `xpdaily:${mode}:${dayIndex()}` } } });
+  return row?.best ?? 0;
+}
+
+export interface GameXpResult extends XpResult {
+  paid: number; // base amount actually paid (after the cap, before multipliers)
+  capped: boolean; // true when the daily budget for this mode was already spent
+  cap: number;
+}
+
+export async function awardGameXp(mode: string, base: number, opts?: { chainHit?: boolean }): Promise<GameXpResult> {
+  const cap = GAME_XP_CAPS[mode] ?? 100;
+  const earned = await gameXpEarnedToday(mode);
+  const safeBase = Math.max(0, Math.round(base));
+  const paid = earned >= cap ? Math.round(safeBase * 0.25) : Math.min(safeBase, cap - earned);
+  const res = await awardXp(paid, opts);
+  if (paid > 0) await addGameXpEarned(mode, paid);
+  return { ...res, paid, capped: paid < safeBase, cap };
+}
+
 // ---------- Daily quests ----------
 
 interface QuestTemplate {
@@ -483,9 +531,9 @@ export const QUEST_TEMPLATES: QuestTemplate[] = [
 
 // Seeded pick of 3 quests per day, biased by active mistake families so the
 // day's missions always point at the leaks. Deterministic per day.
-export async function ensureQuests(userId?: string): Promise<void> {
-  const u = await uid(userId);
+export async function ensureQuests(): Promise<void> {
   const day = dayIndex();
+  const u = await uid();
   const existing = await db.quest.count({ where: { userId: u, day } });
   if (existing > 0) return;
   let famTags: string[] = [];
@@ -520,9 +568,9 @@ function seededPick<T>(arr: T[], n: number, seed: number): T[] {
 
 // Progress a quest by key. kind "sum" accumulates, "max" keeps the best.
 // Finishing pays the quest XP through the same awardXp faucet.
-export async function progressQuest(key: string, amount: number, userId?: string): Promise<void> {
-  const u = await uid(userId);
+export async function progressQuest(key: string, amount: number): Promise<void> {
   const day = dayIndex();
+  const u = await uid();
   const q = await db.quest.findUnique({ where: { userId_id: { userId: u, id: `${day}:${key}` } } });
   if (!q || q.done) return;
   const t = QUEST_TEMPLATES.find((x) => x.key === key);
@@ -531,7 +579,7 @@ export async function progressQuest(key: string, amount: number, userId?: string
     await db.quest.update({ where: { userId_id: { userId: u, id: q.id } }, data: { progress: q.target, done: true } });
     await awardXp(q.xp, { perkXp: "quest" });
     await awardGems(GEMS.questDone).catch(() => undefined);
-    await evaluateAchievements(u);
+    await evaluateAchievements();
   } else {
     await db.quest.update({ where: { userId_id: { userId: u, id: q.id } }, data: { progress } });
   }
@@ -573,10 +621,10 @@ function ghostXp(week: number, slot: number, dailyTarget: number, dayOfWeek: num
 }
 
 export async function getLeagueView(): Promise<LeagueView> {
-  const u = await uid();
   const day = dayIndex();
   const wk = weekOf(day);
   const dayOfWeek = day - wk * 7;
+  const u = await contentUserId().catch(() => "me");
   const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: day - 7, lt: day } } });
   const avg = recent.reduce((s, r) => s + r.xp, 0) / 7;
   const dailyTarget = Math.max(70, Math.round(avg * 0.8));
@@ -606,7 +654,7 @@ export async function getLeagueView(): Promise<LeagueView> {
     history.push({ week: settled.weekKey, division: settled.division, place, promoted, demoted });
     if (promoted) {
       const prev = (await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "league:promotions" } } }))?.best ?? 0;
-      await bumpStat("league:promotions", prev + 1, u);
+      await bumpStat("league:promotions", prev + 1);
       await awardXp(150);
     }
     row = await db.league.update({ where: { userId_id: { userId: u, id: "me" } }, data: { weekKey: wk, division, history: JSON.stringify(history.slice(-12)) } });
@@ -640,8 +688,8 @@ export async function getLeagueView(): Promise<LeagueView> {
 
 // ---------- GameStat ----------
 
-export async function bumpStat(key: string, best?: number, userId?: string): Promise<{ best: number; isNew: boolean }> {
-  const u = await uid(userId);
+export async function bumpStat(key: string, best?: number): Promise<{ best: number; isNew: boolean }> {
+  const u = await uid();
   const row = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key } } });
   if (!row) {
     await db.gameStat.create({ data: { userId: u, key, best: best ?? 0, plays: key.includes(":") && !best ? 1 : 0 } });
@@ -701,9 +749,9 @@ export interface RivalView {
 // deterministically day by day from a rubber-banded daily target (80% of the
 // learner's trailing 7-day average, clamped), so the race is tense but fair.
 export async function getRivalView(): Promise<RivalView> {
-  const u = await uid();
   const day = dayIndex();
   const wk = weekOf(day);
+  const u = await uid();
   let rival = await db.rival.findUnique({ where: { userId_id: { userId: u, id: "me" } } });
   if (!rival) {
     const seedName = RIVAL_NAMES[seededUnit(wk) === 0 ? 0 : Math.floor(seededUnit(wk + 7) * RIVAL_NAMES.length)];
@@ -711,8 +759,7 @@ export async function getRivalView(): Promise<RivalView> {
   }
 
   // Trailing 7-day learner XP average (yesterday backwards).
-  const uR = u;
-  const recent = await db.dailyStat.findMany({ where: { userId: uR, day: { gte: day - 7, lt: day } } });
+  const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: day - 7, lt: day } } });
   const weekSum = recent.reduce((s, r) => s + r.xp, 0);
   const avg = weekSum / 7;
   const dailyTarget = Math.max(70, Math.round(avg * 0.8));
@@ -721,12 +768,12 @@ export async function getRivalView(): Promise<RivalView> {
     // Rollover: settle last week's race, then reset.
     const lastWk = weekOf(day - 1);
     const lastWkDays = Array.from({ length: 7 }, (_, i) => lastWk * 7 + i);
-    const youLast = await db.dailyStat.findMany({ where: { userId: uR, day: { in: lastWkDays } } });
+    const youLast = await db.dailyStat.findMany({ where: { userId: u, day: { in: lastWkDays } } });
     const youXp = youLast.reduce((s, r) => s + r.xp, 0);
     const wins = rival.wins + (youXp >= rival.weekXp ? 1 : 0);
     const losses = rival.losses + (youXp < rival.weekXp ? 1 : 0);
     rival = await db.rival.update({
-      where: { userId_id: { userId: uR, id: "me" } },
+      where: { userId_id: { userId: u, id: "me" } },
       data: {
         lastWeekXp: rival.weekXp,
         weekXp: 0,
@@ -747,11 +794,11 @@ export async function getRivalView(): Promise<RivalView> {
     expected += Math.round(dailyTarget * jitter);
   }
   if (rival.weekXp < expected) {
-    rival = await db.rival.update({ where: { userId_id: { userId: uR, id: "me" } }, data: { weekXp: expected } });
+    rival = await db.rival.update({ where: { userId_id: { userId: u, id: "me" } }, data: { weekXp: expected } });
   }
 
   const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
-  const youThis = await db.dailyStat.findMany({ where: { userId: uR, day: { in: thisWkDays } } });
+  const youThis = await db.dailyStat.findMany({ where: { userId: u, day: { in: thisWkDays } } });
   const youWeek = youThis.reduce((s, r) => s + r.xp, 0);
 
   return {
@@ -779,8 +826,8 @@ export interface GameView {
 }
 
 export async function getGameView(): Promise<GameView> {
-  const u = await uid();
   const l = await db.learner.findUnique({ where: { id: "me" } });
+  const u = await uid();
   const xp = l?.xp ?? 0;
   const [ach, stats] = await Promise.all([
     db.achievement.findMany({ where: { userId: u }, orderBy: { at: "desc" } }),

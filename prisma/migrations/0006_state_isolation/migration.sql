@@ -1,20 +1,13 @@
--- Task-72 reconstruction (2026-10-23): this migration was applied to the live
--- DB by a lost workspace wave whose FILES died in a reprovision while the DB
--- survived (the REG-3 data-vs-code drift class). The SQL below reproduces the
--- applied schema exactly - verified column-by-column against the live DB -
--- so fresh databases (battery stack, future rebuilds) converge to the same
--- shape. Rebuilds are row-preserving: legacy rows land under the singleton
--- key 'me', matching every other isolation migration (0003/0004/0005).
+-- Task 67 (audit P0 residual): CardState + arcade meta + measured bands all
+-- become per-user. Every row keeps its data: legacy rows are stamped
+-- userId 'me' (the singleton key used before isolation). Row-preserving
+-- rebuilds only - never a destructive push.
 
--- Per-user scoping: CardState (the FSRS deck queue), Placement, SkillLevel,
--- Achievement, GameStat, Quest, Rival, League, RunState - the last global
--- aggregate keys. No learner prose lives in these tables (names/labels are
--- engine-generated), which is what made the deployment-lock era safe; they
--- are scoped now so the multi-user push has no residual.
-
+-- RedefineTables
 PRAGMA defer_foreign_keys=ON;
 PRAGMA foreign_keys=OFF;
 
+-- FSRS deck queue: (userId, cardId), plus the due-scan index the queue reads.
 CREATE TABLE "new_CardState" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "cardId" TEXT NOT NULL,
@@ -31,40 +24,12 @@ CREATE TABLE "new_CardState" (
 
     PRIMARY KEY ("userId", "cardId")
 );
-INSERT INTO "new_CardState" ("userId", "cardId", "s", "d", "due", "last", "lapses", "reps", "state", "lastivl", "dir", "suspended") SELECT 'me', "cardId", "s", "d", "due", "last", "lapses", "reps", "state", "lastivl", "dir", "suspended" FROM "CardState";
+INSERT INTO "new_CardState" ("cardId", "s", "d", "due", "last", "lapses", "reps", "state", "lastivl", "dir", "suspended") SELECT "cardId", "s", "d", "due", "last", "lapses", "reps", "state", "lastivl", "dir", "suspended" FROM "CardState";
 DROP TABLE "CardState";
 ALTER TABLE "new_CardState" RENAME TO "CardState";
 CREATE INDEX "CardState_userId_due_idx" ON "CardState"("userId", "due");
 
-CREATE TABLE "new_Placement" (
-    "userId" TEXT NOT NULL DEFAULT 'me',
-    "id" TEXT NOT NULL DEFAULT 'main',
-    "answers" TEXT NOT NULL DEFAULT '[]',
-    "phase" TEXT NOT NULL DEFAULT 'quiz',
-    "level" TEXT NOT NULL DEFAULT '?',
-    "writingLevel" TEXT NOT NULL DEFAULT '?',
-    "updatedAt" DATETIME NOT NULL,
-
-    PRIMARY KEY ("userId", "id")
-);
-INSERT INTO "new_Placement" ("userId", "id", "answers", "phase", "level", "writingLevel", "updatedAt") SELECT 'me', "id", "answers", "phase", "level", "writingLevel", "updatedAt" FROM "Placement";
-DROP TABLE "Placement";
-ALTER TABLE "new_Placement" RENAME TO "Placement";
-
-CREATE TABLE "new_SkillLevel" (
-    "userId" TEXT NOT NULL DEFAULT 'me',
-    "skill" TEXT NOT NULL,
-    "level" TEXT NOT NULL DEFAULT '?',
-    "score" REAL NOT NULL DEFAULT 0,
-    "samples" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" DATETIME NOT NULL,
-
-    PRIMARY KEY ("userId", "skill")
-);
-INSERT INTO "new_SkillLevel" ("userId", "skill", "level", "score", "samples", "updatedAt") SELECT 'me', "skill", "level", "score", "samples", "updatedAt" FROM "SkillLevel";
-DROP TABLE "SkillLevel";
-ALTER TABLE "new_SkillLevel" RENAME TO "SkillLevel";
-
+-- Trophies: (userId, key).
 CREATE TABLE "new_Achievement" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "key" TEXT NOT NULL,
@@ -73,10 +38,11 @@ CREATE TABLE "new_Achievement" (
 
     PRIMARY KEY ("userId", "key")
 );
-INSERT INTO "new_Achievement" ("userId", "key", "at", "meta") SELECT 'me', "key", "at", "meta" FROM "Achievement";
+INSERT INTO "new_Achievement" ("key", "at", "meta") SELECT "key", "at", "meta" FROM "Achievement";
 DROP TABLE "Achievement";
 ALTER TABLE "new_Achievement" RENAME TO "Achievement";
 
+-- Per-game records: (userId, key).
 CREATE TABLE "new_GameStat" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "key" TEXT NOT NULL,
@@ -86,10 +52,11 @@ CREATE TABLE "new_GameStat" (
 
     PRIMARY KEY ("userId", "key")
 );
-INSERT INTO "new_GameStat" ("userId", "key", "best", "plays", "updatedAt") SELECT 'me', "key", "best", "plays", "updatedAt" FROM "GameStat";
+INSERT INTO "new_GameStat" ("key", "best", "plays", "updatedAt") SELECT "key", "best", "plays", "updatedAt" FROM "GameStat";
 DROP TABLE "GameStat";
 ALTER TABLE "new_GameStat" RENAME TO "GameStat";
 
+-- Daily quests: (userId, id) where id is "<day>:<key>".
 CREATE TABLE "new_Quest" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "id" TEXT NOT NULL,
@@ -104,10 +71,11 @@ CREATE TABLE "new_Quest" (
 
     PRIMARY KEY ("userId", "id")
 );
-INSERT INTO "new_Quest" ("userId", "id", "day", "key", "title", "fa", "target", "progress", "done", "xp") SELECT 'me', "id", "day", "key", "title", "fa", "target", "progress", "done", "xp" FROM "Quest";
+INSERT INTO "new_Quest" ("id", "day", "key", "title", "fa", "target", "progress", "done", "xp") SELECT "id", "day", "key", "title", "fa", "target", "progress", "done", "xp" FROM "Quest";
 DROP TABLE "Quest";
 ALTER TABLE "new_Quest" RENAME TO "Quest";
 
+-- Rubber-band rival: (userId, id), id stays 'me' for legacy rows.
 CREATE TABLE "new_Rival" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "id" TEXT NOT NULL,
@@ -121,10 +89,11 @@ CREATE TABLE "new_Rival" (
 
     PRIMARY KEY ("userId", "id")
 );
-INSERT INTO "new_Rival" ("userId", "id", "name", "weekXp", "lastWeekXp", "weekKey", "wins", "losses", "taunt") SELECT 'me', "id", "name", "weekXp", "lastWeekXp", "weekKey", "wins", "losses", "taunt" FROM "Rival";
+INSERT INTO "new_Rival" ("id", "name", "weekXp", "lastWeekXp", "weekKey", "wins", "losses", "taunt") SELECT "id", "name", "weekXp", "lastWeekXp", "weekKey", "wins", "losses", "taunt" FROM "Rival";
 DROP TABLE "Rival";
 ALTER TABLE "new_Rival" RENAME TO "Rival";
 
+-- Weekly league: (userId, id).
 CREATE TABLE "new_League" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "id" TEXT NOT NULL,
@@ -134,10 +103,11 @@ CREATE TABLE "new_League" (
 
     PRIMARY KEY ("userId", "id")
 );
-INSERT INTO "new_League" ("userId", "id", "weekKey", "division", "history") SELECT 'me', "id", "weekKey", "division", "history" FROM "League";
+INSERT INTO "new_League" ("id", "weekKey", "division", "history") SELECT "id", "weekKey", "division", "history" FROM "League";
 DROP TABLE "League";
 ALTER TABLE "new_League" RENAME TO "League";
 
+-- Server-graded game runs (Dungeon/Gauntlet): (userId, id).
 CREATE TABLE "new_RunState" (
     "userId" TEXT NOT NULL DEFAULT 'me',
     "id" TEXT NOT NULL,
@@ -147,23 +117,46 @@ CREATE TABLE "new_RunState" (
 
     PRIMARY KEY ("userId", "id")
 );
-INSERT INTO "new_RunState" ("userId", "id", "day", "state", "updatedAt") SELECT 'me', "id", "day", "state", "updatedAt" FROM "RunState";
+INSERT INTO "new_RunState" ("id", "day", "state", "updatedAt") SELECT "id", "day", "state", "updatedAt" FROM "RunState";
 DROP TABLE "RunState";
 ALTER TABLE "new_RunState" RENAME TO "RunState";
 
-CREATE TABLE "new_Material" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+-- Measured CEFR band per skill: (userId, skill). Found still-global during the
+-- Task-67 sweep - a measured band is learner data.
+CREATE TABLE "new_SkillLevel" (
     "userId" TEXT NOT NULL DEFAULT 'me',
-    "title" TEXT NOT NULL,
-    "source" TEXT NOT NULL DEFAULT '',
-    "text" TEXT NOT NULL DEFAULT '',
-    "words" INTEGER NOT NULL DEFAULT 0,
-    "degraded" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "skill" TEXT NOT NULL,
+    "level" TEXT NOT NULL DEFAULT '?',
+    "score" REAL NOT NULL DEFAULT 0,
+    "samples" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" DATETIME NOT NULL,
+
+    PRIMARY KEY ("userId", "skill")
 );
-INSERT INTO "new_Material" ("id", "userId", "title", "source", "text", "words", "degraded", "createdAt") SELECT "id", 'me', "title", "source", "text", "words", "degraded", "createdAt" FROM "Material";
-DROP TABLE "Material";
-ALTER TABLE "new_Material" RENAME TO "Material";
-CREATE INDEX "Material_userId_idx" ON "Material"("userId");
+INSERT INTO "new_SkillLevel" ("skill", "level", "score", "samples", "updatedAt") SELECT "skill", "level", "score", "samples", "updatedAt" FROM "SkillLevel";
+DROP TABLE "SkillLevel";
+ALTER TABLE "new_SkillLevel" RENAME TO "SkillLevel";
+
+-- Placement state: (userId, id), id stays 'main' for legacy rows.
+CREATE TABLE "new_Placement" (
+    "userId" TEXT NOT NULL DEFAULT 'me',
+    "id" TEXT NOT NULL DEFAULT 'main',
+    "answers" TEXT NOT NULL DEFAULT '[]',
+    "phase" TEXT NOT NULL DEFAULT 'quiz',
+    "level" TEXT NOT NULL DEFAULT '?',
+    "writingLevel" TEXT NOT NULL DEFAULT '?',
+    "updatedAt" DATETIME NOT NULL,
+
+    PRIMARY KEY ("userId", "id")
+);
+INSERT INTO "new_Placement" ("id", "answers", "phase", "level", "writingLevel", "updatedAt") SELECT "id", "answers", "phase", "level", "writingLevel", "updatedAt" FROM "Placement";
+DROP TABLE "Placement";
+ALTER TABLE "new_Placement" RENAME TO "Placement";
 
 PRAGMA foreign_keys=ON;
+PRAGMA defer_foreign_keys=OFF;
+
+-- Materials are the learner's own imported texts (pasted content): stamp the
+-- owner. Simple ADD COLUMN - every legacy row belongs to the singleton 'me'.
+ALTER TABLE "Material" ADD COLUMN "userId" TEXT NOT NULL DEFAULT 'me';
+CREATE INDEX "Material_userId_idx" ON "Material"("userId");

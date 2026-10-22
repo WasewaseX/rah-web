@@ -18,18 +18,21 @@ import Talents from "./games/Talents";
 import Flow from "./games/Flow";
 import BattleCardButton from "./BattleCardButton";
 import type { AppState } from "./App";
+import { NAMING } from "@/lib/naming";
 
+// Task 82 (naming audit): every tab carries its plain-language gloss from the
+// canonical registry - a coined name never ships unexplained.
 const TABS = [
-  { id: "speed", label: "Speed", icon: Zap },
-  { id: "boss", label: "Boss", icon: Swords },
-  { id: "voice", label: "Voice", icon: Mic },
-  { id: "dungeon", label: "Dungeon", icon: Castle },
-  { id: "duel", label: "Duel", icon: Swords },
-  { id: "gauntlet", label: "Gauntlet", icon: Skull },
-  { id: "league", label: "League", icon: Medal },
-  { id: "flow", label: "Flow", icon: Timer },
-  { id: "talents", label: "Talents", icon: Sparkles },
-  { id: "trophies", label: "Trophies", icon: Trophy },
+  { id: "speed", label: "Speed", gloss: NAMING.speed.gloss, icon: Zap },
+  { id: "boss", label: "Boss", gloss: NAMING.boss.gloss, icon: Swords },
+  { id: "voice", label: "Voice", gloss: NAMING.voice.gloss, icon: Mic },
+  { id: "dungeon", label: "Dungeon", gloss: NAMING.dungeon.gloss, icon: Castle },
+  { id: "duel", label: "Duel", gloss: NAMING.duel.gloss, icon: Swords },
+  { id: "gauntlet", label: "Gauntlet", gloss: NAMING.gauntlet.gloss, icon: Skull },
+  { id: "league", label: "League", gloss: NAMING.league.gloss, icon: Medal },
+  { id: "flow", label: "Flow", gloss: NAMING.flow.gloss, icon: Timer },
+  { id: "talents", label: "Talents", gloss: NAMING.talents.gloss, icon: Sparkles },
+  { id: "trophies", label: "Trophies", gloss: NAMING.trophies.gloss, icon: Trophy },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -54,9 +57,18 @@ export default function ArcadeView({ state, onChange }: { state: AppState; onCha
             >
               <Icon className="h-4 w-4" />
               {t.label}
+              <span className="sr-only"> - {t.gloss}</span>
             </button>
           );
         })}
+        {(() => {
+          const active = TABS.find((t) => t.id === tab);
+          return active ? (
+            <div className="w-full pb-1 text-[11px] text-[#7d889c]">
+              <span className="font-bold">{NAMING[active.id].name}</span> — {active.gloss}
+            </div>
+          ) : null;
+        })()}
         {state.game && (
           <div className="ml-auto hidden items-center gap-2 sm:flex">
             <Chip tone="violet">Lv {state.game.level.level} · {state.game.level.name}</Chip>

@@ -1,0 +1,448 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../prisma/pg-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PG_DATABASE_URL")
+}
+
+// Single-learner app state. Rah serves one learner per deployment.
+model Learner {
+  id             String  @id @default("me")
+  name           String  @default("Learner")
+  dailyGoal      Int     @default(20)
+  retention      Float   @default(0.9)
+  newPerDay      Int     @default(10)
+  streak         Int     @default(0)
+  lastActiveDay  Int     @default(-1)
+  level          String  @default("?")
+  placementPhase String  @default("none") // none | quiz | writing | done
+  focusSkill     String  @default("vocabulary")
+  theme          String  @default("") // JSON theme tokens set by the theme plugin
+  mode           String  @default("coach") // coach | roleplay | debate | socratic | daily
+  modeData       String  @default("") // JSON state for the active conversation mode
+  xp             Int     @default(0) // lifetime XP; levels are derived from it in arcade.ts
+  freezes        Int     @default(0) // streak freezes: auto-consumed when one missed day would break a chain (cap 2)
+  chain          Int     @default(0) // momentum chain: consecutive correct answers across ALL surfaces today
+  chainDay       Int     @default(-1) // the day the chain belongs to; a new day resets it
+  sp             Int     @default(0) // talent points banked (1 per level-up, catch-up granted on first tree open)
+  perks          String  @default("") // JSON array of unlocked perk keys (talent tree)
+  persona        String  @default("mentor") // mentor | drill | zen - flavors the AI director and the coach
+  gems           Int     @default(0) // soft currency (Duolingo RE): earned from levels, quests, leagues; spent in the Shop
+  boostUntil     Int     @default(-1) // day index until which all XP payouts are doubled (Shop item, Duolingo XP boost RE)
+  createdAt      DateTime @default(now())
+}
+
+// Accounts. The learner data stays the singleton above; users gate access to it.
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String   @default("Learner")
+  provider  String   @default("email") // email | google
+  createdAt DateTime @default(now())
+  sessions  Session[]
+}
+
+// One-time login codes emailed to the user (10-minute TTL, single use).
+model LoginCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String // sha256 hash of the 6-digit code - plaintext NEVER touches the DB
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int      @default(0) // failed verify guesses against this code; 5 => invalidated
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Server sessions. The token lives in an httpOnly cookie; nothing client-side reads it.
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// FSRS-5 memory state per card. Keys mirror the verified Rust core.
+// Per-user isolation (Task 67, the recorded residual): the FSRS deck queue is
+// learner state, so it carries the (userId, cardId) composite key like every
+// other learning table. Legacy rows keep userId "me".
+model CardState {
+  userId    String  @default("me") // per-user isolation (audit P0)
+  cardId    String
+  s         Float   @default(0)
+  d         Float   @default(0)
+  due       Int     @default(0)
+  last      Int     @default(-1)
+  lapses    Int     @default(0)
+  reps      Int     @default(0)
+  state     String  @default("new")
+  lastivl   Int     @default(0)
+  dir       String  @default("") // last retrieval direction used
+  suspended Boolean @default(false)
+
+  @@id([userId, cardId])
+  @@index([userId, due])
+}
+
+model ReviewLog {
+  id     Int      @id @default(autoincrement())
+  userId String   @default("me") // per-user isolation (audit P0): learning history
+  cardId String
+  grade  Int
+  ivl    Int
+  day    Int
+  at     DateTime @default(now())
+  source String   @default("review") // review | exam | dictation | shadow: where the outcome was earned
+
+  @@index([userId])
+}
+
+// Offline-sync receipt (Task 68, audit P1): the client grades reviews offline
+// and replays them on reconnect. gid is the CLIENT-generated idempotency key
+// (uuid per grade attempt) - the stored response lets a replay return the
+// ORIGINAL result, so a double flush can never double-count XP, streaks or
+// quest progress. Receipts expire (7-day purge on write).
+model GradeAck {
+  gid      String   @id
+  userId   String
+  response String // the exact JSON the first attempt returned
+  at       DateTime @default(now())
+}
+
+// Transactional email ledger (audit P2): every send attempt is recorded with
+// its SMTP result so "did the email go out?" is answerable from the DB, and
+// the unique idemKey makes double-clicks / request retries idempotent - the
+// same key never sends twice.
+model MailLog {
+  id        Int      @id @default(autoincrement())
+  to        String
+  kind      String   @default("login_code")
+  status    String // sent | failed | dev
+  messageId String   @default("") // SMTP provider message id when available
+  error     String   @default("") // delivery failure reason, if any
+  idemKey   String   @unique // sha256(kind|to) - one ledger row per recipient+kind, refreshed per send
+  at        DateTime @default(now())
+}
+
+model Placement {
+  userId       String   @default("me") // per-user isolation (audit P0)
+  id           String   @default("main")
+  answers      String   @default("[]")
+  phase        String   @default("quiz")
+  level        String   @default("?")
+  writingLevel String   @default("?")
+  updatedAt    DateTime @updatedAt
+
+  @@id([userId, id])
+}
+
+model ChatMsg {
+  id      Int      @id @default(autoincrement())
+  userId  String   @default("me") // per-user isolation (audit P0): stamped from the session
+  role    String
+  content String
+  at      DateTime @default(now())
+
+  @@index([userId])
+}
+
+model WritingSub {
+  id       Int      @id @default(autoincrement())
+  userId   String   @default("me") // per-user isolation (audit P0)
+  prompt   String
+  text     String
+  result   String
+  parentId Int? // revision chain: the graded submission this one revises
+  revision Int      @default(1) // 1 = original, n = nth revision of the chain
+  at       DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SpeakSession {
+  id         Int      @id @default(autoincrement())
+  userId     String   @default("me") // per-user isolation (audit P0)
+  prompt     String
+  transcript String
+  round      Int      @default(1)
+  result     String
+  at         DateTime @default(now())
+
+  @@index([userId])
+}
+
+model DailyStat {
+  userId  String @default("me")
+  day     Int
+  reviews Int @default(0)
+  correct Int @default(0)
+  xp      Int @default(0)
+  spoken  Int @default(0)
+  written Int @default(0)
+  listened Int @default(0)
+
+  @@id([userId, day])
+}
+
+model QuizItem {
+  id   Int      @id @default(autoincrement())
+  src  String // text | reading:rd1 | chat
+  quiz String // full JSON
+  at   DateTime @default(now())
+}
+
+// Coach-built exam. Answers live server side; the client only sees items
+// without keys until the grade route scores a submission.
+model Exam {
+  id        String   @id
+  title     String
+  spec      String // JSON: level, targetSkills, plannedCount, minutes
+  items     String // JSON: full items WITH answers/accept/mustInclude
+  status    String   @default("pending") // pending | graded
+  result    String? // JSON: per-item verdicts + per-skill totals
+  createdAt DateTime @default(now())
+}
+
+// Measured CEFR band per skill, separate from the overall placement level.
+// Found still-global during the Task-67 sweep and scoped with the rest: a
+// measured band is learner data (audit P0).
+model SkillLevel {
+  userId    String   @default("me") // per-user isolation (audit P0)
+  skill     String // grammar | vocabulary | writing | speaking | reading | listening
+  level     String   @default("?")
+  score     Float    @default(0) // 0..1 rolling mastery
+  samples   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, skill])
+}
+
+// Unlocked trophies. Keyed by stable achievement key from arcade.ts.
+model Achievement {
+  userId String   @default("me") // per-user isolation (audit P0)
+  key    String
+  at     DateTime @default(now())
+  meta   String   @default("")
+
+  @@id([userId, key])
+}
+
+// Per-game records: speed best score / best combo, boss wins, flawless runs.
+model GameStat {
+  userId    String   @default("me") // per-user isolation (audit P0)
+  key       String // "speed:best", "speed:combo", "boss:wins", ...
+  best      Int      @default(0)
+  plays     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
+}
+
+// Three daily quests, regenerated deterministically from the learner's weak
+// spots. Progress is bumped from the same hooks that award XP; finishing a
+// quest pays its XP automatically.
+model Quest {
+  userId   String  @default("me") // per-user isolation (audit P0)
+  id       String // "<day>:<key>"
+  day      Int
+  key      String  // template key: reviews_20, speed_play, boss_win, ...
+  title    String
+  fa       String  @default("")
+  target   Int
+  progress Int     @default(0)
+  done     Boolean @default(false)
+  xp       Int     @default(0)
+
+  @@id([userId, id])
+}
+
+// The rubber-band rival. Its weekly XP is derived deterministically from the
+// learner's own 7-day average plus a seeded per-day jitter, so the race always
+// feels alive and winnable without any background jobs.
+model Rival {
+  userId      String @default("me") // per-user isolation (audit P0)
+  id          String // "me" (legacy singleton key)
+  name        String
+  weekXp      Int    @default(0)
+  lastWeekXp  Int    @default(0)
+  weekKey     Int    @default(-1)
+  wins        Int    @default(0) // weeks the learner out-gained the rival
+  losses      Int    @default(0)
+  taunt       String @default("")
+
+  @@id([userId, id])
+}
+
+// Weekly league: one row, lazily rolled over. Division index into the
+// DIVISIONS ladder; history keeps every settled week (place, promoted...).
+model League {
+  userId   String @default("me") // per-user isolation (audit P0)
+  id       String // "me" (legacy singleton key)
+  weekKey  Int    @default(-1)
+  division Int    @default(0) // 0=Wood .. 5=Rahiator
+  history  String @default("[]") // JSON: [{ week, division, place, promoted, demoted }]
+
+  @@id([userId, id])
+}
+
+// Generic run state for server-graded games: the Daily Dungeon keeps one row
+// per day (id "day:<n>"), the Gauntlet keeps a single live row (id
+// "gauntlet"). All gameplay lives in the JSON blob.
+model RunState {
+  userId String @default("me") // per-user isolation (audit P0)
+  id    String
+  day   Int    @default(0)
+  state String @default("{}") // JSON: { floors, hearts, shieldUsed, streak, seed, done, cleared }
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, id])
+}
+
+// The AI Director's daily briefing, cached per day so it never re-bills.
+model Briefing {
+  day  Int      @id
+  text String   @default("")
+  at   DateTime @default(now())
+}
+
+// Recurring production-mistake families, mined from corrections across chat,
+// essays, speaking, graded exams and placement misses. Keyed by kind:tag where tag is the Farsi-interference
+// trap taxonomy the tutor already emits, so the same weakness aggregates over
+// time instead of fragmenting per sentence. Count separates a one-off slip
+// from a persistent leak; exams, drills and the tutor prompt prioritize these.
+model MistakeFamily {
+  id        String   @id // "me:chat:statives" - userId-prefixed since Task 65
+  userId    String   @default("me") // isolation completion: the memory is learner content (evidence quotes their sentences)
+  kind      String   // chat | writing | speak | exam | placement
+  tag       String   // normalized trap tag: statives, articles, prepositions, ...
+  label     String   // human-readable family name
+  count     Int      @default(1)
+  evidence  String   // latest wrong -> right example
+  lastSeen  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Provenance: when the learner edits the evidence/label (Mind Reader
+  // corrections), editedAt is set - the UI shows "corrected by you" instead
+  // of presenting learner-edited text as AI-mined.
+  editedAt  DateTime?
+  // Healing loop: exam items tagged with this family report back. Two clean
+  // hits retire the family (resolvedAt set, prompt steering stops); any new
+  // production mistake or exam miss reopens it and resets the streak.
+  streakClean Int     @default(0)
+  resolvedAt  DateTime?
+
+  @@index([userId, resolvedAt])
+  @@index([userId, lastSeen])
+}
+
+// Learner-memory corrections (audit P2, Task 65): when the learner FORGETS a
+// family, the tombstone records which exact evidence pair was rejected. The
+// same wrong->right pair will not re-aggregate (false-positive mining must
+// not resurrect itself every session); genuinely NEW evidence under the same
+// tag reopens the family - forgetting one example is not blinding the coach
+// to future ones.
+
+// The fine-grained half of the learner model. MistakeFamily tracks failures;
+// TagMastery tracks BOTH outcomes per trap tag, so the app can finally say
+// "articles: 45%, falling" instead of only "you got articles wrong twice".
+// ewma is a recency-weighted outcome estimate (0..1, alpha 0.35) that answers
+// "how are they doing lately"; wilson (computed, not stored) answers "how
+// sure are we" - a tag with 2/2 correct stays unproven instead of 100%.
+model TagMastery {
+  userId    String    @default("me")
+  tag       String
+  ok        Int       @default(0)
+  no        Int       @default(0)
+  ewma      Float     @default(0.5)
+  lastOk    DateTime?
+  lastNo    DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@id([userId, tag])
+}
+
+// Tombstones for forgiven mistake families (see MistakeFamily comment).
+model MistakeForgiven {
+  id           String   @id // "me:chat:statives"
+  userId       String   @default("me")
+  kind         String
+  tag          String
+  evidenceHash String   // sha1 of the normalized wrong->right pair that was rejected
+  at           DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Goal planner (audit P2, Task 65). The learner states the goal; Rah turns it
+// into a weekly plan from REAL, measured data - the FSRS due-load forecast
+// (how many reviews the deck will demand), the 14-day activity average
+// (whether the plan fits the learner's actual capacity), and the mastery
+// ledger's danger tags (what to prioritize). No AI writes the plan; the
+// numbers come straight from the tables. Archived, never deleted, so the
+// record of what was planned survives what actually happened.
+model Goal {
+  id             String    @id @default(cuid())
+  userId         String    @default("me")
+  title          String
+  kind           String    @default("habit") // exam | level | habit
+  target         String    @default("")
+  dueDay         Int?      // dayIndex when the goal should be met (nullable = open-ended)
+  weeklySessions Int       @default(4) // planned practice days per week
+  createdAt      DateTime  @default(now())
+  archivedAt     DateTime?
+
+  @@index([userId, archivedAt])
+}
+
+// Review feature #17 (the 7.4/10 wave): the learner can flag content they
+// believe is wrong - a question, an explanation, a Farsi note. Flags are a
+// queue the coach can see (read_state) and the learner can trust: a flagged
+// item is never silently ignored. kind is one of wrong_answer,
+// bad_explanation, bad_farsi, typo, other (clamped server-side).
+model ContentFlag {
+  id     Int      @id @default(autoincrement())
+  cardId String   @default("")
+  kind   String   @default("other")
+  note   String   @default("")
+  status String   @default("open") // open | fixed | wontfix
+  at     DateTime @default(now())
+}
+
+// Stage 03 feature #1 (the audit's top pick): bring-your-own-materials
+// learning. The learner pastes (or imports) real text they actually need to
+// read; Rah extracts vocabulary + collocations WITH their source sentence as
+// context, creates review cards that flow through the SAME FSRS queue, and
+// every card carries its source sentence so nothing is context-free.
+model Material {
+  id        String   @id @default(cuid())
+  userId    String   @default("me") // per-user isolation (audit P0, found in the Task-67 sweep: pasted texts are learner content)
+  title     String
+  source    String   @default("") // provenance: URL, book, "lecture notes"...
+  text      String   @default("") // the full pasted text (capped server-side)
+  words     Int      @default(0)
+  degraded  Boolean  @default(false) // extraction fell back (audit P1-7 honesty)
+  createdAt DateTime @default(now())
+  cards     MaterialCard[]
+
+  @@index([userId])
+}
+
+model MaterialCard {
+  id         String   @id // "mat:<cuid>" - the CardState key
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  front      String   // cloze sentence with ___
+  answer     String   // the blanked phrase
+  context    String   // the exact source sentence
+  note       String   @default("") // short definition / hint
+  createdAt  DateTime @default(now())
+
+  @@index([materialId])
+}

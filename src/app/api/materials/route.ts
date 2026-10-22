@@ -12,14 +12,17 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { importMaterial } from "@/lib/materials";
 import { aiRateLimit } from "@/lib/rate-limit";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
+  const u = await contentUserId(req).catch(() => "me");
   if (id) {
-    const m = await db.material.findUnique({ where: { id }, include: { cards: true } });
+    // Owner-scoped: another account's material reads as 404, never as content.
+    const m = await db.material.findFirst({ where: { id, userId: u }, include: { cards: true } });
     if (!m) return NextResponse.json({ error: "Material not found." }, { status: 404 });
     return NextResponse.json({
       id: m.id,
@@ -33,6 +36,7 @@ export async function GET(req: Request) {
     });
   }
   const mats = await db.material.findMany({
+    where: { userId: u },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { cards: true } } },
   });
@@ -109,10 +113,11 @@ export async function DELETE(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const m = await db.material.findUnique({ where: { id }, include: { cards: true } });
+  const u = await contentUserId(req).catch(() => "me");
+  const m = await db.material.findFirst({ where: { id, userId: u }, include: { cards: true } });
   if (!m) return NextResponse.json({ error: "Material not found." }, { status: 404 });
   // The schedule state of every card dies with the material - no orphans.
-  await db.cardState.deleteMany({ where: { cardId: { in: m.cards.map((c) => c.id) } } });
+  await db.cardState.deleteMany({ where: { userId: u, cardId: { in: m.cards.map((c) => c.id) } } });
   await db.material.delete({ where: { id } });
   return NextResponse.json({ ok: true, removed: m.cards.length });
 }

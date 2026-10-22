@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
-import { awardXp, bumpStat, progressQuest, registerHit, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerHit, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
 import { buildGauntletItem, normalizeAnswer } from "@/lib/arcade-items";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ interface GauntletState {
 }
 
 async function loadRun(): Promise<{ id: string; state: GauntletState }> {
-  const u = await contentUserId().catch(() => SINGLE_USER_ID);
+  const u = await contentUserId().catch(() => "me");
   const row = await db.runState.findUnique({ where: { userId_id: { userId: u, id: "gauntlet" } } });
   if (row) {
     try {
@@ -29,10 +29,10 @@ async function loadRun(): Promise<{ id: string; state: GauntletState }> {
 }
 
 async function resetRun(): Promise<{ id: string; state: GauntletState }> {
-  const u = await contentUserId().catch(() => SINGLE_USER_ID);
   const seed = Math.floor(Date.now() / 1000) % 2_000_000_000;
   const item = await buildGauntletItem(0, seed);
   const state: GauntletState = { seed, streak: 0, shieldUsed: false, done: false, item };
+  const u = await contentUserId().catch(() => "me");
   await db.runState.upsert({ where: { userId_id: { userId: u, id: "gauntlet" } }, create: { userId: u, id: "gauntlet", state: JSON.stringify(state) }, update: { state: JSON.stringify(state) } });
   return { id: "gauntlet", state };
 }
@@ -52,7 +52,7 @@ export async function GET() {
   if (state.done) {
     ({ state } = await resetRun());
   }
-  const best = (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "gauntlet:best" } } }))?.best ?? 0;
+  const best = (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "gauntlet:best" } } }))?.best ?? 0;
   return NextResponse.json({
     ...publicItem(state),
     streak: state.streak,
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     state.streak += 1;
     await registerHit();
     state.item = await buildGauntletItem(state.streak, state.seed);
-    await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => SINGLE_USER_ID), id } }, data: { state: JSON.stringify(state) } });
+    await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => "me"), id } }, data: { state: JSON.stringify(state) } });
     return NextResponse.json({ correct: true, streak: state.streak, next: publicItem(state) });
   }
   // A miss ends the run - unless the Chain Shield talent still has its
@@ -82,18 +82,18 @@ export async function POST(req: Request) {
     state.shieldUsed = true;
     state.streak += 1;
     state.item = await buildGauntletItem(state.streak, state.seed);
-    await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => SINGLE_USER_ID), id } }, data: { state: JSON.stringify(state) } });
+    await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => "me"), id } }, data: { state: JSON.stringify(state) } });
     return NextResponse.json({ correct: false, saved: true, streak: state.streak, next: publicItem(state) });
   }
   state.done = true;
-  await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => SINGLE_USER_ID), id } }, data: { state: JSON.stringify(state) } });
+  await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => "me"), id } }, data: { state: JSON.stringify(state) } });
   const streak = state.streak;
   const gain = streak * 8;
   await bumpStat("gauntlet:best", streak);
   await bumpStat("gauntlet:runs");
   await progressQuest("gauntlet_10", streak);
   let xpResult;
-  if (gain > 0) xpResult = await awardXp(gain, { chainHit: false });
+  if (gain > 0) xpResult = await awardGameXp("gauntlet", gain, { chainHit: false });
   await registerMiss();
-  return NextResponse.json({ correct: false, saved: false, streak, xpGain: gain, totalXp: xpResult?.total, unlocked: xpResult?.unlocked ?? [] });
+  return NextResponse.json({ correct: false, saved: false, streak, xpGain: xpResult?.paid ?? 0, capped: xpResult?.capped ?? false, totalXp: xpResult?.total, unlocked: xpResult?.unlocked ?? [] });
 }

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { DECK, cardById } from "@/lib/content";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
 import type { ProfileJson } from "@/lib/ai";
 
 export async function getLearner() {
@@ -68,10 +68,8 @@ export interface QueueCounts {
 export async function queueCounts(): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
-  // Per-user isolation (Task 72): counts are the CALLER's queue, never the
-  // whole table (the singleton default keeps the legacy flows intact).
-  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
-  const all = await db.cardState.findMany({ where: { userId } });
+  const u = await contentUserId().catch(() => "me");
+  const all = await db.cardState.findMany({ where: { userId: u } });
   // BYO-material cards (cardId "mat:<id>") share the SAME queue, budget and
   // badge truth as deck cards - the Task-44 lesson: one source of truth.
   const deckStates = all.filter((s) => !s.cardId.startsWith("mat:"));
@@ -105,12 +103,13 @@ export async function dueCount(): Promise<number> {
 // Live learner profile handed to every AI job.
 export async function buildProfile(): Promise<ProfileJson> {
   const l = await getLearner();
+  const u = await contentUserId().catch(() => "me");
   const today = dayIndex();
   const due = await dueCount();
 
   // Recent trap tags from the last graded lapses drive AI focus.
   const recent = await db.reviewLog.findMany({
-    where: { grade: 1 },
+    where: { userId: u, grade: 1 },
     orderBy: { id: "desc" },
     take: 12,
   });
@@ -121,7 +120,7 @@ export async function buildProfile(): Promise<ProfileJson> {
   }
 
   // Weakest skills by lapse ratio over cards with reps.
-  const states = await db.cardState.findMany({ where: { reps: { gt: 3 } } });
+  const states = await db.cardState.findMany({ where: { userId: u, reps: { gt: 3 } } });
   const agg: Record<string, { ok: number; lapse: number }> = {};
   for (const st of states) {
     const c = cardById(st.cardId);
@@ -171,7 +170,8 @@ export async function buildProfile(): Promise<ProfileJson> {
 // signal and name the fix, the way a human coach would.
 export async function diagnose() {
   const today = dayIndex();
-  const states = await db.cardState.findMany();
+  const u = await contentUserId().catch(() => "me");
+  const states = await db.cardState.findMany({ where: { userId: u } });
   const bySkill: Record<string, { due: number; lapses: number; reps: number; young: number }> = {};
   for (const st of states) {
     const c = cardById(st.cardId);

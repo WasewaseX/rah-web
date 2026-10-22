@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart, Play, Skull, Swords } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "../ui";
+import { submitGameResult } from "@/lib/offline";
 
 interface Item {
   id: string;
@@ -32,6 +33,7 @@ interface Result {
   xpGain: number;
   leveledUp: boolean;
   level: number;
+  queued?: boolean; // offline: the aggregate is queued to sync (Task 78)
 }
 
 function normalize(s: string): string {
@@ -59,18 +61,20 @@ export default function BossBattle({ onChange }: { onChange: () => void }) {
       if (settled.current) return;
       settled.current = true;
       setPhase(won ? "won" : "lost");
-      try {
-        const r = await fetch("/api/arcade/boss", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ won, phaseReached, heartsLeft, correct: t.correct, total: t.total }),
-        });
-        const j = await r.json();
-        setResult({ xpGain: j.xpGain, leveledUp: j.leveledUp, level: j.level });
-        onChange();
-      } catch {
-        setResult({ xpGain: won ? 180 : 30, leveledUp: false, level: 0 });
+      const res = await submitGameResult("/api/arcade/boss", {
+        won,
+        phaseReached,
+        heartsLeft,
+        correct: t.correct,
+        total: t.total,
+      });
+      if (res.online) {
+        const j = res.data as { xpGain?: number; leveledUp?: boolean; level?: number };
+        setResult({ xpGain: j.xpGain ?? 0, leveledUp: j.leveledUp ?? false, level: j.level ?? 0 });
+      } else {
+        setResult({ xpGain: 0, leveledUp: false, level: 0, queued: true });
       }
+      onChange();
     },
     [onChange],
   );
@@ -181,6 +185,7 @@ export default function BossBattle({ onChange }: { onChange: () => void }) {
           <Chip tone="emerald">{tally.correct} hits landed</Chip>
           <Chip tone="rose">{hearts} heart{hearts === 1 ? "" : "s"} left</Chip>
           <Chip tone="cyan">+{result?.xpGain ?? 0} XP</Chip>
+          {result?.queued && <span className="text-[11px] text-amber-300">Offline - the battle is queued to sync</span>}
           {result?.leveledUp && <Chip tone="violet">LEVEL UP · Lv {result.level}</Chip>}
         </div>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">

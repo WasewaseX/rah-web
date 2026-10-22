@@ -94,8 +94,10 @@ data/coach-workspace/
 # isolated-battery stack (Task 52) + isolation battery dist (Task 63)
 .next-battery/
 .next-isolation/
+.next-mobile/
 db/battery-isolated.db*
 db/battery-isolation.db*
+db/battery-mobile.db*
 
 # deploy-pipeline artifacts - never commit or package these (Task 60)
 db/admin-token
@@ -112,3 +114,12 @@ upload/rah-backups/
 
 # private-vault sync working clone (Task 62)
 db/vault-work/
+
+# Task 67 hygiene: test-artifact outputs (synthetic TTS/ASR clips, CI JSON dumps) stay local
+scripts/out/
+
+# Task 74: generated PG client (sandbox-only; the app client stays sqlite)
+prisma/pg-client/
+
+# Task 76: pilot series derives from learner data - local only, regenerable
+db/pilot/

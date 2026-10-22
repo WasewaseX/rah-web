@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Flame, Play, Timer, Zap } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "../ui";
+import { submitGameResult } from "@/lib/offline";
 
 interface Item {
   id: string;
@@ -27,6 +28,7 @@ interface Result {
   bestCombo: number;
   leveledUp: boolean;
   level: number;
+  queued?: boolean; // offline: the aggregate is queued to sync (Task 78)
 }
 
 const ROUND_MS = 60_000;
@@ -66,20 +68,16 @@ export default function SpeedRound({ onChange }: { onChange: () => void }) {
       stopTimer();
       setFinalTally(final);
       setPhase("done");
-      try {
-        const r = await fetch("/api/arcade/speed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...final, ms: ROUND_MS }),
-        });
-        const j = await r.json();
-        setResult(j);
+      const res = await submitGameResult("/api/arcade/speed", { ...final, ms: ROUND_MS });
+      if (res.online) {
+        const j = res.data as { best?: number; bestCombo?: number };
+        setResult(res.data as unknown as Result);
         setBest(j.best ?? 0);
         setBestCombo(j.bestCombo ?? 0);
-        onChange();
-      } catch {
-        setResult({ xpGain: 0, best: final.score, isNewBest: false, bestCombo: final.maxCombo, leveledUp: false, level: 0 });
+      } else {
+        setResult({ xpGain: 0, best: final.score, isNewBest: false, bestCombo: final.maxCombo, leveledUp: false, level: 0, queued: true });
       }
+      onChange();
     },
     [onChange],
   );
@@ -188,6 +186,7 @@ export default function SpeedRound({ onChange }: { onChange: () => void }) {
           <Chip tone="emerald">{s.correct} correct</Chip>
           <Chip tone={s.maxCombo >= 8 ? "amber" : "slate"}>max combo {s.maxCombo}x</Chip>
           <Chip tone="cyan">+{result?.xpGain ?? 0} XP</Chip>
+          {result?.queued && <span className="text-[11px] text-amber-300">Offline - the run is queued to sync</span>}
           {result?.leveledUp && <Chip tone="violet">LEVEL UP · Lv {result.level}</Chip>}
         </div>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">

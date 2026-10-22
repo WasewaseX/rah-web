@@ -69,7 +69,7 @@ async function main() {
   if (card0) {
     await db.cardState.update({ where: { userId_cardId: { userId: "me", cardId: CARD } }, data: { ...card0 } });
   } else {
-    await db.cardState.deleteMany({ where: { cardId: CARD } });
+    await db.cardState.deleteMany({ where: { userId: "me", cardId: CARD } });
   }
   const logsNow = await db.reviewLog.findMany({ orderBy: { id: "desc" }, take: logs2 - logs0 });
   for (const row of logsNow) await db.reviewLog.delete({ where: { id: row.id } });

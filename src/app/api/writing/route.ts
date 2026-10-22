@@ -44,7 +44,8 @@ export async function GET(req: Request) {
       cur = await db.writingSub.findFirst({ where: { id: cur.parentId, ...scope } });
     }
     if (chain.length === 0) return NextResponse.json({ error: "Submission not found." }, { status: 404 });
-    return NextResponse.json({ chain: chain.reverse() });
+    const ordered = chain.reverse();
+    return NextResponse.json({ chain: ordered, rubric: rubricHistory(ordered), changes: revisionChanges(ordered) });
   }
   const rows = await db.writingSub.findMany({ where: scope, orderBy: { id: "desc" }, take: 10 });
   return NextResponse.json({
@@ -119,6 +120,78 @@ export async function POST(req: Request) {
     await Promise.allSettled(errs.map((e) => noteTagOutcome(e.tag, false)));
   }
   return NextResponse.json({ ...result, ruleChecks });
+}
+
+// Rubric history (audit: writing-revision workspace - criterion-level deltas
+// across a revision chain). The grader stores four criterion scores on every
+// graded submission; the chain view compares the FIRST and LAST graded ends
+// so the learner sees WHERE the revision moved the needle - and an honest
+// null when a chain has fewer than two graded ends (no invented numbers).
+type RubricScores = Partial<Record<"task" | "organization" | "range" | "accuracy", number>>;
+
+export function rubricHistory(chain: { result: { scores?: RubricScores } | null }[]): {
+  criteria: { key: string; first: number; last: number; delta: number }[];
+  note: string;
+} | null {
+  const graded = chain.filter((c) => c.result && c.result.scores);
+  if (graded.length < 2) {
+    return { criteria: [], note: "Revise once more to unlock criterion deltas - two graded drafts make a comparison." };
+  }
+  const first = graded[0].result!.scores!;
+  const last = graded[graded.length - 1].result!.scores!;
+  const keys = ["task", "organization", "range", "accuracy"] as const;
+  return {
+    criteria: keys.map((k) => {
+      const f = first[k] ?? 0;
+      const l = last[k] ?? 0;
+      return { key: k, first: f, last: l, delta: Math.round((l - f) * 10) / 10 };
+    }),
+    note: "Deltas compare the first and last graded drafts of this chain.",
+  };
+}
+
+// Revision change summary (Task 83, the writing workspace's last clause):
+// between consecutive GRADED submissions, what did the revision actually fix?
+// Deterministic and zero-AI: the grader's error lists (bad -> good) are
+// compared by their normalized "bad" side. Fixed = flagged before and gone
+// now; remaining = flagged before and still flagged; introduced = new flags.
+export interface RevisionChange {
+  fromRevision: number;
+  toRevision: number;
+  fixed: number;
+  remaining: number;
+  introduced: number;
+  fixedExamples: string[];
+}
+
+const normBad = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+export function revisionChanges(
+  chain: { revision: number; result: { errors?: { bad: string; good: string }[] } | null }[]
+): RevisionChange[] {
+  const out: RevisionChange[] = [];
+  let prev: { revision: number; bads: Set<string>; goods: Map<string, string> } | null = null;
+  for (const c of chain) {
+    if (!c.result) continue; // an ungraded draft carries no error list - it must not reset the comparison base
+    const errors = (c.result?.errors ?? []).filter((e) => e && typeof e.bad === "string");
+    const bads = new Set(errors.map((e) => normBad(e.bad)));
+    const goods = new Map(errors.map((e) => [normBad(e.bad), e.good]));
+    if (prev) {
+      const fixed = [...prev.bads].filter((b) => !bads.has(b));
+      const remaining = [...prev.bads].filter((b) => bads.has(b));
+      const introduced = [...bads].filter((b) => !prev!.bads.has(b));
+      out.push({
+        fromRevision: prev.revision,
+        toRevision: c.revision,
+        fixed: fixed.length,
+        remaining: remaining.length,
+        introduced: introduced.length,
+        fixedExamples: fixed.slice(0, 3).map((b) => prev!.goods.get(b) ?? b),
+      });
+    }
+    prev = { revision: c.revision, bads, goods };
+  }
+  return out;
 }
 
 function safeParse(s: string): WritingResult | null {

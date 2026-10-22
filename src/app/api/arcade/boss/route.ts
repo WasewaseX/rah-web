@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { buildBossFight, type BossPhase } from "@/lib/arcade-items";
 import { db } from "@/lib/db";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
-import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
+import { awardGameXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
+import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ const PER_PHASE = 8;
 // to the client for instant combat feedback, the server checks the aggregate.
 export async function GET() {
   const phases: BossPhase[] = await buildBossFight(PER_PHASE, PHASES);
-  const wins = await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => SINGLE_USER_ID), key: "boss:wins" } } });
+  const u = await contentUserId().catch(() => "me");
+  const wins = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "boss:wins" } } });
   return NextResponse.json({ phases, bossWins: wins?.best ?? 0 });
 }
 
@@ -35,6 +37,11 @@ export async function POST(req: Request) {
   const heartsLeft = Math.min(3, Math.max(0, Math.round(Number(b.heartsLeft ?? 0))));
   const total = Math.min(PHASES * PER_PHASE, Math.max(0, Math.round(Number(b.total ?? 0))));
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
 
   if (won) {
     await bumpStat("boss:wins", 1);
@@ -43,17 +50,20 @@ export async function POST(req: Request) {
   await bumpDaily("reviews", total);
   await bumpDaily("correct", correct);
   const gain = won ? 120 + heartsLeft * 20 : 25 + (phaseReached - 1) * 5;
-  const xp = await awardXp(gain, { chainHit: won });
+  const xp = await awardGameXp("boss", gain, { chainHit: won });
   if (!won) await registerMiss();
   await touchStreak();
   await progressQuest("boss_phase", phaseReached);
   if (won) await progressQuest("boss_win", 1);
 
-  return NextResponse.json({
-    xpGain: gain,
+  const payload = {
+    xpGain: xp.paid,
+    capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     level: xp.level,
     unlocked: xp.unlocked,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

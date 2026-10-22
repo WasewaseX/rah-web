@@ -11,9 +11,10 @@ import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
 import { setCoachActivity } from "@/lib/activity-store";
-import { submitReviewGrade } from "@/lib/offline-queue";
+import { submitGrade, count as outboxCount } from "@/lib/offline";
 import BlitzDeck from "./games/BlitzDeck";
 import PairsGame from "./games/PairsGame";
+import { provenanceOf } from "@/lib/provenance";
 
 interface QueueCard {
   card: {
@@ -96,7 +97,14 @@ function PromptBody({ q, dir, revealed, correct }: { q: QueueCard; dir: string; 
     return (
       <div className="text-center">
         <div className="text-[26px] font-extrabold leading-snug tracking-tight text-[#f2f5fa]">{card.en}</div>
-        {revealed && <div className="mt-4 text-sm text-[#8b96a9]">{card.note}</div>}
+        {revealed && (
+          <>
+            <div className="mt-4 text-sm text-[#8b96a9]">{card.note}</div>
+            <div className="mt-1 text-[11px] text-white/30">
+              {provenanceOf(card.id).label} — {provenanceOf(card.id).detail}
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -182,8 +190,8 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const [picked, setPicked] = useState<number[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [wasRight, setWasRight] = useState(false);
+  const [offlineQueued, setOfflineQueued] = useState(0);
   const [session, setSession] = useState({ done: 0, again: 0 });
-  const [queuedHint, setQueuedHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -356,11 +364,13 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const grade = async (g: number) => {
     if (!q || busy) return;
     setBusy(true);
-    // Offline-safe (Task 69): when the network is down the grade lands in the
-    // IndexedDB queue and syncs automatically on reconnect; the server stays
-    // the FSRS source of truth either way.
-    const res = await submitReviewGrade({ cardId: q.card.id, grade: g, dir });
-    if (res.applied === "queued") setQueuedHint(true);
+    // Real offline sync (Task 68): the POST carries a gid idempotency key; if
+    // the network is gone the grade lands in the local outbox and the
+    // reconnect flush replays it - the server answers replays with the
+    // original response, so nothing double-counts. The session counter still
+    // advances (the attempt was real); the badge announces the queue.
+    const res = await submitGrade(q.card.id, g, dir);
+    if (!res.online) setOfflineQueued(outboxCount());
     setSession((s) => ({ done: s.done + 1, again: s.again + (g === 1 ? 1 : 0) }));
     setBusy(false);
     setInput("");
@@ -429,6 +439,11 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
         {session.done > 0 && (
           <p className="mx-auto mt-2.5 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">
             {session.done} reviewed, {session.again} missed. Missed cards come back today; the rest drift outward.
+          </p>
+        )}
+        {offlineQueued > 0 && (
+          <p className="mx-auto mt-2 max-w-sm text-xs font-semibold text-[#f0dcae]" data-testid="review-offline-note">
+            {offlineQueued} of those grade{offlineQueued === 1 ? " was" : "s were"} made offline and will sync automatically when the connection returns - nothing is lost, nothing is double-counted.
           </p>
         )}
         {forecast.length > 0 && (
@@ -514,19 +529,18 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
           Card {idx + 1} of {queue.length}
         </span>
         <div className="flex items-center gap-2">
-          {queuedHint && <Chip tone="amber">Offline: saved to sync queue</Chip>}
           <Chip tone="blue">{DIR_LABEL[dir] ?? dir}</Chip>
           <Chip tone="emerald">{q.card.level}</Chip>
           <Chip>{q.card.skill}</Chip>
           {q.ahead && <Chip tone="amber">Extra practice</Chip>}
           <button
             onClick={() => setFlagOpen((o) => !o)}
-            className={`rounded-full border p-1.5 transition-colors ${
+            className={`rounded-full border p-2 transition-colors ${
               flagOpen ? "border-[#ff6b81]/50 bg-[#ff6b81]/[0.12] text-[#ff8ba0]" : "border-[#2a3242] text-[#7d889c] hover:border-[#3f4c63] hover:text-[#b7c1d3]"
             }`}
             aria-label="Report a problem with this item"
           >
-            <Flag className="h-3.5 w-3.5" />
+            <Flag className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -577,7 +591,10 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
         <div className="text-center text-[11px] font-medium text-[#5c6678]">First meeting. Rah schedules it from here.</div>
       )}
 
-      <Card key={idx} className="rah-pop min-h-72">
+      {/* pb clears the mobile bottom nav (fixed, 62px): the 2x2 grade grid
+          wraps on phones and its second row must be scrollable ABOVE the nav,
+          never trapped underneath (Task 69 mobile audit finding). */}
+      <Card key={idx} className="rah-pop min-h-72 pb-24 md:pb-5">
         <PromptBody q={q} dir={dir} revealed={revealed} correct={wasRight} />
 
         {/* mcq choices */}
@@ -758,7 +775,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
             onClick={() => void suspendCard()}
             disabled={busy}
             title="Stops this card coming back - it keeps its schedule if you change your mind"
-            className="text-[11px] font-semibold text-[#5d6879] transition-colors hover:text-[#ff8ba0] disabled:opacity-50"
+            className="min-h-[36px] px-2 py-2 text-[11px] font-semibold text-[#5d6879] transition-colors hover:text-[#ff8ba0] disabled:opacity-50"
           >
             Suspend this card
           </button>

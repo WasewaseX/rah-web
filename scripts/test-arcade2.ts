@@ -118,7 +118,7 @@ async function drive(day: number) {
   // The dungeon is one run per day BY DESIGN, so a run left over from an
   // earlier attempt (user play or a crashed prior suite run) would poison
   // this section. Snapshot-and-delete, then walk a fresh run.
-  await db.runState.deleteMany({ where: { id: `day:${day}` } });
+  await db.runState.deleteMany({ where: { userId: "me", id: `day:${day}` } });
   const dg = await jget("/api/arcade/dungeon");
   check("3 floors x 4 items", dg.floors?.length === 3 && dg.floors.every((f: any) => f.items.length === 4));
   check("no keys in public payload", JSON.stringify(dg).includes('"key"') === false);
@@ -257,15 +257,15 @@ async function restore(ctx: { day: number; learner0: any; stat0: any; gs0: any[]
     await db.gameStat.update({ where: { userId_key: { userId: "me", key: row.key } }, data: { best: row.best, plays: row.plays } });
   }
   const kept = new Set(gs0.map((r) => r.key));
-  await db.gameStat.deleteMany({ where: { key: { in: GAME_KEYS.filter((k) => !kept.has(k)) } } });
-  await db.gameStat.deleteMany({ where: { key: { startsWith: "shield:" } } });
+  await db.gameStat.deleteMany({ where: { userId: "me", key: { in: GAME_KEYS.filter((k) => !kept.has(k)) } } });
+  await db.gameStat.deleteMany({ where: { userId: "me", key: { startsWith: "shield:" } } });
   // RunState: restore pre-existing rows, delete test rows.
   for (const row of runRows0) {
     await db.runState.update({ where: { userId_id: { userId: "me", id: row.id } }, data: { state: row.state, day: row.day } });
   }
   const runKept = new Set(runRows0.map((r) => r.id));
   const testRunIds = [`day:${day}`, "gauntlet"].filter((id) => !runKept.has(id));
-  if (testRunIds.length) await db.runState.deleteMany({ where: { id: { in: testRunIds } } });
+  if (testRunIds.length) await db.runState.deleteMany({ where: { userId: "me", id: { in: testRunIds } } });
   // Quests: restore progress/done.
   for (const q of quests0) {
     await db.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } });

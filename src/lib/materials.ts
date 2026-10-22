@@ -15,8 +15,8 @@
 import { db } from "@/lib/db";
 import { aiJson } from "@/lib/ai";
 import { buildProfile } from "@/lib/server";
-import { contentUserId, SINGLE_USER_ID } from "@/lib/scope";
 import { defaultState, dayIndex } from "@/lib/fsrs";
+import { contentUserId } from "@/lib/scope";
 import type { Card } from "@/lib/content";
 import { APKG_MAX_CARDS } from "@/lib/apkg";
 import { randomBytes } from "crypto";
@@ -93,7 +93,7 @@ export interface ExtractionResult {
 }
 
 export async function importMaterial(title: string, text: string, source = ""): Promise<ExtractionResult> {
-  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
+  const u = await contentUserId().catch(() => "me");
   const trimmed = text.trim().slice(0, MAX_MATERIAL_CHARS);
   if (trimmed.length < 120) throw new Error("The text is too short - paste at least a paragraph (120+ characters).");
   const words = trimmed.split(/\s+/).filter(Boolean).length;
@@ -131,8 +131,8 @@ export async function importMaterial(title: string, text: string, source = ""): 
   const today = dayIndex();
   await db.material.create({
     data: {
-      userId,
       id: materialId,
+      userId: u,
       title: title.trim().slice(0, 80) || trimmed.slice(0, 60),
       source: source.trim().slice(0, 200),
       text: trimmed,
@@ -148,7 +148,7 @@ export async function importMaterial(title: string, text: string, source = ""): 
     // Enter the SAME FSRS pipeline: state "new", due today - the queue serves
     // material cards from the shared new-card budget (queue truth stays exact).
     await db.cardState.create({
-      data: { userId, cardId, ...defaultState(), due: today },
+      data: { userId: u, cardId, ...defaultState(), due: today },
     });
   }
   return { materialId, created: valid.length, degraded, reason };
@@ -188,8 +188,8 @@ export async function materialCardById(cardId: string): Promise<Card | null> {
 // the same queue. No AI, no context promise (these cards have no source
 // sentence) - the note says where they came from.
 export async function importDeckCsv(title: string, csv: string): Promise<ExtractionResult> {
-  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
   const { parseDeckCsv } = await import("@/lib/csv-cards");
+  const u = await contentUserId().catch(() => "me");
   const parsed = parseDeckCsv(csv.slice(0, MAX_MATERIAL_CHARS));
   if (parsed.cards.length === 0) {
     throw new Error("No usable rows found. Expected lines like: front<TAB>back (Anki-style). # header lines and empty rows are skipped.");
@@ -198,8 +198,8 @@ export async function importDeckCsv(title: string, csv: string): Promise<Extract
   const today = dayIndex();
   await db.material.create({
     data: {
-      userId,
       id: materialId,
+      userId: u,
       title: title.trim().slice(0, 80) || "Imported deck",
       source: "Imported deck (CSV/TSV)",
       text: csv.slice(0, MAX_MATERIAL_CHARS),
@@ -211,7 +211,7 @@ export async function importDeckCsv(title: string, csv: string): Promise<Extract
     await db.materialCard.create({
       data: { id: cardId, materialId, front: c.front, answer: c.answer, context: "", note: c.note },
     });
-    await db.cardState.create({ data: { userId, cardId, ...defaultState(), due: today } });
+    await db.cardState.create({ data: { userId: u, cardId, ...defaultState(), due: today } });
   }
   return { materialId, created: parsed.cards.length, degraded: false, reason: parsed.skipped ? `${parsed.skipped} row(s) skipped (empty, duplicate, or over the ${300}-row cap)` : undefined };
 }
@@ -220,8 +220,8 @@ export async function importDeckCsv(title: string, csv: string): Promise<Extract
 // FSRS cards - same machinery as CSV, no AI, honest about what stays behind
 // (media refs and Anki's own scheduling state do not cross over).
 export async function importDeckApkg(title: string, buf: Uint8Array): Promise<ExtractionResult & { mediaRefs?: number }> {
-  const userId = await contentUserId().catch(() => SINGLE_USER_ID);
   const { parseApkg } = await import("@/lib/apkg");
+  const u = await contentUserId().catch(() => "me");
   const parsed = await parseApkg(buf);
   if (parsed.cards.length === 0) {
     throw new Error(`No usable cards found in the .apkg (${parsed.skipped} skipped: empty fronts/backs, duplicates, or the ${300}-card cap).`);
@@ -230,8 +230,8 @@ export async function importDeckApkg(title: string, buf: Uint8Array): Promise<Ex
   const today = dayIndex();
   await db.material.create({
     data: {
-      userId,
       id: materialId,
+      userId: u,
       title: title.trim().slice(0, 80) || "Imported Anki deck",
       source: `Imported deck (Anki .apkg, ${parsed.format})`,
       text: `(binary .apkg import - ${parsed.cards.length} cards from the collection)`,
@@ -243,7 +243,7 @@ export async function importDeckApkg(title: string, buf: Uint8Array): Promise<Ex
     await db.materialCard.create({
       data: { id: cardId, materialId, front: c.front, answer: c.back, context: "", note: "" },
     });
-    await db.cardState.create({ data: { userId, cardId, ...defaultState(), due: today } });
+    await db.cardState.create({ data: { userId: u, cardId, ...defaultState(), due: today } });
   }
   const bits = [parsed.skipped ? `${parsed.skipped} note(s) skipped (empty, duplicate, or over the ${APKG_MAX_CARDS}-card cap)` : ""];
   if (parsed.mediaRefs > 0) bits.push(`${parsed.mediaRefs} media ref(s) left behind (audio/images do not import yet)`);

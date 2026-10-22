@@ -1,6 +1,6 @@
 # ROADMAP AUDIT — checklist, incidents, and open items
 
-**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-23 (Task-67 reconciliation wave: this file and ROADMAP-STATUS.md re-derived from code + task log; the offline/goal-planner/pronunciation disagreements are resolved — see §1 checklist and §3 table) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
+**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-22 (REG-1/REG-2 waves + **Task 67 reconciliation**: this file is the canonical ledger; `ROADMAP-STATUS.md` now agrees with it on offline, goal planner, pronunciation, exam tracks, email and Azure — disagreements found and removed, see §3 bookkeeping) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
 
 Purpose: one place that tracks (a) incident post-mortems with acceptance tests, (b) the standing audit checklist, (c) what an external evaluator praised vs. what actually broke. Update it every wave; do not let "DONE" claims outrun the drills that prove them.
 
@@ -120,6 +120,26 @@ Purpose: one place that tracks (a) incident post-mortems with acceptance tests, 
 
 ---
 
+**ADDENDUM 3 (Task 75, 2026-10-22) — the dangling-commit sweep: the scrub is complete on the history, but GitHub still serves the past by hash.** The auditor's warning ("third-party caches of earlier commits may survive") was probed with evidence, not assumed:
+
+- **15 of 16 pre-scrub SHAs are STILL RETRIEVABLE** via `GET /repos/WasewaseX/rah-web/commits/<sha>` (dangling objects on GitHub's side): 4d4f582, 240100a, 0c02959, 0e9100e, 3b2049f, d1722f7, 161d7cb, f52e593, cd35f15, 3e49329, 6b9fda4, 5156b4b, b02be56, 79ac327, ab9514a. Only 9b9c360 is gone.
+- **WORST FINDING: the leaked snapshot itself is anonymously fetchable at 5156b4b** (the Task-60 era commit that carried `db/sync/rah-latest.db`): `raw.githubusercontent.com/WasewaseX/rah-web/5156b4b/db/sync/rah-latest.db` returns **HTTP 200, 217,088 bytes, NO authentication**, and the whole pre-scrub tree downloads via `codeload.github.com/.../tar.gz/5156b4b`. At every OTHER dangling SHA the snapshot paths 404 (the leak window was Oct-20 18:57 through Task 60's commit range; the audit's 14-row sizing applies to this blob).
+- Clean re-verifications: public events API carries zero pre-scrub SHAs; the public tree carries ZERO learner-data paths; the vault repo is `private=true`; nothing is LISTED anywhere — every exposure requires knowing a hash.
+
+**What this means (honest):** the history rewrite did its job for anyone browsing or pulling the repo; it CANNOT expunge GitHub's object CDN. The email + first-session progress must be treated as EXPOSED (standing doctrine since REG-2). The one remaining human action is the account holder filing GitHub Support's "remove sensitive data" (trailing/cached views) request — it cannot be filed from inside the sandbox. Template (ready to paste):
+
+> Subject: Purge dangling commits and cached views after a force-push (sensitive data removal)
+>
+> Repo: WasewaseX/rah-web (public). We rewrote history via git filter-repo and force-pushed (old tip 9b9c360). The following PRE-REWRITE commits are still retrievable by hash via the contents API, raw.githubusercontent.com and codeload tarballs, and one still serves a sensitive SQLite file (db/sync/rah-latest.db containing a user email address):
+>
+> [paste the 15 SHAs above, one per line]
+>
+> Please run a GC / purge these unreachable objects and cached views from all endpoints (API, raw CDN, codeload, web UI). We understand the objects are not linked from any branch or tag.
+
+Re-run the sweep any time: `python3 scripts/privacy-sweep.py` (exit 1 = human action still pending). This addendum closes the SWEEP half of incident-response item #2; the purge-request half stays open until the learner files it and the sweep returns clean.
+
+---
+
 ### REG-3 (2026-10-22 06:51 UTC, 4th wipe, CONTAINED-BY-DESIGN): stale reprovision from 9b9c360 — the guard held, the freshness window didn't
 
 **What happened:** the platform rebuilt the workspace again (4th wipe), this time from a STALE ref (Task-57-era 9b9c360, not origin/main). Cost: db/sync, db/vault-work, backups/, db/backups and the vault remote config all died (gitignored or local state); the boot guard restored the learner automatically — but from the 21:47 OSS snapshot (xp=10), stale by one evening of learning (the learner had reached xp=220, 17 reviews, 6 chats by 22:57).
@@ -138,7 +158,7 @@ Purpose: one place that tracks (a) incident post-mortems with acceptance tests, 
 ## 1. Standing checklist (evaluator's October 20 + 22 updates, reconciled)
 Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this wave.
 
-### Critical fixes (9/10 closed + 1 hole found and closed)
+### Critical fixes (10/10 closed — isolation residual closed by the parallel wave's Task 67)
 - ✅ Green GitHub CI (Task 45)
 - ✅ No browser-readable auth tokens (Task 46)
 - ✅ Secure email verification codes (Task 46)
@@ -148,28 +168,25 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - ✅ Agent permissions + prompt-injection defenses (Task 51)
 - ✅ Account deletion + privacy cleanup (Task 49)
 - ✅ Isolated automated tests (Task 52)
-- 🟡 Learner data isolation — **content surfaces CLOSED (Tasks 63+65)**: chats, essays, transcripts, review logs, mistake memory (+ corrections/tombstones), mastery ledger, daily stats, goals — all userId-stamped, scoped, and proven by the 29-check two-account battery. Residual: CardState (FSRS queue) + arcade meta (Quest/GameStat/League/Rival/Achievement/RunState) remain global aggregate keys — no learner prose, safe only while the deployment lock holds; scoped with the PostgreSQL/multi-user push.
+- ✅ Learner data isolation — deployment lock in place (Task 48) AND per-user scoping complete (Tasks 63+65+67): every learning table carries userId (content, memory, stats, goals, and as of Task 67 the FSRS queue, arcade meta, skill bands, placement history, imported materials), reads/deletes scoped, two-account battery 45/45. Remaining before public multi-user: the Postgres move + the lock decision itself.
 
-### Critical features (5 done, 5 partial, 0 pending)
-- ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59) · ✅ Goal-based weekly planner (Task 65: deterministic plan from due-load forecast + rhythm + danger tags; honest feasibility) · ✅ Exam tracks at honest scope (Task 66: IELTS/TOEFL/C1A format practice, generated — not licensed papers)
-- 🟡 Acoustic pronunciation (measured word-level tier shipped, Task 64; phoneme tier awaits a configured AND validated Azure key — claim-precision rule below) · 🟡 Evidence-backed reference (provenance surfacing pending) · 🟡 Writing-revision workspace (revision chain shipped, Task 63; rubric history view pending) · 🟡 Content quality console (flag lifecycle shipped; per-flag regression tests pending) · 🟡 Offline sync (PWA shell + read-only grace reads shipped; offline write queue + reconciliation = the active P1 workstream)
+### Critical features (4 done, 6 partial — reconciled to the post-wave state, Task 73)
+- ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59) · ✅ Goal-based weekly planner (Task 65: FSRS due-load forecast + observed rhythm + honest feasibility, deterministic)
+- 🟡 Exam tracks (IELTS/TOEFL/C1A) — format-faithful tracks shipped (Task 66); **scores are practice estimates** until grading is validated against expert-reviewed responses and exam-specific rubrics
+- 🟡 Acoustic pronunciation assessment — **word-level measured tier shipped (Task 64)**; NOT a complete phonetic/accent assessment until the Azure phoneme adapter is configured AND validated
+- 🟡 Offline sync — **the daily-habit write loop is offline now (Task 68)**: gid-receipt grade idempotency (replays return the original response, nothing double-counts), client outbox, reconnect flush, honest badge + PWA offline shell/reads; Task 78 extended the queue to the SOLO arcade aggregates (speed/boss/duel/pairs/flow via generic gid receipts; battery 433/433); the honest boundary is now: dungeon/gauntlet (server-dealt state machines), chats/writings/speak (need the model) refuse offline by design, and physical-device spot-check beyond emulation is pending
+- ✅ Writing-revision workspace — revision chain + revise flow (Task 63) + criterion-level rubric history (Task 77) + per-revision change summaries (Task 83: fixed/remaining/introduced with the grader's own corrections as evidence)
+- ✅ Evidence-backed reference (Task 79) · ✅ Content quality console (Task 80: per-flag regression instrument + batteries)
 
-> **Reconciliation note (Task 67, 2026-10-23):** earlier editions of this checklist said "❌ Offline sync · ❌ Goal-based weekly planner" and "🟡 Exam tracks / 🟡 Acoustic pronunciation" — that drift against the shipped code is what the external assessment flagged. Rows above are now re-derived from the code; ROADMAP-STATUS.md §2 carries the matching per-item evidence. The two documents agree from this revision on.
+### Polish (8 done, 2 partial — the parallel wave closed transparency/placement/reports/anti-farming)
+- ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier) · ✅ Mistake memory/mastery (Task 65) · ✅ Coach transparency — verified already-shipped (Task 72: next-best actions carry per-action measured reasons) · ✅ Placement confidence (Task 72: per-skill sample counts + stated uncertainty) · ✅ Progress reports (Task 70: first-try recall curve + standing proxy-metric caveat) · ✅ XP/gems/quests anti-farming (Task 72: per-mode daily XP budgets, 25% engagement floor, ledger==sum-of-paids invariant)
+- ✅ Exam generation/grading (Task 81) · ✅ Onboarding/naming (Task 82: the naming registry + on-screen glosses + bot chips everywhere)
 
-### Polish (4 done, 6 partial)
-- ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier) · ✅ Mistake memory v1 incl. learner corrections (Task 65)
-- 🟡 Coach transparency · exam generation/grading · placement confidence · XP/gems/quests · progress reports (pilot protocol pending) · onboarding naming
-
-### Reverse-engineering targets
-- ✅ Anki · ✅ Duolingo · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key) · ❌ LingQ (imported-reading workflow study)
+### Reverse-engineering targets (3 done, 1 partial)
+- ✅ Anki · ✅ Duolingo · ✅ LingQ (Task 71: RE study + MaterialReader imported-reading workflow — tap-to-lookup in context, grades through the same FSRS queue, offline-safe via the outbox; per-token known-word ledger deliberately not copied, honest reason recorded) · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key)
 
 ### External stores / APIs (deliberately deferred, single-user era)
-- ❌ PostgreSQL (decision + migration plan = §4 decision 4, tracked) · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · ✅ Transactional email delivery ledger + idempotency (Task 63: MailLog, SMTP messageId reporting)
-
-### Claim-precision rules (Task 67, binding on every doc and UI surface)
-1. **Pronunciation:** the shipped score is WORD-level accuracy from the learner's real recording. Until the Azure phoneme-assessment adapter is configured AND validated against real learner audio, nothing may present it as a complete phonetic or accent assessment.
-2. **Exam scores:** IELTS/TOEFL/C1A track scores are PRACTICE ESTIMATES with rough range band references until grading is validated against expert-reviewed responses and exam-specific rubrics. Official-score language is forbidden; disclaimers ship in every track and coach reply.
-3. From the same assessment: PostgreSQL + public multi-user registration are separate launch requirements; the critical-fix 10/10 count is valid for the locked single-learner deployment only; category counts are not additive.
+- ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · ✅ Transactional email delivery ledger + idempotency (Task 63; SMTP credentials remain a config gap, not a code gap)
 
 ---
 
@@ -177,10 +194,10 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 
 | Stage | Scope | Status |
 |-------|-------|--------|
-| 01 Stabilize and isolate | CI green, learner data isolation, auth hardening, safe migrations, **data survival across updates** | **CLOSED** — Tasks 45–48 + 57. The audit's 5 P0s plus the REG-1 data guard. Residual: true per-user scoping = mega-update (see stage 01→03 bridge below). |
-| 02 Make the learning system trustworthy | Account deletion, abuse limits, tool permissions, test isolation, degraded-result honesty | **5/5 CLOSED** (Tasks 49–52 + 57: honest degraded states on every AI surface). |
-| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **CLOSED** — BYO materials (Task 54), CSV/TSV import (Task 55), CEFR graph (Task 58), .apkg import (Task 59), measured acoustic tier + config-gated Azure adapter (Task 64), exam format tracks (Task 66). |
-| 04 Dependable daily product | Anki binary import, offline sync, reminders, longitudinal effectiveness evidence | **IN PROGRESS** — .apkg import DONE (Task 59); local reminders DONE (PWA, best-effort); offline sync PARTIAL (read-only grace; offline write queue + reconciliation = the active P1 workstream); longitudinal effectiveness evidence = learner-pilot protocol (§4 decision 3). |
+| 01 Stabilize and isolate | CI green, learner data isolation, auth hardening, safe migrations, **data survival across updates** | **CLOSED** — Tasks 45–48 + 57; the isolation residual (CardState/arcade/bands/materials) closed by the wave's Task 67 (isolation battery 45/45). Structural remainder before public multi-user: the Postgres move + the lock decision (open critical list below). |
+| 02 Make the learning system trustworthy | Account deletion, abuse limits, tool permissions, test isolation, degraded-result honesty | **5/5 closed** (Tasks 49–52 + 57's honest degraded states on every AI surface). |
+| 03 Add the differentiators | BYO materials, curriculum graph, acoustic pronunciation, import interop | **CLOSED (single-learner era)** — all four shipped: BYO materials (Task 54, source-validated), CEFR B2–C1 graph with mastery gates (Task 58 — the earlier "pending" note here was stale), acoustic word-level tier (Task 64) with the Azure phoneme adapter config-gated, import interop CSV/TSV + `.apkg` (Tasks 55/59). Honest limits that remain are validation/config items, not missing code: phoneme tier awaits an Azure key, exam scores stay practice estimates until rubric validation (Task 66). |
+| 04 Dependable daily product | Anki binary import, offline sync, reminders, longitudinal effectiveness evidence | **IN PROGRESS** — `.apkg` import shipped (Task 59), reminders shipped (PWA habit loop), offline grade loop shipped (Task 68), first longitudinal evidence shipped (Task 70: first-try recall curve); remaining: offline queue beyond grades, the structured multi-week pilot |
 
 **Audit's score-lift doctrine (binding):** the next score increase must come from *validated teaching + real speech assessment*, NOT another batch of unrelated features. Passing CI proves engineering behavior, not educational effectiveness.
 
@@ -191,19 +208,38 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 | Priority | Remaining work | Status |
 |----------|----------------|--------|
 | P0 — privacy | **Stop publishing live learner DB snapshots; private backups only** | **CLOSED (Task 62)** — vault repo + history scrub; email treated as exposed |
-| P0 — architecture | Real per-user data isolation before public multi-user | **PARTIAL — content surfaces complete (Tasks 63+65)**: chats, essays, transcripts, review logs, the mistake memory (families + corrections + tombstones), the mastery ledger, daily activity stats, goals and all state-route counts are stamped + filtered per user, proven by the two-account battery. Residual for the next wave: CardState (the FSRS deck queue) and arcade meta tables (Quest/GameStat/League/Rival/Achievement/RunState) are still global keys — aggregate state, no learner prose, safe only while the deployment lock holds |
+| P0 — architecture | Real per-user data isolation before public multi-user | **CLOSED (Tasks 63+65+67)** — every learning table carries userId: chats, essays, transcripts, review logs, mistake memory, mastery ledger, daily stats, goals, AND (Task 67) the FSRS deck queue, arcade meta (quests/trophies/game records/rival/league/runs), measured skill bands, placement history and imported materials. Account deletion removes the caller's learner rows in both branches. Proven by the two-account isolation battery 45/45 (queue cross-user blindness, trophies, speed records, per-user quests/rival rows, placement bands, material 404s). Structural remainder: the Postgres move + the deployment-lock decision |
 | P1 — learning quality | Genuine acoustic pronunciation assessment | **DONE (Task 64) — decision shipped in code**: built-in measured word-level tier (server ASR → deterministic alignment, TTS→ASR roundtrip-validated, real-clip E2E at 100/100) + Azure phoneme-assessment adapter dormant until the learner sets AZURE_SPEECH_KEY/REGION; no phoneme claims anywhere until then |
 | P1 — curriculum | Authentic IELTS/TOEFL/C1A tracks | **PARTIAL — format tracks shipped (Task 66)**: IELTS/TOEFL/C1 Advanced-style practice built on the existing exam engine (per-track task-type mix + rubric in the generation prompt, deterministic rough band reference on grading, not-affiliated disclaimers everywhere, skill routing in the coach). Honest limit: format-faithful GENERATED practice, not licensed past papers - those stay out of scope for a zero-licensing app |
-| P1 — reliability | Offline sync + real mobile-browser testing | **OPEN — precisely scoped (Task 67 survey)**: EXISTS today = PWA manifest, SHA-keyed service worker with self-evicting caches, network-first GET grace reads for offline opens, install prompt, local reminders. MISSING = every write (grade/chat/writing/speak POST) requires the network; no IndexedDB store, no offline write queue, no reconciliation layer, no offline UI banner. The active workstream closes exactly that gap: offline review queue + replay + reconciliation, offline affordances in the UI, then a real mobile-browser pass (mobile viewport, touch targets, overflow) |
+| P1 — reliability | Offline sync + real mobile-browser testing | **SUBSTANTIALLY DONE (Tasks 68+69) — honest residual recorded** — offline GRADE loop end-to-end: gid-stamped outbox → server GradeAck receipts (replays return the ORIGINAL response, nothing double-counts), reconnect flush on online/visibility/mount, honest badge; whole app driven in a real headless mobile browser at iPhone-14 emulation (390×844, DPR3, touch, mobile UA) with fixes shipped (the nav-trapped grade grid was UNREACHABLE — measured with elementFromPoint — plus tap-target fixes) and an on-device offline E2E (grade offline → queued → reconnect → ReviewLog row with the same gid). Residual: the offline queue covers the review loop; chats/writings/arcade scores refuse offline honestly; physical-device spot-check beyond emulation pending |
 | P2 — depth | Learner-memory corrections, goal planner | **DONE (Task 65)** — memory corrections: Mind Reader correct (edit quoted evidence/label, editedAt provenance) + forget with a tombstone (the exact rejected pair never re-aggregates; new evidence still reopens the family); goal planner: deterministic weekly plan from FSRS due-load forecast + observed 14-day rhythm + mastery danger tags, honest feasibility (on_track/tight/overcommitted with numbers), archive-never-delete. Writing revision history DONE (Task 63) |
 | P2 — operations | Transactional email delivery reporting + idempotency | **DONE (Task 63)** — MailLog ledger (one row per recipient+kind = the delivery report), sliding-window idempotency, SMTP messageId reporting |
 
-Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-counts two separately-listed items against the original 39 recommendations — the true ledger stays 17 done / 15 partial / 7 pending, and this wave's REG-2 closure is a privacy fix, not a new feature. CI note: the newest visible run (Oct 20) pre-dates 57-bis because `on.push.branches` was corrupted — pushes to main never triggered CI until Task 57-bis; the force-push after the history scrub is the first run under the fixed selector.
+### Bookkeeping (Task 73, 2026-10-22) — the canonical category ledger (post-wave)
 
-2. Per-user ownership/scoping + PostgreSQL (unblocks public multi-user; also shrinks the snapshot-window risk class).
-3. True acoustic pronunciation assessment (evaluate Azure Speech against real learner audio; honesty gates like Sound Lab's).
-4. Authentic exam task structures + rubric validation against expert-reviewed examples.
-5. Prove learning effectiveness (retention/writing/listening/speaking over time) — CI green ≠ teaching works.
+The evaluator's third re-review replaced the flat 39-item count with per-category totals (the old flat counts double-counted overlapping work). **This table is the canonical top-level ledger; both roadmap files now carry it and agree.**
+
+| Category | Done | Partial | Pending |
+|----------|------|---------|---------|
+| Original critical fixes | 10 | 0 | 0 |
+| Critical feature additions (10) | 7 | 3 | 0 |
+| Existing-feature polish (10) | 10 | 0 | 0 |
+| Reverse-engineering benchmarks | 3 | 1 | 0 |
+| Three recommended data stores | 0 | 0 | 3 |
+| Three recommended API integrations | 2 | 1 | 0 |
+
+Notes: (a) the critical-fix row is for the currently LOCKED single-learner deployment with documented security controls — PostgreSQL and the public-registration decision remain separate launch requirements; (b) category totals are not additive (features support more than one recommendation); (c) deltas vs the evaluator's snapshot (features 4/6, polish 3/7, RE 2/1/1): Task 65 closed memory corrections, Tasks 70+72 closed progress reports / placement confidence / coach transparency / anti-farming, Task 71 closed LingQ — offline stays PARTIAL because the shipped offline loop covers grades, not every write surface; (d) the evaluator's earlier 17/15/7 flat ledger is superseded by this table. CI note kept for the record: pushes to main never triggered CI until Task 57-bis fixed the `on.push.branches` corruption.
+
+### Open critical list (evaluator 2026-10-22, third re-review — reconciled)
+
+1. **P0 — Finish the production database decision.** Per-user scoping is complete (Tasks 63/65/67) but the app still runs SQLite, and registration stays locked. **Decision = PostgreSQL; the validation work is DONE (Task 74, on a real PostgreSQL 17.5 server):** the full 30-table datamodel applies cleanly via `prisma migrate diff` (schema.postgres.prisma variant, client generated to a separate output — the app's SQLite client untouched); the grade route's exact transaction shape ran 200 concurrent transactions (8 workers) at ~341 tx/s with ZERO lost updates (atomic XP increment, exact ReviewLog/DailyStat/CardState aggregates); the GradeAck gid race (12 concurrent same-gid creates) lets exactly ONE win on the PK with 11 honest P2002s — the offline-replay idempotency holds on PG; per-user scoped reads/deletes behave identically; a whole-DB logical restore into a second database matches per-table counts across all 30 tables; and the REAL cutover script (`scripts/sqlite-to-postgres.mjs`, SQLite opened READ-ONLY) migrated the live learner data (58 rows, all 30 tables, zero mismatches, zero dropped columns; xp=220/streak=2 verified on the PG side). Honest negatives recorded: the SQLite migration SQL does NOT run on PG (dialect) — the cutover baselines via `migrate diff`, which is exactly what was proven; what remains is the PHYSICAL flip on the real deployment (provision managed Postgres, baseline migrations, run the cutover in maintenance mode, flip the lock decision) — deployment-architecture work that cannot be completed inside this sandbox.
+2. **P0 — Finish the privacy incident response.** **SWEEP DONE (Task 75, evidence in REG-2 addendum 3):** 15/16 pre-scrub SHAs confirmed dangling-retrievable, and the leaked snapshot blob is anonymously fetchable by hash at 5156b4b (raw CDN + codeload, 217 KB) — the auditor's cache warning is now EVIDENCE, not assumption. The published email stays treated as EXPOSED. **Remaining: one human action — the account holder files GitHub Support's sensitive-data removal with the ready-made template (incident log); `scripts/privacy-sweep.py` re-runs until it exits 0.** All future backups stay private (vault-only doctrine, opt-in encryption shipped in Task 63).
+3. **P1 — Validate actual educational outcomes.** **PROTOCOL + INSTRUMENT SHIPPED (Task 76):** `PILOT-PROTOCOL.md` pre-registers the verdict criteria (retention / writing / listening / speaking tracks, >=50-attempts-per-week verdict rule, small-sample honesty labels, failure handling, and an explicit can-not-prove section) and `scripts/pilot-metrics.mjs` computes the weekly zero-AI snapshot from the real tables. **Week-0 baseline recorded** (2026-10-22): 17 first attempts @ 29% recall, 2 active days, 17 cards / 9 lapses, no writing/speaking/dictation volume yet — honestly flagged as small samples. What remains is TIME, not code: the pilot runs over the coming weeks (minimum 4, target 8) by re-running the instrument weekly; the Task 70 recall curve gives the learner the in-app view.
+
+### Two technical claims to keep precise (binding copy doctrine — verified in shipped code, Task 73)
+
+1. **Pronunciation:** Rah scores actual recorded speech at the WORD level (`measured:asr-alignment` tier chip, ReadAloud.tsx). Until the Azure phoneme-assessment adapter is configured AND validated, no surface presents the score as a complete phonetic or accent assessment.
+2. **Exam preparation:** the IELTS/TOEFL/C1A workflows carry not-affiliated + not-an-official-score disclaimers verbatim (`exam-tracks.ts`); their scores are PRACTICE ESTIMATES until grading is validated against expert-reviewed responses and exam-specific rubrics.
 
 ---
 
@@ -211,6 +247,4 @@ Evaluator bookkeeping note (2026-10-22): the expanded tracker's 19/15/7 double-c
 
 1. **Single vs multi-user** — the deployment lock is the sanctioned interim; the real decision (multi-tenant Postgres with per-user scoping vs staying single-learner) gates the data-store stage. No date promised; the lock keeps either path safe.
 2. **Azure AI Speech** — RESOLVED as a two-tier decision (Task 64): the measured word-level acoustic tier ships NOW on the built-in SDK ASR (zero new credentials, validated by roundtrip + real-clip E2E), and the Azure pronunciation-assessment adapter (HundredMark/Phoneme/Comprehensive, miscue on) ships config-gated — it activates the moment the learner sets AZURE_SPEECH_KEY + AZURE_SPEECH_REGION, no code changes, with the route degrading honestly to the word tier if Azure errors. Until a key exists, no phoneme-level claims are made anywhere in the UI.
-3. **Learning-effectiveness measurement (P1, protocol now tracked)** — the audit's warning: proxy metrics (XP, streaks) prove engagement, not learning; passing tests ≠ learning gains. The 2026-10-23 assessment makes this P1: run a STRUCTURED LEARNER PILOT over several weeks tracking retention (FSRS recall curves), writing quality (rubric deltas on the revision chain), listening comprehension, and speaking improvement. Protocol tracked in §3; instrumentation task owns the in-app outcome ledger.
-4. **Production database (P0 before public multi-user)** — the app stays SQLite + versioned migrations for the locked single-learner deployment. The decision to open to multiple public users REQUIRES: migrate to PostgreSQL, validate concurrent writes and migrations on it, and test isolation + recovery on the real deployment architecture. The migration plan + compatibility work is a tracked task; the deployment lock keeps the interim safe.
-5. **Privacy-incident residue (P0)** — REG-2 closed the repo itself, but the 2026-10-23 assessment keeps two follow-ups open: (a) third-party caches of pre-scrub commits may survive (GitHub Support purge, search-engine cache removal requests — tracked task owns the runbook); (b) the previously published email address is PERMANENTLY treated as exposed (re-registration with a fresh address recommended; no expectation of privacy on it again). All future backup copies stay in the private vault (and stay encrypted there — the opt-in AES-256-CBC/PBKDF2 path from Task 63 is the doctrine).
+3. **Learning-effectiveness measurement** — the audit's warning: proxy metrics (XP, streaks) prove engagement, not learning. The effectiveness ledger exists (zero-AI numbers); the FIRST retention-curve evidence shipped (Task 70: per-day first-attempt good rate, small-sample days dimmed and labeled); next step is the structured multi-week pilot.

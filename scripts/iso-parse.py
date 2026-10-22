@@ -51,5 +51,17 @@ elif mode == "mistakes_labels":
     print(json.dumps([f.get("label") for f in d.get("families", [])]))
 elif mode == "mistakes_edited":
     print(1 if any(f.get("editedAt") for f in d.get("families", []) + d.get("healed", [])) else 0)
+elif mode == "queue_has":
+    print(len([x for x in d.get("batch", []) if x.get("card", {}).get("id") == sys.argv[2]]))
+elif mode == "state_seen":
+    print(int(d.get("seen", 0)))
+elif mode == "state_unlocked":
+    print(1 if sys.argv[2] in (d.get("game", {}).get("unlocked", []) or []) else 0)
+elif mode == "speed_best":
+    print(int(d.get("best", 0)))
+elif mode == "placement_level":
+    print(str(d.get("level", "?")))
+elif mode == "materials_has":
+    print(len([m for m in d.get("materials", []) if m.get("title") == sys.argv[2]]))
 else:
     print("PARSE_ERR")
