@@ -175,7 +175,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - 🟡 Exam tracks (IELTS/TOEFL/C1A) — format-faithful tracks shipped (Task 66); **scores are practice estimates** until grading is validated against expert-reviewed responses and exam-specific rubrics
 - 🟡 Acoustic pronunciation assessment — **word-level measured tier shipped (Task 64)**; NOT a complete phonetic/accent assessment until the Azure phoneme adapter is configured AND validated
 - 🟡 Offline sync — **the daily-habit write loop is offline now (Task 68)**: gid-receipt grade idempotency (replays return the original response, nothing double-counts), client outbox, reconnect flush, honest badge + PWA offline shell/reads; Task 78 extended the queue to the SOLO arcade aggregates (speed/boss/duel/pairs/flow via generic gid receipts; battery 433/433); the honest boundary is now: dungeon/gauntlet (server-dealt state machines), chats/writings/speak (need the model) refuse offline by design, and physical-device spot-check beyond emulation is pending
-- 🟡 Writing-revision workspace — revision chain + revise flow (Task 63) + criterion-level rubric history (Task 77: per-criterion deltas across the chain, honest unlock note under two graded ends); remaining: per-revision criterion-level edit suggestions
+- ✅ Writing-revision workspace — revision chain + revise flow (Task 63) + criterion-level rubric history (Task 77) + per-revision change summaries (Task 83: fixed/remaining/introduced with the grader's own corrections as evidence)
 - ✅ Evidence-backed reference (Task 79) · ✅ Content quality console (Task 80: per-flag regression instrument + batteries)
 
 ### Polish (8 done, 2 partial — the parallel wave closed transparency/placement/reports/anti-farming)
@@ -222,7 +222,7 @@ The evaluator's third re-review replaced the flat 39-item count with per-categor
 | Category | Done | Partial | Pending |
 |----------|------|---------|---------|
 | Original critical fixes | 10 | 0 | 0 |
-| Critical feature additions (10) | 6 | 4 | 0 |
+| Critical feature additions (10) | 7 | 3 | 0 |
 | Existing-feature polish (10) | 10 | 0 | 0 |
 | Reverse-engineering benchmarks | 3 | 1 | 0 |
 | Three recommended data stores | 0 | 0 | 3 |

@@ -32,6 +32,9 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
   // Rubric history (writing-revision workspace): criterion deltas across the
   // chain being revised - shown in the revising banner, honest when absent.
   const [rubric, setRubric] = useState<{ criteria: { key: string; first: number; last: number; delta: number }[]; note: string } | null>(null);
+  // What the previous revision actually fixed (Task 83): the honest change
+  // summary between the chain's last two graded submissions.
+  const [changes, setChanges] = useState<{ fixed: number; remaining: number; introduced: number; fixedExamples: string[] }[] | null>(null);
 
   const loadRecent = useCallback(() => {
     fetch("/api/writing", { cache: "no-store" })
@@ -59,6 +62,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
       setText(last.text ?? "");
       setRevisingId(last.id);
       setRubric(j.rubric ?? null);
+      setChanges(j.changes ?? null);
       setResult(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -101,6 +105,7 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
               onClick={() => {
                 setRevisingId(null);
                 setRubric(null);
+                setChanges(null);
               }}
               className="text-xs font-bold text-[#9dc0ff] hover:underline"
             >
@@ -132,6 +137,17 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
           {rubric && rubric.criteria.length === 0 && (
             <div className="mt-1 text-[11px] text-white/40">{rubric.note}</div>
           )}
+          {changes && changes.length > 0 && (() => {
+            const last = changes[changes.length - 1];
+            return (
+              <div className="mt-1 text-[11px] text-white/50">
+                The previous revision fixed {last.fixed} flagged issue{last.fixed === 1 ? "" : "s"}
+                {last.remaining > 0 ? `, ${last.remaining} still flagged` : ""}
+                {last.introduced > 0 ? `, ${last.introduced} new one${last.introduced === 1 ? "" : "s"} appeared` : ""}.
+                {last.fixedExamples.length > 0 ? ` e.g. "${last.fixedExamples[0]}"` : ""}
+              </div>
+            );
+          })()}
         </Note>
       )}
       <Card>

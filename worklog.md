@@ -1352,3 +1352,18 @@ Work Log:
 
 Stage Summary:
 - The polish category is 10/10. Remaining PARTIALs anywhere: exam-track rubric validation (external dependency - expert-reviewed responses), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions, the three deferred stores, Azure phoneme validation (needs a key), the physical PG flip + lock decision (deployment), the GitHub Support purge (account holder), and the pilot itself (weeks).
+
+---
+Task ID: 83
+Agent: Super Z (main)
+Task: The writing workspace's last residual - per-revision change summaries (what did each revision actually fix?).
+
+Work Log:
+- Route: revisionChanges(chain) compares consecutive GRADED submissions by their normalized error sets: fixed = flagged before and gone now; remaining = still flagged; introduced = new flags; fixedExamples carry up to 3 of the grader's own GOOD replacements (zero-AI - the evidence is the grader's corrections, not new commentary). GET /api/writing?id=N returns `changes`.
+- SEMANTICS FIX caught by the battery before any claim: ungraded drafts initially RESET the comparison base (an empty error list read as "all clean") - the fix skips result-less entries entirely; the honest base is the previous GRADED submission. Battery-pinned.
+- UI: the revising banner states the last revision's haul in plain words ("The previous revision fixed 2 flagged issues, 1 still flagged, 1 new one appeared. e.g. ...").
+- GATES: writing battery 18/18 (was 11), tsc 0, eslint 0; main battery re-run 433/433.
+- Ledger: writing workspace row -> DONE; category table features 6/4 -> 7/3.
+
+Stage Summary:
+- Critical-feature additions now stand at 7 done / 3 partial (the partials: offline sync's dungeon/gauntlet boundary, exam-track rubric validation, acoustic phoneme validation - all three are external-dependency or deliberate-boundary items, recorded as such).

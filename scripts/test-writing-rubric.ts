@@ -11,12 +11,12 @@
  *
  * Run: bun scripts/test-writing-rubric.ts
  */
-import { rubricHistory } from "../src/app/api/writing/route";
+import { rubricHistory, revisionChanges } from "../src/app/api/writing/route";
 
-type Sub = { result: { scores: { task: number; organization: number; range: number; accuracy: number } } | null };
+type Sub = { revision: number; result: { scores: { task: number; organization: number; range: number; accuracy: number }; errors?: { bad: string; good: string }[] } | null };
 
-function sub(scores: [number, number, number, number] | null): Sub {
-  return { result: scores ? { scores: { task: scores[0], organization: scores[1], range: scores[2], accuracy: scores[3] } } : null };
+function sub(scores: [number, number, number, number] | null, revision = 1): Sub {
+  return { revision, result: scores ? { scores: { task: scores[0], organization: scores[1], range: scores[2], accuracy: scores[3] } } : null };
 }
 
 let pass = 0, fail = 0;
@@ -50,6 +50,35 @@ check(r4!.criteria.find((c) => c.key === "range")?.delta === 0, "range 4->4 = 0"
 // 6. decline stays negative end-to-end even if the last draft is below the first
 const r5 = rubricHistory([sub([8, 8, 8, 8]), sub([6.5, 7, 7, 7])]);
 check(r5!.criteria.every((c) => c.delta < 0 || (c.key === "organization" && c.delta === -1)), "declining chain renders negative deltas", JSON.stringify(r5!.criteria));
+
+// ---- Task 83: revision change summaries
+const err = (bad: string, good: string) => ({ bad, good });
+const chain = [
+  { revision: 1, result: { scores: { task: 6, organization: 5, range: 7, accuracy: 6 }, errors: [err("I am very disappoint", "I am very disappointed"), err("in the internet", "on the internet"), err("since two years", "for two years")] } },
+  { revision: 2, result: { scores: { task: 7, organization: 5.5, range: 7, accuracy: 7 }, errors: [err("in the internet", "on the internet"), err("more better", "better")] } },
+];
+const ch = revisionChanges(chain);
+check(ch.length === 1, "one adjacent graded pair -> one change row", JSON.stringify(ch));
+check(ch[0].fixed === 2, "fixed = flagged before and gone now (2)", JSON.stringify(ch[0]));
+check(ch[0].remaining === 1, "remaining = still flagged (1)");
+check(ch[0].introduced === 1, "introduced = new flags (1)");
+check(ch[0].fixedExamples.length === 2 && ch[0].fixedExamples.includes("I am very disappointed"), "fixedExamples carry the GOOD replacements", JSON.stringify(ch[0].fixedExamples));
+
+// ungraded submissions are skipped, not treated as clean revisions
+const chain2 = [
+  chain[0],
+  { revision: 2, result: null },
+  chain[1],
+];
+check(revisionChanges(chain2).length === 1, "ungraded revisions are skipped (they carry no error list)");
+
+// a chain with no errors anywhere produces a zero-row (no invented fixes)
+const chain3 = [
+  { revision: 1, result: { scores: { task: 6, organization: 5, range: 7, accuracy: 6 }, errors: [] } },
+  { revision: 2, result: { scores: { task: 6, organization: 5, range: 7, accuracy: 6 }, errors: [] } },
+];
+const ch3 = revisionChanges(chain3);
+check(ch3.length === 1 && ch3[0].fixed === 0 && ch3[0].introduced === 0, "clean pair -> honest zero row");
 
 console.log(`\n=== WRITING RUBRIC BATTERY: ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);
