@@ -1449,3 +1449,16 @@ Work Log:
 Stage Summary:
 - The contamination class is closed: any future boot now self-heals a live-but-damaged DB from the snapshot chain before the app accepts writes.
 - Data-protection chain today: db-restore (missing) -> db-integrity-repair (damaged) -> migrations -> server; watchdog hourly db-sync + daily integrity check + snapshot + vault push.
+
+---
+Task ID: 86-bis
+Agent: Super Z (main)
+Task: Complete the boot wiring - db-guard.sh boot mode was STILL orphaned (migrations ran with no pre-snapshot since some lost merge).
+
+Work Log:
+- ensure-server.sh now runs the full guard family in order: db-guard boot (snapshot-if-used BEFORE any schema work / restore-if-fresh) -> db-restore (missing-only) -> db-migrate-safe -> db-integrity-repair (damaged) -> server.
+- Live-validated the whole sequence end-to-end: boot snapshot taken (custom-20261022-221117-boot.db, keep-14), clean migrate deploy, integrity OK, db-sync staged to the OSS mount, private vault push confirmed.
+- Guard battery still 40/40; app answers 200 with the restored state.
+
+Stage Summary:
+- The Task-57 machinery actually runs at boot again. Data-survival chain: snapshot -> restore-if-missing -> repair-if-damaged -> migrate -> serve -> snapshot -> sync -> vault.

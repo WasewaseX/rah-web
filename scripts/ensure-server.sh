@@ -11,6 +11,7 @@
 # refresh both snapshot stores and keep the watchdog alive.
 cd /home/z/my-project || exit 1
 
+bash scripts/db-guard.sh boot || true   # Task 86 wiring: snapshot-if-used BEFORE any schema work / restore-if-fresh
 bash scripts/db-restore.sh || true
 bash scripts/db-migrate-safe.sh || echo "(migrate skipped/failed - see /tmp/db-migrate.log)"
 # Task 86: scheduling-loss repair - a live-but-damaged DB (review history
