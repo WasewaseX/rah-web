@@ -11,6 +11,7 @@ import { startDaily, clearMode } from "./mode-flow";
 import { updateSkillLevels, getSkillLevels, buildAssessment, spreadLine } from "./levels";
 import { parseThemeRequest, presetById, PRESETS } from "./theme";
 import { topMistakes } from "@/lib/mistakes";
+import { contentUserId } from "@/lib/scope";
 import { basePersona } from "./skills-util";
 
 const TAG_TO_SKILL: Record<string, string> = {
@@ -347,7 +348,7 @@ Open the debate: 2 or 3 sentences with your strongest opening argument, ending w
       const steps: StepTrace[] = [];
       steps.push({ label: "Crunching your data", detail: "7 days, bands, exams, memory" });
       const since = Date.now() / 1000;
-      const days = await db.dailyStat.findMany({ where: { day: { gte: Math.floor(since / 86400) - 7 } } });
+      const days = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me"), day: { gte: Math.floor(since / 86400) - 7 } } });
       const reviews = days.reduce((a, d) => a + d.reviews, 0);
       const xp = days.reduce((a, d) => a + d.xp, 0);
       const correct = days.reduce((a, d) => a + d.correct, 0);

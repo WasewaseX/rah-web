@@ -9,6 +9,7 @@ import { Card, Chip, Note, Bar, Btn } from "./ui";
 import { handCoach } from "@/lib/bus";
 import { Radar, AccuracyTimeline } from "./WarRoom";
 import MindReader from "./MindReader";
+import GoalPlanner from "./GoalPlanner";
 import Replay from "./Replay";
 import Portfolio from "./Portfolio";
 import BattleCardButton from "./BattleCardButton";
@@ -414,6 +415,7 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
       <BackupPanel />
 
       {/* Mind reader: the coach's memory, visible and editable */}
+      <GoalPlanner />
       <MindReader onChange={() => undefined} />
 
       {/* Replay theater: watch graded exams back turn by turn */}

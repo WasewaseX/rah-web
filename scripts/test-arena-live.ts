@@ -38,7 +38,7 @@ async function main() {
   // Live: POST a rep with restore
   const learner0 = await db.learner.findUnique({ where: { id: "me" } });
   const day = Math.floor(Date.now() / 86400000);
-  const stat0 = await db.dailyStat.findUnique({ where: { day } });
+  const stat0 = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day } } });
   const quests0 = await db.quest.findMany();
   const sess0 = await db.speakSession.count();
 
@@ -59,8 +59,8 @@ async function main() {
 
   // Restore
   await db.learner.update({ where: { id: "me" }, data: { xp: learner0?.xp ?? 0 } });
-  if (stat0) await db.dailyStat.update({ where: { day }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
-  else await db.dailyStat.deleteMany({ where: { day } });
+  if (stat0) await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
+  else await db.dailyStat.deleteMany({ where: { userId: "me", day } });
   for (const q of quests0) await db.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
   const logs = await db.speakSession.findMany({ orderBy: { id: "desc" }, take: sess1 - sess0 });
   for (const row of logs) await db.speakSession.delete({ where: { id: row.id } }).catch(() => undefined);

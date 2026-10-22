@@ -63,7 +63,7 @@ async function main() {
   const day = dayIndex();
   // ---------- snapshots ----------
   const learner0 = await db.learner.findUnique({ where: { id: "me" } });
-  const stat0 = await db.dailyStat.findUnique({ where: { day } });
+  const stat0 = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day } } });
   const gs0 = await db.gameStat.findMany({ where: { key: { in: GAME_KEYS } } });
   const runRows0 = await db.runState.findMany();
   const quests0 = await db.quest.findMany({ where: { day } });
@@ -248,9 +248,9 @@ async function restore(ctx: { day: number; learner0: any; stat0: any; gs0: any[]
     },
   });
   if (stat0) {
-    await db.dailyStat.update({ where: { day }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
+    await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
   } else {
-    await db.dailyStat.deleteMany({ where: { day } });
+    await db.dailyStat.deleteMany({ where: { userId: "me", day } });
   }
   // GameStats: restore pre-existing, delete test-made.
   for (const row of gs0) {

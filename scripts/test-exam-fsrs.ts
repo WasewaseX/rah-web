@@ -38,15 +38,15 @@ const today = dayIndex();
 // ---------- snapshot for restore ----------
 const learnerBefore = await prisma.learner.findUnique({ where: { id: "me" } });
 const statDay = Math.floor(Date.now() / 86400000);
-const statBefore = await prisma.dailyStat.findUnique({ where: { day: statDay } });
+const statBefore = await prisma.dailyStat.findUnique({ where: { userId_day: { userId: "me", day: statDay } } } );
 // The vocab item MUST deck-match: "make" resolves to the make-a-decision card.
 const DECK_HIT = DECK.find((c) => normToken(c.answer) === "make") ?? null;
 const cardCols = [DECK_HIT ? DECK_HIT.id : "col001", `${EXAM_CARD_PREFIX}${TAG}`];
 const cardsBefore = await prisma.cardState.findMany({ where: { cardId: { in: cardCols } } });
 const logsBeforeCount = await prisma.reviewLog.count();
 const examLogsBefore = await prisma.reviewLog.findMany({ where: { cardId: { in: cardCols }, source: "exam" } });
-const familyBefore = await prisma.mistakeFamily.findUnique({ where: { id: `exam:${TAG}` } });
-const ledgerBefore = await prisma.tagMastery.findUnique({ where: { tag: TAG } });
+const familyBefore = await prisma.mistakeFamily.findUnique({ where: { id: `me:exam:${TAG}` } });
+const ledgerBefore = await prisma.tagMastery.findUnique({ where: { userId_tag: { userId: "me", tag: TAG } } });
 const examBefore = await prisma.exam.findUnique({ where: { id: EXAM_ID } });
 const questsBefore = await prisma.quest.findMany();
 const achievementsBefore = await prisma.achievement.findMany();
@@ -235,9 +235,9 @@ try {
   }
   if (statBefore) {
     const { day, ...rest } = statBefore;
-    await prisma.dailyStat.update({ where: { day }, data: rest });
+    await prisma.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: rest });
   } else {
-    await prisma.dailyStat.deleteMany({ where: { day: statDay } });
+    await prisma.dailyStat.deleteMany({ where: { userId: "me", day: statDay } });
   }
   await prisma.quest.deleteMany({});
   for (const q of questsBefore) {

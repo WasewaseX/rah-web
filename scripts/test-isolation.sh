@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Per-user data isolation battery (audit P0-1, Task 63). Proves - on a
+# Per-user data isolation battery (audit P0-1, Tasks 63+65). Proves - on a
 # THROWAWAY stack with two registered users - that learner content does not
-# cross accounts: chats, essays, transcripts and the writing revision chain
-# are stamped with the creator's user id, filtered on every read/delete, and
-# a wrong-user request gets a 404, not the data. Also proves the mailer
-# idempotency ledger (audit P2): a repeated request-code inside the idem
-# window records ONE delivery attempt, not two.
+# cross accounts: chats, essays, transcripts, the writing revision chain AND
+# the mistake memory (families, corrections, forget-tombstones) are stamped
+# with the creator's user id, filtered on every read/delete, and a wrong-user
+# request gets a 404, not the data. Also proves the mailer idempotency ledger
+# (audit P2): a repeated request-code inside the idem window records ONE
+# delivery attempt, not two.
 #
 # The real learner's db/custom.db is never touched (own DB + own dist dir +
 # RAH_OPEN_REGISTRATION scoped to this stack).
@@ -113,6 +114,53 @@ S_A=$(curl -s -b "$JA" "$BASE/api/speak" | python3 scripts/iso-parse.py speak_se
 S_LEAK=$(curl -s -b "$JB" "$BASE/api/speak" | python3 scripts/iso-parse.py speak_secret "pA")
 check "A sees own speak session"       "$S_A" "1"
 check "B does NOT see A's transcript"  "$S_LEAK" "0"
+
+# --- mistake memory: scoping + corrections (Task 65) --------------------------
+# One family per user under the SAME kind:tag key; each caller must see only
+# their own, cross-user corrections/forgets must 404, and forget must leave a
+# tombstone so the rejected pair cannot re-aggregate.
+python3 - "$DB" <<'PY'
+import sqlite3, sys, json
+db = sys.argv[1].replace("file:", "")
+c = sqlite3.connect(db)
+a = c.execute("SELECT id FROM User WHERE email='iso-a@rah.test'").fetchone()[0]
+b = c.execute("SELECT id FROM User WHERE email='iso-b@rah.test'").fetchone()[0]
+c.execute("INSERT INTO MistakeFamily (id, userId, kind, tag, label, count, evidence, updatedAt) VALUES (?,?,?,?,?,?,?,datetime('now'))", (a + ":chat:statives", a, "chat", "statives", "Statives A", 3, "A-SECRET-wrong -> A-RIGHT"))
+c.execute("INSERT INTO MistakeFamily (id, userId, kind, tag, label, count, evidence, updatedAt) VALUES (?,?,?,?,?,?,?,datetime('now'))", (b + ":chat:statives", b, "chat", "statives", "Statives B", 1, "B-wrong -> B-right"))
+c.commit()
+open("/tmp/isolation-famids.json", "w").write(json.dumps({"a_fam": a + ":chat:statives"}))
+print("seeded families")
+c.close()
+PY
+A_FAM=$(python3 scripts/iso-id.py /tmp/isolation-famids.json a_fam)
+MM_A1=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives A")
+MM_A2=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives B")
+check "A sees own family"                 "$MM_A1" "1"
+check "A does NOT see B's family"         "$MM_A2" "0"
+MM_B2=$(curl -s -b "$JB" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives B")
+MM_B1=$(curl -s -b "$JB" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives A")
+check "B sees own family"                 "$MM_B2" "1"
+check "B does NOT see A's family"         "$MM_B1" "0"
+X_CORRECT=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" -X POST "$BASE/api/mistakes" -H 'content-type: application/json' -d "{\"id\":\"$A_FAM\",\"label\":\"hacked\"}")
+check "B correcting A's family = 404"     "$X_CORRECT" "404"
+X_FORGET=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" -X DELETE "$BASE/api/mistakes?id=$A_FAM")
+check "B forgetting A's family = 404"     "$X_FORGET" "404"
+A_STILL=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+print(c.execute('SELECT COUNT(*) FROM MistakeFamily WHERE id=?', ('$A_FAM',)).fetchone()[0])")
+check "A's family survived B's attempts"  "$A_STILL" "1"
+OK_CORRECT=$(curl -s -o /dev/null -w '%{http_code}' -b "$JA" -X POST "$BASE/api/mistakes" -H 'content-type: application/json' -d "{\"id\":\"$A_FAM\",\"label\":\"Statives A (edited)\"}")
+check "A corrects own family = 200"       "$OK_CORRECT" "200"
+A_EDITED=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_edited)
+check "correction sets editedAt provenance" "$A_EDITED" "1"
+OK_FORGET=$(curl -s -o /dev/null -w '%{http_code}' -b "$JA" -X DELETE "$BASE/api/mistakes?id=$A_FAM")
+check "A forgets own family = 200"        "$OK_FORGET" "200"
+TOMB=$(python3 -c "
+import sqlite3
+c = sqlite3.connect('$(echo $DB | sed s/file://)')
+print(c.execute('SELECT COUNT(*) FROM MistakeForgiven WHERE id=?', ('$A_FAM',)).fetchone()[0])")
+check "forget leaves a tombstone"         "$TOMB" "1"
 
 # --- scoped delete -----------------------------------------------------------
 curl -s -b "$JA" -X DELETE "$BASE/api/chat" > /dev/null

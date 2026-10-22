@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { DECK, cardById } from "@/lib/content";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
+import { contentUserId } from "@/lib/scope";
 import type { ProfileJson } from "@/lib/ai";
 
 export async function getLearner() {
@@ -12,11 +13,12 @@ export async function getLearner() {
   return l;
 }
 
-export async function bumpDaily(field: "reviews" | "correct" | "xp" | "spoken" | "written" | "listened", inc = 1) {
+export async function bumpDaily(field: "reviews" | "correct" | "xp" | "spoken" | "written" | "listened", inc = 1, userId?: string) {
+  const u = userId ?? (await contentUserId().catch(() => "me"));
   const day = dayIndex();
   await db.dailyStat.upsert({
-    where: { day },
-    create: { day, [field]: inc },
+    where: { userId_day: { userId: u, day } },
+    create: { userId: u, day, [field]: inc },
     update: { [field]: { increment: inc } },
   });
 }

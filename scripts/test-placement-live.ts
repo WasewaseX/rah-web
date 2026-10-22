@@ -53,7 +53,7 @@ await db.mistakeFamily.create({
   },
 });
 
-const dailyBefore = await db.dailyStat.findUnique({ where: { day: dayIndex() } });
+const dailyBefore = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day: dayIndex() } } } );
 
 try {
   const r = await fetch(`${BASE}/api/placement`, {
@@ -189,7 +189,7 @@ try {
   }
   if (dailyBefore) {
     await db.dailyStat.update({
-      where: { day: dailyBefore.day },
+      where: { userId_day: { userId: "me", day: dailyBefore.day } },
       data: {
         reviews: dailyBefore.reviews,
         correct: dailyBefore.correct,

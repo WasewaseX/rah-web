@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 import { computeCurriculum } from "@/lib/curriculum";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 // Every gate reads the mastery ledger (Wilson bound) and the skill bands -
 // the same numbers the Progress war room shows. No AI, fully deterministic.
 export async function GET() {
-  const [tagRows, skillRows] = await Promise.all([db.tagMastery.findMany(), db.skillLevel.findMany()]);
+  const u = await contentUserId();
+  const [tagRows, skillRows] = await Promise.all([db.tagMastery.findMany({ where: { userId: u } }), db.skillLevel.findMany()]);
   const result = computeCurriculum(
     tagRows.map((t) => ({ tag: t.tag, ok: t.ok, no: t.no, ewma: t.ewma })),
     skillRows.map((s) => ({ skill: s.skill, score: s.score, samples: s.samples })),

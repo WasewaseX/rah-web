@@ -52,7 +52,8 @@ async function readState(): Promise<ToolResult> {
   const mistakes = await topMistakes(8);
   const nextBest = await nextBestActions();
   const today = dayIndex();
-  const stats = await db.dailyStat.findMany({ orderBy: { day: "desc" }, take: 7 });
+  const { contentUserId } = await import("@/lib/scope");
+  const stats = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me") }, orderBy: { day: "desc" }, take: 7 });
   const l = await db.learner.findUnique({ where: { id: "me" } });
   // Review feature #17: the learner's content flags are part of the truth.
   const openFlags = await db.contentFlag.count({ where: { status: "open" } });

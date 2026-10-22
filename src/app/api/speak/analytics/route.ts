@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -86,8 +87,9 @@ export async function GET() {
     .sort((a, b) => b.overallDelta - a.overallDelta);
 
   // Recurring spoken-error families (the mistake memory, speak slice only).
+  const u = await contentUserId();
   const fams = await db.mistakeFamily.findMany({
-    where: { kind: "speak" },
+    where: { userId: u, kind: "speak" },
     orderBy: [{ count: "desc" }, { lastSeen: "desc" }],
     take: 12,
   });

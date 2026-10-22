@@ -46,7 +46,7 @@ const familyBefore = await prisma.mistakeFamily.findUnique({ where: { id: `liste
 const questsBefore = await prisma.quest.findMany();
 const achievementsBefore = await prisma.achievement.findMany();
 const statDay = Math.floor(Date.now() / 86400000);
-const statBefore = await prisma.dailyStat.findUnique({ where: { day: statDay } });
+const statBefore = await prisma.dailyStat.findUnique({ where: { userId_day: { userId: "me", day: statDay } } } );
 
 try {
   check(!DECK.some((c) => [c.answer, c.en, ...c.alt].some((a) => a.trim().toLowerCase() === TOKEN)), "fixture: token absent from the deck", TOKEN);
@@ -137,9 +137,9 @@ try {
   }
   if (statBefore) {
     const { day, ...rest } = statBefore;
-    await prisma.dailyStat.update({ where: { day }, data: rest });
+    await prisma.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: rest });
   } else {
-    await prisma.dailyStat.deleteMany({ where: { day: statDay } });
+    await prisma.dailyStat.deleteMany({ where: { userId: "me", day: statDay } });
   }
   await prisma.quest.deleteMany({});
   for (const q of questsBefore) {

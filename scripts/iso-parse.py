@@ -39,5 +39,17 @@ elif mode == "speak_secret":
         if sys.argv[2] in blob:
             n += 1
     print(n)
+elif mode == "mistakes_len":
+    print(len(d.get("families", [])) + len(d.get("healed", [])))
+elif mode == "mistakes_secret":
+    n = 0
+    for f in d.get("families", []) + d.get("healed", []):
+        if sys.argv[2] in str(f.get("evidence", "")) + str(f.get("label", "")):
+            n += 1
+    print(n)
+elif mode == "mistakes_labels":
+    print(json.dumps([f.get("label") for f in d.get("families", [])]))
+elif mode == "mistakes_edited":
+    print(1 if any(f.get("editedAt") for f in d.get("families", []) + d.get("healed", [])) else 0)
 else:
     print("PARSE_ERR")

@@ -52,7 +52,7 @@ function normalize(s: string): string {
 
 // ---------- snapshot for restore ----------
 const learnerBefore = await prisma.learner.findUnique({ where: { id: "me" } });
-const statBefore = await prisma.dailyStat.findUnique({ where: { day: today } });
+const statBefore = await prisma.dailyStat.findUnique({ where: { userId_day: { userId: "me", day: today } } } );
 let gradedCardId: string | null = null;
 let gradedStateBefore: Record<string, unknown> | null = null;
 let gradedLogIdsBefore: number[] = [];
@@ -214,9 +214,9 @@ try {
     }
     if (statBefore) {
       const st = statBefore as unknown as Record<string, never>;
-      await prisma.dailyStat.update({ where: { day: today }, data: { ...st } as never });
+      await prisma.dailyStat.update({ where: { userId_day: { userId: "me", day: today } }, data: { ...st } as never });
     } else {
-      await prisma.dailyStat.deleteMany({ where: { day: today } });
+      await prisma.dailyStat.deleteMany({ where: { userId: "me", day: today } });
     }
   } catch (e) {
     console.error(`RESTORE FAILED: ${String(e).slice(0, 200)}`);

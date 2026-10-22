@@ -148,8 +148,9 @@ export async function derivedExamCard(cardId: string): Promise<Card | null> {
   if (!prefix) return null;
   const tag = cardId.slice(prefix.length);
   if (!tag) return null;
+  const u = await contentUserId().catch(() => "me");
   const family = await db.mistakeFamily.findFirst({
-    where: { tag, OR: [{ resolvedAt: null }, { resolvedAt: { gt: new Date(0) } }] },
+    where: { userId: u, tag, OR: [{ resolvedAt: null }, { resolvedAt: { gt: new Date(0) } }] },
     orderBy: [{ resolvedAt: "asc" }, { updatedAt: "desc" }],
   });
   if (!family) return null;

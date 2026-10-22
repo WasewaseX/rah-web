@@ -23,7 +23,7 @@ async function main() {
   const xp0 = learner?.xp ?? 0;
   const freezes0 = learner?.freezes ?? 0;
   const day = Math.floor(Date.now() / 86400000); // dayIndex() is UTC epoch days; mirror it
-  const stat0 = await db.dailyStat.findUnique({ where: { day } });
+  const stat0 = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day } } });
   const card0 = await db.cardState.findUnique({ where: { cardId: CARD } });
   const quests0 = await db.quest.findMany();
   const logs0 = await db.reviewLog.count();
@@ -45,7 +45,7 @@ async function main() {
   // Engine effects
   const learner2 = await db.learner.findUnique({ where: { id: "me" } });
   check("xp +10", (learner2?.xp ?? 0) === xp0 + 10, `${xp0} -> ${learner2?.xp}`);
-  const stat2 = await db.dailyStat.findUnique({ where: { day } });
+  const stat2 = await db.dailyStat.findUnique({ where: { userId_day: { userId: "me", day } } });
   check("daily xp +10", (stat2?.xp ?? 0) === (stat0?.xp ?? 0) + 10);
   check("daily reviews +1", (stat2?.reviews ?? 0) === (stat0?.reviews ?? 0) + 1);
   const quests2 = await db.quest.findMany({ where: { day, key: { in: ["reviews_20", "reviews_35", "correct_15"] } } });
@@ -64,8 +64,8 @@ async function main() {
 
   // Restore everything
   await db.learner.update({ where: { id: "me" }, data: { xp: xp0, freezes: freezes0, chain: chainSnap?.chain ?? 0, chainDay: chainSnap?.chainDay ?? -1 } });
-  if (stat0) await db.dailyStat.update({ where: { day }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
-  else await db.dailyStat.deleteMany({ where: { day } });
+  if (stat0) await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
+  else await db.dailyStat.deleteMany({ where: { userId: "me", day } });
   if (card0) {
     await db.cardState.update({ where: { cardId: CARD }, data: { ...card0 } });
   } else {

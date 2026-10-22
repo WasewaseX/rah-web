@@ -11,6 +11,7 @@ import type { ExamItem, ExamSpec, ExamClient, ExamResult, ExamVerdict, StepTrace
 import { updateSkillLevels } from "./levels";
 import { noteExamAnswer } from "@/lib/mistakes";
 import { noteTagOutcome, masteryWeakTags } from "@/lib/mastery";
+import { contentUserId } from "@/lib/scope";
 import { arbitrateMisses, vetItems } from "./exam-ai";
 import { itemAnswerable, evidenceItem } from "./exam-gate";
 import { resolveExamCardTargets, scheduleExamOutcomes } from "@/lib/exam-cards";
@@ -323,7 +324,8 @@ export async function generateExam(
   // item's DNA because the item IS the family's recorded miss.
   const stillMissing = hunted.filter((t) => !items.some((it) => it.tag === t));
   if (stillMissing.length > 0) {
-    const families = await db.mistakeFamily.findMany({ where: { tag: { in: stillMissing }, resolvedAt: null } });
+    const u = await contentUserId().catch(() => "me");
+    const families = await db.mistakeFamily.findMany({ where: { userId: u, tag: { in: stillMissing }, resolvedAt: null } });
     for (const tag of stillMissing) {
       const fam = families.find((f) => f.tag === tag);
       const item = evidenceItem(tag, fam?.evidence ?? "");

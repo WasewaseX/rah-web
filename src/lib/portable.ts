@@ -43,6 +43,8 @@ const TABLES: TableSpec[] = [
   { model: "briefing", dates: ["at"] },
   { model: "mistakeFamily", dates: ["lastSeen", "updatedAt", "resolvedAt"] },
   { model: "tagMastery", dates: ["lastOk", "lastNo", "updatedAt"] },
+  { model: "mistakeForgiven", dates: ["at"] },
+  { model: "goal", dates: ["createdAt", "archivedAt"] },
 ];
 
 type Bundle = { format: string; exportedAt: string; tables: Record<string, Record<string, unknown>[]> };

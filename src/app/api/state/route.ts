@@ -7,18 +7,20 @@ import { ensureQuests, getGameView, getRivalView, getLeagueView, getChain } from
 import { getMasteryView } from "@/lib/mastery";
 import { nextBestActions } from "@/lib/next-best";
 import { shopView } from "@/lib/shop";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const l = await getLearner();
   const today = dayIndex();
-  const stat = await db.dailyStat.findUnique({ where: { day: today } });
+  const u = await contentUserId().catch(() => "me");
+  const stat = await db.dailyStat.findUnique({ where: { userId_day: { userId: u, day: today } } });
   const due = await dueCount();
   const diag = await diagnose();
-  const chatCount = await db.chatMsg.count();
-  const writes = await db.writingSub.count();
-  const speaks = await db.speakSession.count();
+  const chatCount = await db.chatMsg.count({ where: { userId: u } });
+  const writes = await db.writingSub.count({ where: { userId: u } });
+  const speaks = await db.speakSession.count({ where: { userId: u } });
   const seen = await db.cardState.count();
   const profile = await buildProfile();
   const theme = l.theme ? JSON.parse(l.theme) : null;

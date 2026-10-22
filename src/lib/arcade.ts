@@ -7,6 +7,7 @@
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
 import { topMistakes } from "@/lib/mistakes";
+import { contentUserId } from "@/lib/scope";
 import { bumpDaily, getLearner } from "@/lib/server";
 import { GEMS, awardGems, boostActive } from "@/lib/shop";
 
@@ -555,7 +556,8 @@ export async function getLeagueView(): Promise<LeagueView> {
   const day = dayIndex();
   const wk = weekOf(day);
   const dayOfWeek = day - wk * 7;
-  const recent = await db.dailyStat.findMany({ where: { day: { gte: day - 7, lt: day } } });
+  const u = await contentUserId().catch(() => "me");
+  const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: day - 7, lt: day } } });
   const avg = recent.reduce((s, r) => s + r.xp, 0) / 7;
   const dailyTarget = Math.max(70, Math.round(avg * 0.8));
 
@@ -572,7 +574,7 @@ export async function getLeagueView(): Promise<LeagueView> {
     const settled = row;
     const lastDow = 6;
     const thisWkDays = Array.from({ length: 7 }, (_, i) => settled.weekKey * 7 + i);
-    const youRows = await db.dailyStat.findMany({ where: { day: { in: thisWkDays } } });
+    const youRows = await db.dailyStat.findMany({ where: { userId: u, day: { in: thisWkDays } } });
     const youXp = youRows.reduce((s, r) => s + r.xp, 0);
     const lastAvg = Math.max(70, Math.round(avg * 0.8));
     const ghosts = Array.from({ length: LEAGUE_SIZE - 1 }, (_, i) => ghostXp(settled.weekKey, i, lastAvg, lastDow));
@@ -591,7 +593,7 @@ export async function getLeagueView(): Promise<LeagueView> {
   }
 
   const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
-  const youRows = await db.dailyStat.findMany({ where: { day: { in: thisWkDays } } });
+  const youRows = await db.dailyStat.findMany({ where: { userId: u, day: { in: thisWkDays } } });
   const youXp = youRows.reduce((s, r) => s + r.xp, 0);
   const standings: LeagueStanding[] = [
     { name: "You", xp: youXp, you: true },
@@ -687,7 +689,8 @@ export async function getRivalView(): Promise<RivalView> {
   }
 
   // Trailing 7-day learner XP average (yesterday backwards).
-  const recent = await db.dailyStat.findMany({ where: { day: { gte: day - 7, lt: day } } });
+  const uR = await contentUserId().catch(() => "me");
+  const recent = await db.dailyStat.findMany({ where: { userId: uR, day: { gte: day - 7, lt: day } } });
   const weekSum = recent.reduce((s, r) => s + r.xp, 0);
   const avg = weekSum / 7;
   const dailyTarget = Math.max(70, Math.round(avg * 0.8));
@@ -696,7 +699,7 @@ export async function getRivalView(): Promise<RivalView> {
     // Rollover: settle last week's race, then reset.
     const lastWk = weekOf(day - 1);
     const lastWkDays = Array.from({ length: 7 }, (_, i) => lastWk * 7 + i);
-    const youLast = await db.dailyStat.findMany({ where: { day: { in: lastWkDays } } });
+    const youLast = await db.dailyStat.findMany({ where: { userId: uR, day: { in: lastWkDays } } });
     const youXp = youLast.reduce((s, r) => s + r.xp, 0);
     const wins = rival.wins + (youXp >= rival.weekXp ? 1 : 0);
     const losses = rival.losses + (youXp < rival.weekXp ? 1 : 0);
@@ -726,7 +729,7 @@ export async function getRivalView(): Promise<RivalView> {
   }
 
   const thisWkDays = Array.from({ length: 7 }, (_, i) => wk * 7 + i);
-  const youThis = await db.dailyStat.findMany({ where: { day: { in: thisWkDays } } });
+  const youThis = await db.dailyStat.findMany({ where: { userId: uR, day: { in: thisWkDays } } });
   const youWeek = youThis.reduce((s, r) => s + r.xp, 0);
 
   return {

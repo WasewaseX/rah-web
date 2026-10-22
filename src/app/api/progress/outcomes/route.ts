@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayIndex } from "@/lib/fsrs";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,8 @@ export async function GET() {
 
   // 4) Mistake-family extinction: how many persistent error families the
   // healing loop has retired (2 clean exam hits) vs still active.
-  const fams = await db.mistakeFamily.findMany({ select: { kind: true, resolvedAt: true, count: true } });
+  const u = await contentUserId();
+  const fams = await db.mistakeFamily.findMany({ where: { userId: u }, select: { kind: true, resolvedAt: true, count: true } });
   const families = {
     total: fams.length,
     active: fams.filter((f) => !f.resolvedAt).length,

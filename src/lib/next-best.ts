@@ -9,6 +9,7 @@
 
 import { db } from "@/lib/db";
 import { dueCount, getLearner } from "@/lib/server";
+import { contentUserId } from "@/lib/scope";
 import { getMasteryView, type TagMasteryRow } from "@/lib/mastery";
 import { getSkillLevels } from "@/lib/agent/levels";
 import { computeCurriculum } from "@/lib/curriculum";
@@ -26,12 +27,13 @@ export interface NextAction {
 const DANGER_URGENCY = (wilson: number) => Math.min(0.95, 0.6 + (0.45 - wilson) * 0.8);
 
 export async function nextBestActions(): Promise<NextAction[]> {
+  const u = await contentUserId().catch(() => "me");
   const [learner, due, mastery, skills, families] = await Promise.all([
     getLearner(),
     dueCount(),
     getMasteryView(),
     getSkillLevels(),
-    db.mistakeFamily.findMany({ where: { resolvedAt: null }, orderBy: [{ count: "desc" }, { lastSeen: "desc" }] }),
+    db.mistakeFamily.findMany({ where: { userId: u, resolvedAt: null }, orderBy: [{ count: "desc" }, { lastSeen: "desc" }] }),
   ]);
 
   const actions: NextAction[] = [];

@@ -87,7 +87,8 @@ const ROUTES: { path: string; methods: string[] }[] = [
   { path: "/api/listen", methods: ["GET", "POST"] },
   { path: "/api/listen/dictation", methods: ["POST"] },
   { path: "/api/materials", methods: ["GET", "POST", "DELETE"] },
-  { path: "/api/mistakes", methods: ["GET", "DELETE"] },
+  { path: "/api/mistakes", methods: ["GET", "POST", "DELETE"] },
+  { path: "/api/goals", methods: ["GET", "POST"] },
   { path: "/api/placement", methods: ["GET", "POST"] },
   { path: "/api/progress", methods: ["GET"] },
   { path: "/api/progress/outcomes", methods: ["GET"] },
@@ -307,6 +308,10 @@ try {
 
   const mistakes = await api("/api/mistakes");
   check(mistakes.status === 200, "GET /api/mistakes 200", String(mistakes.status));
+  const goals0 = await api("/api/goals");
+  check(goals0.status === 200 && Array.isArray(goals0.body?.active) && goals0.body?.plan?.dueForecast, "goal planner ships goals + deterministic plan", JSON.stringify(goals0.body).slice(0, 120));
+  const goalsBad = await api("/api/goals", { method: "POST", body: JSON.stringify({ title: "ab" }) });
+  check(goalsBad.status === 400, "goal with short title is 400 with a speakable error", JSON.stringify(goalsBad.body));
 
   const version = await api("/api/version");
   check(version.status === 200 && Boolean(version.body), "GET /api/version 200", String(version.status));

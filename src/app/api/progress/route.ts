@@ -4,12 +4,13 @@ import { dayIndex } from "@/lib/fsrs";
 import { cardById, DECK } from "@/lib/content";
 import { diagnose } from "@/lib/server";
 import { getSkillLevels } from "@/lib/agent/levels";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const today = dayIndex();
-  const stats = await db.dailyStat.findMany({ where: { day: { gte: today - 34 } } });
+  const stats = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me"), day: { gte: today - 34 } } });
   const statMap = new Map(stats.map((s) => [s.day, s]));
   const days = Array.from({ length: 35 }, (_, i) => {
     const d = today - 34 + i;

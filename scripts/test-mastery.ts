@@ -13,6 +13,9 @@
 // Full state restore in finally - the drive must leave no residue.
 
 process.env.DATABASE_URL ||= "file:/home/z/my-project/db/custom.db";
+// TagMastery gained a composite key (userId, tag) in Task 65 - the drive runs
+// as the singleton "me", so every unique lookup goes through this helper.
+const T = (tag: string) => ({ userId_tag: { userId: "me", tag } as const });
 const BASE = "http://localhost:3000";
 export {};
 
@@ -34,7 +37,7 @@ const ledgerBefore = await prisma.tagMastery.findMany();
 const familiesBefore = await prisma.mistakeFamily.findMany();
 const examsBefore = await prisma.exam.findMany();
 const learnerBefore = await prisma.learner.findUnique({ where: { id: "me" } });
-const statBefore = await prisma.dailyStat.findUnique({ where: { day: Math.floor(Date.now() / 86400000) } });
+const statBefore = await prisma.dailyStat.findUnique({ where: { userId_day: { userId: "me", day: Math.floor(Date.now() / 86400000) } } } );
 const gameBefore = learnerBefore
   ? { xp: learnerBefore.xp, sp: learnerBefore.sp, chain: learnerBefore.chain, chainDay: learnerBefore.chainDay }
   : null;
@@ -70,7 +73,7 @@ try {
   await noteTagOutcome(TAG_A, true);
   await noteTagOutcome(TAG_A, true);
   await noteTagOutcome(TAG_A, false);
-  const rowA = await prisma.tagMastery.findUnique({ where: { tag: TAG_A } });
+  const rowA = await prisma.tagMastery.findUnique({ where: T(TAG_A) });
   check(!!rowA && rowA.ok === 2 && rowA.no === 1, "ledger counts both outcomes", JSON.stringify(rowA));
   check(!!rowA && rowA.ewma < 0.62 && rowA.ewma > 0.5, "EWMA settles between prev 0.5 and outcomes", rowA ? `${rowA.ewma}` : "missing");
 
@@ -95,9 +98,9 @@ try {
   const gradeJson = (await gradeRes.json()) as { correct: number; total: number };
   check(gradeJson.correct === 1 && gradeJson.total === 2, "drive exam grades 1/2", JSON.stringify(gradeJson));
 
-  const rowB = await prisma.tagMastery.findUnique({ where: { tag: "drive_statives" } });
+  const rowB = await prisma.tagMastery.findUnique({ where: T("drive_statives") });
   check(!!rowB && rowB.ok === 1 && rowB.no === 0, "correct tagged exam answer credits ledger (canonical _ key)", JSON.stringify(rowB));
-  const rowC = await prisma.tagMastery.findUnique({ where: { tag: "drive_prepositions" } });
+  const rowC = await prisma.tagMastery.findUnique({ where: T("drive_prepositions") });
   check(!!rowC && rowC.ok === 0 && rowC.no === 1, "wrong tagged exam answer debits ledger (canonical _ key)", JSON.stringify(rowC));
   const famC = await prisma.mistakeFamily.findMany({ where: { tag: "drive_prepositions", kind: "exam" } });
   check(famC.length === 1, "exam miss lands in mistake family under the SAME canonical key", `${famC.length} ${JSON.stringify(famC.map((f) => f.id))}`);
@@ -105,9 +108,9 @@ try {
   // Key unification: the same raw tag in different spellings ("Drive Prepositions!")
   // must land on the ONE canonical ledger row, not fork a new key.
   await noteTagOutcome("Drive Prepositions!", false);
-  const rowC2 = await prisma.tagMastery.findUnique({ where: { tag: "drive_prepositions" } });
+  const rowC2 = await prisma.tagMastery.findUnique({ where: T("drive_prepositions") });
   check(!!rowC2 && rowC2.no === 2, "alternate spellings unify onto one canonical ledger row", JSON.stringify(rowC2));
-  const forked = await prisma.tagMastery.findUnique({ where: { tag: "drive-prepositions" } });
+  const forked = await prisma.tagMastery.findUnique({ where: T("drive-prepositions") });
   check(!forked, "no hyphen-key fork row exists", JSON.stringify(forked));
 
   // ---------- 4. Mastery view + state payload ----------
@@ -128,7 +131,7 @@ try {
   await noteTagOutcome(TAG_B, false);
   await noteTagOutcome(TAG_B, false);
   await noteTagOutcome(TAG_B, false);
-  const weakB = await prisma.tagMastery.findUnique({ where: { tag: "drive_statives" } });
+  const weakB = await prisma.tagMastery.findUnique({ where: T("drive_statives") });
   const actions = await nextBestActions();
   const drill = actions.find((a) => a.action === "drill");
   check(!!weakB, "TAG_B now has 1/4 record", JSON.stringify(weakB));
@@ -167,13 +170,13 @@ try {
   const keepTags = new Set(ledgerBefore.map((r) => r.tag));
   const ledgerNow = await prisma.tagMastery.findMany();
   for (const r of ledgerNow) {
-    if (!keepTags.has(r.tag)) await prisma.tagMastery.delete({ where: { tag: r.tag } });
+    if (!keepTags.has(r.tag)) await prisma.tagMastery.delete({ where: T(r.tag) });
   }
   // restore exact pre-drive ledger rows
   for (const r of ledgerBefore) {
     await prisma.tagMastery.upsert({
-      where: { tag: r.tag },
-      create: { tag: r.tag, ok: r.ok, no: r.no, ewma: r.ewma, lastOk: r.lastOk, lastNo: r.lastNo },
+      where: T(r.tag),
+      create: { userId: "me", tag: r.tag, ok: r.ok, no: r.no, ewma: r.ewma, lastOk: r.lastOk, lastNo: r.lastNo },
       update: { ok: r.ok, no: r.no, ewma: r.ewma, lastOk: r.lastOk, lastNo: r.lastNo },
     });
   }
@@ -212,8 +215,8 @@ try {
   }
   if (statBefore) {
     await prisma.dailyStat.upsert({
-      where: { day: statBefore.day },
-      create: { day: statBefore.day, reviews: statBefore.reviews, correct: statBefore.correct, xp: statBefore.xp, spoken: statBefore.spoken, written: statBefore.written, listened: statBefore.listened },
+      where: { userId_day: { userId: "me", day: statBefore.day } },
+      create: { userId: "me", day: statBefore.day, reviews: statBefore.reviews, correct: statBefore.correct, xp: statBefore.xp, spoken: statBefore.spoken, written: statBefore.written, listened: statBefore.listened },
       update: { reviews: statBefore.reviews, correct: statBefore.correct, xp: statBefore.xp, spoken: statBefore.spoken, written: statBefore.written, listened: statBefore.listened },
     });
   }

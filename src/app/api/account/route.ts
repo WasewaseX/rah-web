@@ -47,7 +47,8 @@ export async function DELETE(req: Request) {
     await db.chatMsg.deleteMany();
     await db.writingSub.deleteMany();
     await db.speakSession.deleteMany();
-    await db.dailyStat.deleteMany();
+    await db.dailyStat.deleteMany({ where: { userId: user.id } });
+    await db.goal.deleteMany({ where: { userId: user.id } });
     await db.quizItem.deleteMany();
     await db.exam.deleteMany();
     await db.skillLevel.deleteMany();
@@ -58,8 +59,9 @@ export async function DELETE(req: Request) {
     await db.league.deleteMany();
     await db.runState.deleteMany();
     await db.briefing.deleteMany();
-    await db.mistakeFamily.deleteMany();
-    await db.tagMastery.deleteMany();
+    await db.mistakeFamily.deleteMany({ where: { userId: user.id } });
+    await db.mistakeForgiven.deleteMany({ where: { userId: user.id } });
+    await db.tagMastery.deleteMany({ where: { userId: user.id } });
     await db.contentFlag.deleteMany();
     await db.learner.deleteMany();
     removed.learnerState = true;

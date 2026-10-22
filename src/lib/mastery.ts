@@ -15,6 +15,7 @@
 //   retiring a weakness.
 
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 
 const ALPHA = 0.35;
 const Z = 1.96; // 95% Wilson interval
@@ -57,16 +58,30 @@ export function normalizeTag(tag: string): string {
   return t === "none" || t === "unknown" ? "" : t;
 }
 
-export async function noteTagOutcome(tag: string, ok: boolean): Promise<void> {
+// The isolation seam (Task 65): explicit userId wins; otherwise the session
+// user; else the singleton while the deployment lock holds. The ledger is
+// per-learner learning signal - two accounts never share a row.
+async function actor(explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+  try {
+    return await contentUserId();
+  } catch {
+    return "me";
+  }
+}
+
+export async function noteTagOutcome(tag: string, ok: boolean, userId?: string): Promise<void> {
+  const u = await actor(userId);
   const t = normalizeTag(tag);
   if (!t) return;
   try {
-    const existing = await db.tagMastery.findUnique({ where: { tag: t } });
+    const existing = await db.tagMastery.findUnique({ where: { userId_tag: { userId: u, tag: t } } });
     const prevEwma = existing?.ewma ?? 0.5;
     const ewma = prevEwma * (1 - ALPHA) + (ok ? 1 : 0) * ALPHA;
     await db.tagMastery.upsert({
-      where: { tag: t },
+      where: { userId_tag: { userId: u, tag: t } },
       create: {
+        userId: u,
         tag: t,
         ok: ok ? 1 : 0,
         no: ok ? 0 : 1,
@@ -113,8 +128,9 @@ export function classifyTag(tag: string, ok: number, no: number, ewma: number): 
   return { tag, samples, ok, no, raw: Math.round(raw * 100) / 100, ewma: Math.round(ewma * 100) / 100, wilson: Math.round(wilson * 100) / 100, trend, status };
 }
 
-export async function getMasteryView(): Promise<MasteryView> {
-  const rows = await db.tagMastery.findMany();
+export async function getMasteryView(userId?: string): Promise<MasteryView> {
+  const u = await actor(userId);
+  const rows = await db.tagMastery.findMany({ where: { userId: u } });
   const tags = rows
     .map((r) => classifyTag(r.tag, r.ok, r.no, r.ewma))
     .sort((a, b) => a.wilson - b.wilson || b.samples - a.samples);
