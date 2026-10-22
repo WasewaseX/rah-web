@@ -1197,3 +1197,23 @@ Work Log:
 
 Stage Summary:
 - The two roadmap files now agree everywhere; the canonical category ledger lives in ROADMAP-AUDIT.md §3 and both files carry it. The auditor's three criticals are queued: P0 production-DB validation (PostgreSQL), P0 privacy-incident completion (cache sweep), P1 structured learner pilot (first evidence surface already shipped by Task 70). Standing lesson reinforced: a merge is also a claims event - verify the incoming wave against its diffs before letting its doc flips into the canonical ledger.
+
+---
+Task ID: 74
+Agent: Super Z (main)
+Task: The evaluator's P0 #1 - finish the production database decision: validate PostgreSQL for Rah (concurrent writes, migrations, isolation, recovery) as far as the sandbox allows.
+
+Work Log:
+- No root, no docker in the sandbox -> stood up REAL PostgreSQL 17.5 in userspace (Zonky @embedded-postgres/linux-x64 binaries into the gitignored scripts/out/pgsandbox; initdb + pg_ctl on 127.0.0.1:5433).
+- prisma/schema.postgres.prisma: provider switch + separate client output (prisma/pg-client, gitignored) - the app's sqlite client never touched; `prisma migrate diff --from-empty --to-schema-datamodel` produced the PG DDL (30 tables) and it applied cleanly to a fresh "rah" database.
+- scripts/pg-validate.ts (PG VALIDATION BATTERY, 16/16):
+  * the grade route's EXACT transaction shape (cardState.upsert + reviewLog.create + learner xp increment + dailyStat upsert) run by 8 concurrent workers x 25 rounds = 200 transactions in 586ms (~341 tx/s) with ZERO rejections, ZERO lost updates (xp exactly 2000; ReviewLog 200; DailyStat reviews=200/xp=2000; sum(cardState.reps)=200) - Prisma's atomic increments + upserts hold on PG READ COMMITTED;
+  * GradeAck gid race: 12 concurrent creates of the SAME gid -> exactly ONE wins on the PK, 11 fail with P2002 (the Task-68 offline-replay idempotency holds on PG); the receipt holds the original response verbatim; a replay touches nothing;
+  * per-user scoped reads/deletes behave identically (user-a deleteMany never touches user-b rows);
+  * whole-DB logical restore into a second database (rah_restored): per-table row counts identical across ALL 30 tables; restored learner xp matches;
+  * honest negative pinned: the SQLite migration SQL does NOT run on PG (dialect) - the cutover baselines via `migrate diff`, which is exactly what this battery proves works.
+- scripts/sqlite-to-postgres.mjs (the REAL cutover path): opened the LIVE db/custom.db READ-ONLY (mode=ro), column-intersected every table against the PG schema, adapted types (booleans 0/1, epoch-ms INTEGER dates -> ISO, jsonb), bulk-inserted: 58 rows across all 30 tables, ZERO mismatches, ZERO dropped columns; learner xp=220/streak=2 verified on the PG side. The live SQLite DB was never written.
+- What remains (recorded honestly in both ledgers): the PHYSICAL flip on the real deployment (provision managed Postgres, baseline migrations, run the cutover in maintenance mode, make the lock decision) - deployment-architecture work that cannot be done inside this sandbox. The P0's decision + validation halves are DONE; the launch checklist is written into ROADMAP-AUDIT open critical list #1.
+
+Stage Summary:
+- The evaluator's P0 #1 moved from "decision pending" to "decision made + path validated on a real PostgreSQL 17.5 server, with the live learner data proven to cross zero-mismatch". PG battery 16/16 is a new standing gate (scripts/pg-validate.ts). Next: P0 #2 privacy-incident completion (dangling-commit/cache sweep), then P1 #3 the learner pilot protocol.

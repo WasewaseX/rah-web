@@ -117,3 +117,6 @@ db/vault-work/
 
 # Task 67 hygiene: test-artifact outputs (synthetic TTS/ASR clips, CI JSON dumps) stay local
 scripts/out/
+
+# Task 74: generated PG client (sandbox-only; the app client stays sqlite)
+prisma/pg-client/
