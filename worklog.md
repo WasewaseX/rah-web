@@ -1307,3 +1307,18 @@ Work Log:
 
 Stage Summary:
 - Task 62-bis's lesson (a commit message is not a diff) applies to battery counts too. Verify-then-claim, and when a claim slips, correct forward in the ledger - never silently.
+
+---
+Task ID: 80
+Agent: Super Z (main)
+Task: Content quality console (audit feature #10 residual) - regression tests per flag.
+
+Work Log:
+- lib/flag-regressions.ts (pure): checkCardIntegrity(card, flag) holds EVERY flagged card to one bar (prompt/answer/example non-empty; cloze accepts contain the answer; no distractor equals the answer; wrong-answer flags get a targeted accepts/answer check; a vanished card is an honest failure - a fixed flag on a deleted card cannot fake a pass). regressionLine renders [status] kind card: PASS/FAIL - problems.
+- scripts/flag-regression-run.mjs: the read-only runner over the REAL flag queue (node:sqlite mode=ro): every fixed flag must still pass (exit 1 otherwise), open flags show current state, mat: cards resolve from MaterialCard, bank/dynamic cards reported for the battery path.
+- scripts/test-flag-regressions.ts unit battery 9/9 (healthy card, fixed-stays-green pin, empty answer, distractor==answer, ghost card, wrong-answer mismatch, readable line, taxonomy).
+- SELF-CORRECTION during verification: my first draft asserted "cloze card with no trap tags" as a defect - tracing the real data flow showed review misses feed the ARCADE chain (registerMiss), and the mistake memory is fed by the writing/exam/coach paths (recordMistakes with tags). The rule was a false coupling and was REMOVED before any claim was written; the correction is recorded here and in STATUS.
+- Ledger: feature #10 -> DONE; category table features 5/5 -> 6/4. Gates: tsc 0, eslint 0, battery (main) untouched.
+
+Stage Summary:
+- Feature #10 closed. Remaining partials: exam gen/grading item-bank validation + distractor quality (polish #5), onboarding naming (#10 polish), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
