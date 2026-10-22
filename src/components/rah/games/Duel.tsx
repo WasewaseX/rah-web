@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Swords, Timer } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "../ui";
+import { submitGameResult } from "@/lib/offline";
 
 interface Item {
   id: string;
@@ -33,6 +34,7 @@ interface DuelResult {
   rivalScore: number;
   xpGain: number;
   leveledUp: boolean;
+  queued?: boolean; // offline: the result is queued to sync (Task 78)
 }
 
 function normalize(s: string): string {
@@ -72,18 +74,18 @@ export default function Duel({ onChange }: { onChange: () => void }) {
       locked.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
       setPhase("done");
-      try {
-        const r = await fetch("/api/arcade/duel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ seed: data.seed, correct: finalCorrect, total: data.items.length, ms }),
-        });
-        const j = (await r.json()) as DuelResult;
-        setResult(j);
-        onChange();
-      } catch {
-        // network blip: the duel stands unresolved
+      const res = await submitGameResult("/api/arcade/duel", {
+        seed: data.seed,
+        correct: finalCorrect,
+        total: data.items.length,
+        ms,
+      });
+      if (res.online) {
+        setResult(res.data as unknown as DuelResult);
+      } else {
+        setResult({ queued: true, win: false, youScore: 0, rivalScore: 0, xpGain: 0, capped: false, totalXp: 0, leveledUp: false, unlocked: [] } as DuelResult);
       }
+      onChange();
     },
     [data, onChange],
   );
@@ -200,6 +202,7 @@ export default function Duel({ onChange }: { onChange: () => void }) {
             <div className={`text-lg font-black ${result.win ? "text-[#7fe0ac]" : "text-[#ffa3b1]"}`}>{result.win ? "Duel won." : "Duel lost."}</div>
             <div className="text-sm text-[#a9b4c6]">
               You {result.youScore} — rival {result.rivalScore} · {result.xpGain > 0 ? `+${result.xpGain} XP` : "no XP"}
+              {result.queued && <span className="ml-2 text-[11px] text-amber-300">Offline - queued to sync</span>}
               {result.leveledUp ? " · LEVEL UP" : ""}
             </div>
             {!result.win && (

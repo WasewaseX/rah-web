@@ -1264,3 +1264,19 @@ Work Log:
 
 Stage Summary:
 - The writing-workspace PARTIAL narrowed to its honest residual (per-revision criterion-level edit suggestions). The pilot's writing track now has its quality-delta instrument ready for when the learner's chains accumulate.
+
+---
+Task ID: 78
+Agent: Super Z (main)
+Task: Continue the backlog - offline sync beyond grades (the honest residual the reconciliation recorded): the solo arcade aggregates.
+
+Work Log:
+- SCOPED the seven game surfaces first and split them honestly: speed/boss/duel/pairs/flow are fully client-played aggregates (server clamps the POST) -> queue-able; dungeon/gauntlet are SERVER-DEALT state machines (RunState holds the dealt items; the next gauntlet item is built server-side per streak) -> offline play would require faking the deal, so they stay online-only BY DESIGN (recorded, not hidden).
+- Server: src/lib/sync-receipt.ts - the generic gid receipt (parseGid/beginReceipt/endReceipt/receiptReplay) reusing GradeAck (shape-generic since Task 68; every outbox item mints a fresh uuid so grade/game receipts never collide); wired into all five aggregate routes (parse gid -> receipt replay early-return -> endReceipt wrapping the final payload). A concurrent duplicate keeps the FIRST receipt; a torn receipt falls through and serves fresh (same rule as the grade route).
+- Client: the outbox gained a games store (localStorage rah-outbox-games-v1, capped 60, same honesty rules: network failures enqueue, 4xx refusals drop and count, 5xx keeps) drained by the SAME flush; submitGameResult(path, body) stamps the gid into the payload and resolves the server's ORIGINAL clamped response; the badge count now covers grades + games.
+- UI: SpeedRound/BossBattle/Duel/Flow/PairsGame swapped to submitGameResult; the offline path shows "Offline - queued to sync" in the result view (amber, in-context) and the badge announces the sync on reconnect.
+- BATTERY CATCHES (two, both mine): (1) the new section read GameStat under userId "me" - GameStat is per-user since migration 0006, the reads now use the battery session UID; (2) counters live in the `plays` column, not `best`. The battery caught both before any claim was written.
+- GATES: battery 425 -> 433/433 (receipt replay = ORIGINAL payload verbatim, NO second play counted, NO second XP, new gid = exactly one more play, stateful-mode honesty pin), tsc 0, eslint 0, guard 27/27.
+
+Stage Summary:
+- The offline story is now: grades + solo arcade aggregates survive disconnects with idempotent replay; AI surfaces and server-dealt state machines refuse offline honestly; the PWA shell + reads already worked. The residual is precisely bounded (dungeon/gauntlet redesign if wanted, physical-device spot-check).

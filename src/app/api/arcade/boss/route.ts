@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { awardGameXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,11 @@ export async function POST(req: Request) {
   const heartsLeft = Math.min(3, Math.max(0, Math.round(Number(b.heartsLeft ?? 0))));
   const total = Math.min(PHASES * PER_PHASE, Math.max(0, Math.round(Number(b.total ?? 0))));
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
 
   if (won) {
     await bumpStat("boss:wins", 1);
@@ -50,12 +56,14 @@ export async function POST(req: Request) {
   await progressQuest("boss_phase", phaseReached);
   if (won) await progressQuest("boss_win", 1);
 
-  return NextResponse.json({
+  const payload = {
     xpGain: xp.paid,
     capped: xp.capped,
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     level: xp.level,
     unlocked: xp.unlocked,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

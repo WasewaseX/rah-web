@@ -6,6 +6,7 @@ import { buildSpeedPool } from "@/lib/arcade-items";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,11 @@ export async function POST(req: Request) {
   const total = Math.min(ITEMS, Math.max(0, Math.round(Number(b.total ?? 0))));
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
   const ms = Math.min(3_600_000, Math.max(30_000, Math.round(Number(b.ms ?? 900_000))));
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
   const gain = correct * 10 + (total >= 8 && correct / Math.max(1, total) >= 0.8 ? 30 : 0);
   const xp = gain > 0 ? await awardGameXp("flow", gain, { chainHit: correct / Math.max(1, total) >= 0.8 }) : null;
 
@@ -45,7 +51,7 @@ export async function POST(req: Request) {
   await bumpStat("flow:best", correct);
   await bumpStat("flow:plays");
   await progressQuest("flow_1", 1);
-  return NextResponse.json({
+  const payload = {
     xpGain: xp?.paid ?? 0,
     capped: xp?.capped ?? false,
     totalXp: xp?.total,
@@ -53,5 +59,7 @@ export async function POST(req: Request) {
     unlocked: xp?.unlocked ?? [],
     streak,
     perfectBonus: total >= 8 && correct / Math.max(1, total) >= 0.8,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

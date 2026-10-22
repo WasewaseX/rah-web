@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Grid2x2Check, Undo2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Spinner } from "../ui";
+import { submitGameResult } from "@/lib/offline";
 
 interface PairSide {
   id: string;
@@ -50,17 +51,12 @@ export default function PairsGame({ onExit }: { onExit: () => void }) {
     async (finalMatched: Set<string>, finalMissteps: number) => {
       setDone(true);
       const ms = Date.now() - startedAt.current;
-      try {
-        const r = await fetch("/api/arcade/pairs", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ matched: [...finalMatched], missteps: finalMissteps, ms }),
-        });
-        const j = (await r.json()) as { xpGain?: number };
-        setXpGain(j.xpGain ?? 0);
-      } catch {
-        setXpGain(0);
-      }
+      const res = await submitGameResult("/api/arcade/pairs", {
+        matched: [...finalMatched],
+        missteps: finalMissteps,
+        ms,
+      });
+      setXpGain(res.online ? Number((res.data as { xpGain?: number }).xpGain ?? 0) : 0);
     },
     [],
   );

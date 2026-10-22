@@ -4,6 +4,7 @@ import { awardGameXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
 import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,11 @@ export async function POST(req: Request) {
   const m = Math.min(5, maxCombo);
   const cap = 10 * tri(m) + 50 * Math.max(0, correct - maxCombo);
   const score = Math.min(Math.max(0, Math.round(Number(b.score ?? 0))), cap);
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
 
   const bestRun = await bumpStat("speed:best", score);
   const bestCombo = await bumpStat("speed:combo", maxCombo);
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
   await progressQuest("speed_play", 1);
   if (maxCombo > 0) await progressQuest("speed_combo_8", maxCombo);
 
-  return NextResponse.json({
+  const payload = {
     xpGain: xp.paid,
     capped: xp.capped,
     totalXp: xp.total,
@@ -69,5 +75,7 @@ export async function POST(req: Request) {
     best: bestRun.best,
     isNewBest: bestRun.isNew,
     bestCombo: bestCombo.best,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

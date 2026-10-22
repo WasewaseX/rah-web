@@ -15,6 +15,7 @@ import { awardGameXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { touchStreak } from "@/lib/server";
 import { buildPairs } from "@/lib/pairs";
 import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,11 @@ interface PairsResult {
 export async function POST(req: Request) {
   const b = (await req.json().catch(() => null)) as Partial<PairsResult> | null;
   if (!b) return NextResponse.json({ error: "body required" }, { status: 400 });
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
 
   // Clamp: at most 5 real cards, deduped, ids must exist in the deck.
   const seen = new Set<string>();
@@ -83,7 +89,7 @@ export async function POST(req: Request) {
     await touchStreak().catch(() => undefined);
   }
 
-  return NextResponse.json({
+  const payload = {
     graded,
     clean,
     xpGain: xp?.paid ?? 0,
@@ -92,5 +98,7 @@ export async function POST(req: Request) {
     leveledUp: xp?.leveledUp ?? false,
     level: xp?.level ?? 0,
     unlocked: xp?.unlocked ?? [],
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

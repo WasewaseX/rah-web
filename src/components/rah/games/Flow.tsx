@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Timer } from "lucide-react";
 import { Btn, Card, Chip, Note, Spinner } from "../ui";
+import { submitGameResult } from "@/lib/offline";
 
 interface Item {
   id: string;
@@ -38,7 +39,7 @@ export default function Flow({ onChange }: { onChange: () => void }) {
   const [tally, setTally] = useState({ correct: 0, total: 0 });
   const [left, setLeft] = useState(FLOW_MS);
   const [flash, setFlash] = useState<"ok" | "miss" | null>(null);
-  const [report, setReport] = useState<{ xpGain: number; streak: number; perfectBonus: boolean } | null>(null);
+  const [report, setReport] = useState<{ xpGain: number; streak: number; perfectBonus: boolean; queued?: boolean } | null>(null);
   const corRef = useRef(0);
   const totRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,18 +68,17 @@ export default function Flow({ onChange }: { onChange: () => void }) {
     doneRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
     setPhase("done");
-    try {
-      const r = await fetch("/api/flow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correct: corRef.current, total: totRef.current, ms: FLOW_MS - (Date.now() - startRef.current) }),
-      });
-      const j = (await r.json()) as { xpGain: number; streak: number; perfectBonus: boolean };
-      setReport(j);
-      onChange();
-    } catch {
-      // blip: flow stands unrecorded
+    const res = await submitGameResult("/api/flow", {
+      correct: corRef.current,
+      total: totRef.current,
+      ms: FLOW_MS - (Date.now() - startRef.current),
+    });
+    if (res.online) {
+      setReport(res.data as { xpGain: number; streak: number; perfectBonus: boolean });
+    } else {
+      setReport({ xpGain: 0, streak: 0, perfectBonus: false, queued: true });
     }
+    onChange();
   }, [onChange]);
 
   const start = () => {
@@ -187,6 +187,7 @@ export default function Flow({ onChange }: { onChange: () => void }) {
             <div className="text-lg font-black text-[#7fe0ac]">Flow complete.</div>
             <div className="text-sm text-[#a9b4c6]">
               {report.xpGain > 0 ? `+${report.xpGain} XP` : "no XP"} · flow streak {report.streak} day{report.streak === 1 ? "" : "s"}
+              {(report as { queued?: boolean }).queued ? <span className="ml-2 text-[11px] text-amber-300">Offline - the flow is queued to sync</span> : null}
               {report.perfectBonus ? " · 80% bonus paid" : ""}
             </div>
             <Btn variant="soft" onClick={load}>

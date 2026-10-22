@@ -5,6 +5,7 @@ import { getLearner } from "@/lib/server";
 import { awardGameXp, bumpStat, progressQuest, registerMiss, hasPerk } from "@/lib/arcade";
 import { buildSpeedPool, duelPar } from "@/lib/arcade-items";
 import { contentUserId } from "@/lib/scope";
+import { parseGid, receiptReplay, endReceipt } from "@/lib/sync-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
   const correct = Math.min(total, Math.max(0, Math.round(Number(b.correct ?? 0))));
   const seed = Math.max(0, Math.min(2_000_000_000, Math.round(Number(b.seed ?? 0))));
   const ms = Math.min(300_000, Math.max(5_000, Math.round(Number(b.ms ?? 40_000))));
+  const gid = parseGid((b as { gid?: unknown }).gid);
+  const uid = await contentUserId().catch(() => "me");
+  const replay = await receiptReplay(gid, uid);
+  if (replay) return replay;
+
   // Anti-cheat: 10 points per hit plus at most a 20-point speed bonus.
   const youScore = Math.min(correct * 10 + 20, correct * 10 + Math.max(0, 20 - Math.floor(ms / 4000)));
   const l = await getLearner();
@@ -64,7 +70,7 @@ export async function POST(req: Request) {
   }
   await bumpStat("duel:plays");
   const xp = await awardGameXp("duel", win ? 60 : 25, { chainHit: win });
-  return NextResponse.json({
+  const payload = {
     win,
     youScore,
     rivalScore,
@@ -73,5 +79,7 @@ export async function POST(req: Request) {
     totalXp: xp.total,
     leveledUp: xp.leveledUp,
     unlocked: xp.unlocked,
-  });
+  };
+  await endReceipt(gid, uid, payload);
+  return NextResponse.json(payload);
 }

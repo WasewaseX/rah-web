@@ -127,7 +127,9 @@ export async function POST(req: Request) {
 // graded submission; the chain view compares the FIRST and LAST graded ends
 // so the learner sees WHERE the revision moved the needle - and an honest
 // null when a chain has fewer than two graded ends (no invented numbers).
-export function rubricHistory(chain: { result: WritingResult | null }[]): {
+type RubricScores = Partial<Record<"task" | "organization" | "range" | "accuracy", number>>;
+
+export function rubricHistory(chain: { result: { scores?: RubricScores } | null }[]): {
   criteria: { key: string; first: number; last: number; delta: number }[];
   note: string;
 } | null {
@@ -135,11 +137,15 @@ export function rubricHistory(chain: { result: WritingResult | null }[]): {
   if (graded.length < 2) {
     return { criteria: [], note: "Revise once more to unlock criterion deltas - two graded drafts make a comparison." };
   }
-  const first = graded[0].result!.scores;
-  const last = graded[graded.length - 1].result!.scores;
+  const first = graded[0].result!.scores!;
+  const last = graded[graded.length - 1].result!.scores!;
   const keys = ["task", "organization", "range", "accuracy"] as const;
   return {
-    criteria: keys.map((k) => ({ key: k, first: first[k], last: last[k], delta: Math.round((last[k] - first[k]) * 10) / 10 })),
+    criteria: keys.map((k) => {
+      const f = first[k] ?? 0;
+      const l = last[k] ?? 0;
+      return { key: k, first: f, last: l, delta: Math.round((l - f) * 10) / 10 };
+    }),
     note: "Deltas compare the first and last graded drafts of this chain.",
   };
 }

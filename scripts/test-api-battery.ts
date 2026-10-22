@@ -750,6 +750,36 @@ try {
     await prG.$disconnect();
   }
 
+  // --- offline sync beyond grades: arcade gid receipts (Task 78) ---
+  console.log("\n--- offline sync: arcade gid receipts ---");
+  {
+    const { PrismaClient: PCG2 } = await import("@prisma/client");
+    const prG2 = new PCG2();
+    const gameGid = `battery-game-${Date.now()}-a`;
+    const run = { score: 150, correct: 10, total: 10, maxCombo: 3, ms: 30000 };
+    const s1 = await api("/api/arcade/speed", { method: "POST", body: JSON.stringify({ ...run, gid: gameGid }) });
+    check(s1.status === 200 && typeof s1.body?.xpGain === "number", "arcade: speed aggregate accepted (gid)", JSON.stringify(s1.body).slice(0, 100));
+    const plays1 = (await prG2.gameStat.findUnique({ where: { userId_key: { userId: UID, key: "speed:plays" } } }))?.plays ?? 0;
+    const xp1 = (await prG2.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    const s2 = await api("/api/arcade/speed", { method: "POST", body: JSON.stringify({ ...run, gid: gameGid }) });
+    check(s2.status === 200 && s2.body?.replayed === true, "arcade replay: answered from the receipt", JSON.stringify(s2.body).slice(0, 80));
+    check(JSON.stringify(s2.body) === JSON.stringify({ ...s1.body, replayed: true }), "arcade replay: ORIGINAL payload verbatim");
+    const plays2 = (await prG2.gameStat.findUnique({ where: { userId_key: { userId: UID, key: "speed:plays" } } }))?.plays ?? 0;
+    const xp2 = (await prG2.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    check(plays2 === plays1, "arcade replay: NO second play counted", `${plays1} -> ${plays2}`);
+    check(xp2 === xp1, "arcade replay: NO second XP paid", `${xp1} -> ${xp2}`);
+    const s3 = await api("/api/arcade/speed", { method: "POST", body: JSON.stringify({ ...run, gid: `battery-game-${Date.now()}-b` }) });
+    check(s3.status === 200 && s3.body?.replayed !== true, "arcade: different gid = a real new run", JSON.stringify(s3.body).slice(0, 60));
+    const plays3 = (await prG2.gameStat.findUnique({ where: { userId_key: { userId: UID, key: "speed:plays" } } }))?.plays ?? 0;
+    check(plays3 === plays1 + 1, "new gid counts exactly one more play", String(plays3));
+    // dungeon/gauntlet stay online-only: their POSTs are stateful server-dealt
+    // answers (RunState) - an outbox item for them would replay against moved
+    // state, so the client refuses offline instead of faking a queue entry.
+    const dg = await api("/api/arcade/dungeon", { method: "POST", body: JSON.stringify({ idx: 99, pick: "x", gid: `battery-dg-${Date.now()}` }) });
+    check(dg.status < 500, "stateful mode (dungeon) stays honest on garbage input (no fake receipt path)", String(dg.status));
+    await prG2.$disconnect();
+  }
+
   // ================= 6h. BYO MATERIALS (Stage 03 #1) =================
   console.log("\n--- materials ---");
   {
