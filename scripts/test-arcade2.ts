@@ -111,14 +111,14 @@ async function drive(day: number) {
   check("daysLeft 0..6", league.daysLeft >= 0 && league.daysLeft <= 6);
   check("division valid", league.division >= 0 && league.division <= 5, league.divisionName);
   check("promotion cut >= demotion cut", league.promoteCut >= league.demoteCut);
-  const leagueLeague = await db.league.findUnique({ where: { id: "me" } });
+  const leagueLeague = await db.league.findUnique({ where: { userId_id: { userId: "me", id: "me" } } });
   check("league row persisted", !!leagueLeague);
 
   console.log("\n=== DAILY DUNGEON (server-graded) ===");
   // The dungeon is one run per day BY DESIGN, so a run left over from an
   // earlier attempt (user play or a crashed prior suite run) would poison
   // this section. Snapshot-and-delete, then walk a fresh run.
-  await db.runState.deleteMany({ where: { id: `day:${day}` } });
+  await db.runState.deleteMany({ where: { userId: "me", id: `day:${day}` } });
   const dg = await jget("/api/arcade/dungeon");
   check("3 floors x 4 items", dg.floors?.length === 3 && dg.floors.every((f: any) => f.items.length === 4));
   check("no keys in public payload", JSON.stringify(dg).includes('"key"') === false);
@@ -128,7 +128,7 @@ async function drive(day: number) {
   check("miss reveals key", missOut.body.correct === false && typeof missOut.body.key === "string" && missOut.body.key.length > 0);
   check("miss costs a heart", missOut.body.hearts === dg.hearts - 1);
   // Now read the run's keys from the DB and clear the rest correctly.
-  const dgRow = await db.runState.findUnique({ where: { id: `day:${day}` } });
+  const dgRow = await db.runState.findUnique({ where: { userId_id: { userId: "me", id: `day:${day}` } } });
   const dgState = JSON.parse(dgRow!.state);
   let lastOut: any = null;
   const picks: string[] = dgState.floors.flatMap((f: any) => f.items.map((i: any) => i.key));
@@ -137,7 +137,7 @@ async function drive(day: number) {
   }
   check("all-correct run clears", lastOut?.body?.done === true && lastOut.body.cleared === 3, `hearts ${lastOut?.body?.hearts}`);
   check("clear-3 pays 160 XP", lastOut?.body?.xp === 160);
-  const dgBest = await db.gameStat.findUnique({ where: { key: "dungeon:best" } });
+  const dgBest = await db.gameStat.findUnique({ where: { userId_key: { userId: "me", key: "dungeon:best" } } });
   check("dungeon:best recorded", (dgBest?.best ?? 0) === 3);
   // A second run today is locked to the same rooms.
   const dg2 = await jget("/api/arcade/dungeon");
@@ -152,7 +152,7 @@ async function drive(day: number) {
   check("perfect run wins", duelWin.body.win === true, `you ${duelWin.body.youScore} vs ${duelWin.body.rivalScore}`);
   const duelLose = await jpost("/api/arcade/duel", { seed: duel2.seed, correct: 0, total: 8, ms: 39_000 });
   check("zero hits loses", duelLose.body.win === false);
-  const duelWins = await db.gameStat.findUnique({ where: { key: "duel:wins" } });
+  const duelWins = await db.gameStat.findUnique({ where: { userId_key: { userId: "me", key: "duel:wins" } } });
   check("duel:wins >= 2", (duelWins?.best ?? 0) >= 2);
 
   console.log("\n=== GAUNTLET ===");
@@ -162,18 +162,18 @@ async function drive(day: number) {
   // Climb 3 correct answers, reading keys from the DB. A fresh GET always
   // rolls a new run, so a prior death never blocks this climb.
   for (let k = 0; k < 3; k++) {
-    const row = await db.runState.findUnique({ where: { id: "gauntlet" } });
+    const row = await db.runState.findUnique({ where: { userId_id: { userId: "me", id: "gauntlet" } } });
     const st = JSON.parse(row!.state);
     g = await jpost("/api/arcade/gauntlet", { pick: st.item.key });
     if (!g.body.correct) break;
   }
   check("streak climbed to 3", g.body.correct === true && g.body.streak === 3, `streak ${g.body?.streak}`);
-  const gRow = await db.runState.findUnique({ where: { id: "gauntlet" } });
+  const gRow = await db.runState.findUnique({ where: { userId_id: { userId: "me", id: "gauntlet" } } });
   const gSt = JSON.parse(gRow!.state);
   const death = await jpost("/api/arcade/gauntlet", { pick: "zzz-definitely-wrong" });
   check("miss ends the run", death.body.saved !== true && death.body.correct === false, `final streak ${death.body.streak}`);
   check("death pays 8/streak", death.body.xpGain === gSt.streak * 8);
-  const gBest = await db.gameStat.findUnique({ where: { key: "gauntlet:best" } });
+  const gBest = await db.gameStat.findUnique({ where: { userId_key: { userId: "me", key: "gauntlet:best" } } });
   check("gauntlet:best recorded", (gBest?.best ?? 0) === gSt.streak);
   const gFresh = await jget("/api/arcade/gauntlet");
   check("GET after death rolls a new run", gFresh.done === false && gFresh.streak === 0);
@@ -254,21 +254,21 @@ async function restore(ctx: { day: number; learner0: any; stat0: any; gs0: any[]
   }
   // GameStats: restore pre-existing, delete test-made.
   for (const row of gs0) {
-    await db.gameStat.update({ where: { key: row.key }, data: { best: row.best, plays: row.plays } });
+    await db.gameStat.update({ where: { userId_key: { userId: "me", key: row.key } }, data: { best: row.best, plays: row.plays } });
   }
   const kept = new Set(gs0.map((r) => r.key));
-  await db.gameStat.deleteMany({ where: { key: { in: GAME_KEYS.filter((k) => !kept.has(k)) } } });
-  await db.gameStat.deleteMany({ where: { key: { startsWith: "shield:" } } });
+  await db.gameStat.deleteMany({ where: { userId: "me", key: { in: GAME_KEYS.filter((k) => !kept.has(k)) } } });
+  await db.gameStat.deleteMany({ where: { userId: "me", key: { startsWith: "shield:" } } });
   // RunState: restore pre-existing rows, delete test rows.
   for (const row of runRows0) {
-    await db.runState.update({ where: { id: row.id }, data: { state: row.state, day: row.day } });
+    await db.runState.update({ where: { userId_id: { userId: "me", id: row.id } }, data: { state: row.state, day: row.day } });
   }
   const runKept = new Set(runRows0.map((r) => r.id));
   const testRunIds = [`day:${day}`, "gauntlet"].filter((id) => !runKept.has(id));
-  if (testRunIds.length) await db.runState.deleteMany({ where: { id: { in: testRunIds } } });
+  if (testRunIds.length) await db.runState.deleteMany({ where: { userId: "me", id: { in: testRunIds } } });
   // Quests: restore progress/done.
   for (const q of quests0) {
-    await db.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } });
+    await db.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } });
   }
   // Briefing: restore pre-existing row or delete.
   if (brief0) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contentScope } from "@/lib/scope";
+import { contentUserId } from "@/lib/scope";
 import { dayIndex, review, preview, defaultState, type FsrsState } from "@/lib/fsrs";
 import { getLearner, bumpDaily, touchStreak } from "@/lib/server";
 import { awardXp, progressQuest, registerMiss } from "@/lib/arcade";
@@ -14,9 +14,10 @@ export async function POST(req: Request) {
   const dir = String(body.dir ?? "");
   if (!cardId) return NextResponse.json({ error: "cardId required" }, { status: 400 });
 
+  const u = await contentUserId(req);
   const l = await getLearner();
   const today = dayIndex();
-  const row = await db.cardState.findUnique({ where: { cardId } });
+  const row = await db.cardState.findUnique({ where: { userId_cardId: { userId: u, cardId } } });
   const st: FsrsState = row
     ? {
         s: row.s,
@@ -33,8 +34,9 @@ export async function POST(req: Request) {
   const out = review(st, grade, today, l.retention);
 
   await db.cardState.upsert({
-    where: { cardId },
+    where: { userId_cardId: { userId: u, cardId } },
     create: {
+      userId: u,
       cardId,
       s: out.fsrs.s,
       d: out.fsrs.d,
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
     },
   });
 
-  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today, ...(await contentScope(req)) } });
+  await db.reviewLog.create({ data: { cardId, grade, ivl: out.ivl, day: today, userId: u } });
   await bumpDaily("reviews");
   await awardXp(grade >= 3 ? 10 : 5, { chainHit: grade >= 3, perkXp: "review" });
   if (grade < 2) await registerMiss();
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
   await progressQuest("reviews_35", 1);
   if (grade >= 3) await progressQuest("correct_15", 1);
 
-  const next = await db.cardState.findUnique({ where: { cardId } });
+  const next = await db.cardState.findUnique({ where: { userId_cardId: { userId: u, cardId } } });
   return NextResponse.json({
     ivl: out.ivl,
     due: out.due,

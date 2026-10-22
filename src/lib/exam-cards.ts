@@ -98,10 +98,11 @@ export async function scheduleExamOutcomes(
 ): Promise<ScheduledOutcome[]> {
   if (targets.length === 0) return [];
   const l = await getLearner();
+  const u = await contentUserId();
   const today = dayIndex();
   const out: ScheduledOutcome[] = [];
   for (const t of targets) {
-    const row = await db.cardState.findUnique({ where: { cardId: t.cardId } });
+    const row = await db.cardState.findUnique({ where: { userId_cardId: { userId: u, cardId: t.cardId } } });
     // Suspended cards keep their suspension - the learner opted out.
     if (row?.suspended) continue;
     const st: FsrsState = row
@@ -110,11 +111,11 @@ export async function scheduleExamOutcomes(
     const res = review(st, t.grade, today, l.retention);
     const f = res.fsrs;
     await db.cardState.upsert({
-      where: { cardId: t.cardId },
-      create: { cardId: t.cardId, s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl, dir: "" },
+      where: { userId_cardId: { userId: u, cardId: t.cardId } },
+      create: { userId: u, cardId: t.cardId, s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl, dir: "" },
       update: { s: f.s, d: f.d, due: f.due, last: f.last, lapses: f.lapses, reps: f.reps, state: f.state, lastivl: f.lastivl },
     });
-    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source, userId: await contentUserId() } });
+    await db.reviewLog.create({ data: { cardId: t.cardId, grade: t.grade, ivl: res.ivl, day: today, source, userId: u } });
     out.push({ cardId: t.cardId, due: res.due, grade: t.grade, via: t.via });
   }
   return out;

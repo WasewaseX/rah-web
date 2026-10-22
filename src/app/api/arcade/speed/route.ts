@@ -3,6 +3,7 @@ import { buildSpeedPool, type ArcadeItem } from "@/lib/arcade-items";
 import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 // the submitted aggregate.
 export async function GET() {
   const items = await buildSpeedPool(40);
-  const best = await db.gameStat.findUnique({ where: { key: "speed:best" } });
-  const combo = await db.gameStat.findUnique({ where: { key: "speed:combo" } });
+  const u = await contentUserId().catch(() => "me");
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:best" } } });
+  const combo = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "speed:combo" } } });
   return NextResponse.json({
     items: items.map((i: ArcadeItem) => ({ ...i })),
     best: best?.best ?? 0,

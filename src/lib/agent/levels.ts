@@ -3,6 +3,7 @@
 // overall band computed as the weighted mean across measured skills.
 
 import { db } from "@/lib/db";
+import { contentUserId } from "@/lib/scope";
 import type { SkillLevelRow, AssessmentPayload } from "./types";
 
 export const MEASURED_SKILLS = ["grammar", "vocabulary", "writing", "speaking", "reading", "listening"] as const;
@@ -24,7 +25,7 @@ function overallBand(rows: SkillLevelRow[]): string {
 }
 
 export async function getSkillLevels(): Promise<SkillLevelRow[]> {
-  const rows = await db.skillLevel.findMany();
+  const rows = await db.skillLevel.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const byId = new Map(rows.map((r) => [r.skill, r]));
   return MEASURED_SKILLS.map((skill) => {
     const r = byId.get(skill);
@@ -40,18 +41,19 @@ export async function getSkillLevels(): Promise<SkillLevelRow[]> {
 // Rolling update: new evidence nudges the mastery score, never nukes it.
 // alpha grows with samples so early evidence moves fast, later evidence moves slow.
 export async function updateSkillLevels(evidence: { skill: string; score: number; samples: number }[]) {
+  const u = await contentUserId().catch(() => "me");
   for (const ev of evidence) {
     if (!/^(grammar|vocabulary|writing|speaking|reading|listening)$/.test(ev.skill)) continue;
     if (ev.samples <= 0) continue;
-    const existing = await db.skillLevel.findUnique({ where: { skill: ev.skill } });
+    const existing = await db.skillLevel.findUnique({ where: { userId_skill: { userId: u, skill: ev.skill } } });
     const prevScore = existing?.score ?? 0.5;
     const prevSamples = existing?.samples ?? 0;
     const total = prevSamples + ev.samples;
     const alpha = Math.max(0.2, 1 - prevSamples / (prevSamples + ev.samples + 4));
     const score = Math.min(1, Math.max(0, prevScore * (1 - alpha) + ev.score * alpha));
     await db.skillLevel.upsert({
-      where: { skill: ev.skill },
-      create: { skill: ev.skill, score, level: band(score), samples: total },
+      where: { userId_skill: { userId: u, skill: ev.skill } },
+      create: { userId: u, skill: ev.skill, score, level: band(score), samples: total },
       update: { score, level: band(score), samples: total },
     });
   }

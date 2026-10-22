@@ -14,12 +14,13 @@ import { dayIndex, cardR, type FsrsState } from "@/lib/fsrs";
 import { awardXp, bumpStat, progressQuest } from "@/lib/arcade";
 import { touchStreak } from "@/lib/server";
 import { buildPairs } from "@/lib/pairs";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
 async function dueCardsForPairs(): Promise<Card[]> {
   const today = dayIndex();
-  const all = await db.cardState.findMany();
+  const all = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const due = all
     .filter((s) => !s.suspended && s.state !== "new" && s.due <= today)
     .sort((a, b) => cardR(a as unknown as FsrsState, today) - cardR(b as unknown as FsrsState, today))
@@ -37,7 +38,7 @@ async function dueCardsForPairs(): Promise<Card[]> {
 export async function GET() {
   const cards = await dueCardsForPairs();
   const board = buildPairs(cards, dayIndex());
-  const best = await db.gameStat.findUnique({ where: { key: "pairs:clean" } });
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "pairs:clean" } } });
   return NextResponse.json({
     left: board.left,
     right: board.right,

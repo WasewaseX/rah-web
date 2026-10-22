@@ -151,7 +151,7 @@ try {
     // lapses incremented, stability crushed) - exactly what the review route
     // does for the same grade. Same-day healing is the exam result screen's
     // drill handoff; the SCHEDULE now owns the resurfacing.
-    const famCard = await prisma.cardState.findUnique({ where: { cardId: `${EXAM_CARD_PREFIX}${TAG}` } });
+    const famCard = await prisma.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId: `${EXAM_CARD_PREFIX}${TAG}` } } });
     check(
       !!famCard && famCard.lapses === 1 && famCard.due <= today + 1 && famCard.due > today - 1 && famCard.s < 1,
       "bomb: lapse recorded, scheduled at post-lapse minimum",
@@ -159,7 +159,7 @@ try {
     );
 
     // 4) pass side: deck card interval extended past today
-    const deckCard = await prisma.cardState.findUnique({ where: { cardId: DECK_HIT.id } });
+    const deckCard = await prisma.cardState.findUnique({ where: { userId_cardId: { userId: "me", cardId: DECK_HIT.id } } });
     check(!!deckCard && deckCard.due > today, "pass: deck card due moved into the future", JSON.stringify(deckCard));
 
     // provenance
@@ -174,7 +174,7 @@ try {
     // 5) queue surfacing on the real-world timeline: yesterday's bomb is
     // due TODAY. Pin the healing card due now and prove the queue renders
     // it from the family's own evidence.
-    await prisma.cardState.update({ where: { cardId: `${EXAM_CARD_PREFIX}${TAG}` }, data: { due: today } });
+    await prisma.cardState.update({ where: { userId_cardId: { userId: "me", cardId: `${EXAM_CARD_PREFIX}${TAG}` } }, data: { due: today } });
     const q = await fetch(`${BASE}/api/review/queue`);
     const qj = (await q.json()) as { batch?: { card: { id: string; kind: string; prompt: string; answer: string; note: string; skill: string } }[] };
     const qcards = (qj.batch ?? []).map((b) => b.card);

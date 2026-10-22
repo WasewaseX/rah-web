@@ -3,6 +3,7 @@ import { buildBossFight, type BossPhase } from "@/lib/arcade-items";
 import { db } from "@/lib/db";
 import { awardXp, bumpStat, progressQuest, registerMiss } from "@/lib/arcade";
 import { bumpDaily, touchStreak } from "@/lib/server";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,8 @@ const PER_PHASE = 8;
 // to the client for instant combat feedback, the server checks the aggregate.
 export async function GET() {
   const phases: BossPhase[] = await buildBossFight(PER_PHASE, PHASES);
-  const wins = await db.gameStat.findUnique({ where: { key: "boss:wins" } });
+  const u = await contentUserId().catch(() => "me");
+  const wins = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "boss:wins" } } });
   return NextResponse.json({ phases, bossWins: wins?.best ?? 0 });
 }
 

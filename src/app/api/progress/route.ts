@@ -18,7 +18,7 @@ export async function GET() {
     return { day: d, reviews: s?.reviews ?? 0, correct: s?.correct ?? 0, xp: s?.xp ?? 0 };
   });
 
-  const states = await db.cardState.findMany();
+  const states = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const byUnit: Record<string, { total: number; started: number; mature: number }> = {};
   for (const c of DECK) {
     byUnit[c.unit] ??= { total: 0, started: 0, mature: 0 };

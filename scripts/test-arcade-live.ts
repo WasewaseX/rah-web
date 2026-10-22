@@ -93,11 +93,11 @@ async function main() {
   await db.learner.update({ where: { id: "me" }, data: { xp: learner0?.xp ?? 0, freezes: learner0?.freezes ?? 0 } });
   if (stat0) await db.dailyStat.update({ where: { userId_day: { userId: "me", day } }, data: { reviews: stat0.reviews, correct: stat0.correct, xp: stat0.xp, spoken: stat0.spoken, written: stat0.written, listened: stat0.listened } });
   else await db.dailyStat.deleteMany({ where: { userId: "me", day } });
-  for (const s of stats0) await db.gameStat.update({ where: { key: s.key }, data: { best: s.best, plays: s.plays } }).catch(() => undefined);
-  for (const s of stats1) if (!stats0.find((x) => x.key === s.key)) await db.gameStat.delete({ where: { key: s.key } }).catch(() => undefined);
-  for (const q of quests0) await db.quest.update({ where: { id: q.id }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
+  for (const s of stats0) await db.gameStat.update({ where: { userId_key: { userId: "me", key: s.key } }, data: { best: s.best, plays: s.plays } }).catch(() => undefined);
+  for (const s of stats1) if (!stats0.find((x) => x.key === s.key)) await db.gameStat.delete({ where: { userId_key: { userId: "me", key: s.key } } }).catch(() => undefined);
+  for (const q of quests0) await db.quest.update({ where: { userId_id: { userId: "me", id: q.id } }, data: { progress: q.progress, done: q.done } }).catch(() => undefined);
   const achKeys = new Set((await (await import("../src/lib/arcade")).ACHIEVEMENTS).map((a) => a.key));
-  for (const a of achievements) if (!achKeys.has(a.key)) await db.achievement.delete({ where: { key: a.key } }).catch(() => undefined);
+  for (const a of achievements) if (!achKeys.has(a.key)) await db.achievement.delete({ where: { userId_key: { userId: "me", key: a.key } } }).catch(() => undefined);
 
   console.log(`\nARCADE LIVE ${pass} pass, ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);

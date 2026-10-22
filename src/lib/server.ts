@@ -68,7 +68,8 @@ export interface QueueCounts {
 export async function queueCounts(): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
-  const all = await db.cardState.findMany();
+  const u = await contentUserId().catch(() => "me");
+  const all = await db.cardState.findMany({ where: { userId: u } });
   // BYO-material cards (cardId "mat:<id>") share the SAME queue, budget and
   // badge truth as deck cards - the Task-44 lesson: one source of truth.
   const deckStates = all.filter((s) => !s.cardId.startsWith("mat:"));
@@ -102,12 +103,13 @@ export async function dueCount(): Promise<number> {
 // Live learner profile handed to every AI job.
 export async function buildProfile(): Promise<ProfileJson> {
   const l = await getLearner();
+  const u = await contentUserId().catch(() => "me");
   const today = dayIndex();
   const due = await dueCount();
 
   // Recent trap tags from the last graded lapses drive AI focus.
   const recent = await db.reviewLog.findMany({
-    where: { grade: 1 },
+    where: { userId: u, grade: 1 },
     orderBy: { id: "desc" },
     take: 12,
   });
@@ -118,7 +120,7 @@ export async function buildProfile(): Promise<ProfileJson> {
   }
 
   // Weakest skills by lapse ratio over cards with reps.
-  const states = await db.cardState.findMany({ where: { reps: { gt: 3 } } });
+  const states = await db.cardState.findMany({ where: { userId: u, reps: { gt: 3 } } });
   const agg: Record<string, { ok: number; lapse: number }> = {};
   for (const st of states) {
     const c = cardById(st.cardId);
@@ -168,7 +170,8 @@ export async function buildProfile(): Promise<ProfileJson> {
 // signal and name the fix, the way a human coach would.
 export async function diagnose() {
   const today = dayIndex();
-  const states = await db.cardState.findMany();
+  const u = await contentUserId().catch(() => "me");
+  const states = await db.cardState.findMany({ where: { userId: u } });
   const bySkill: Record<string, { due: number; lapses: number; reps: number; young: number }> = {};
   for (const st of states) {
     const c = cardById(st.cardId);

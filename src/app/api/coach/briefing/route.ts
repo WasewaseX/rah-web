@@ -6,6 +6,7 @@ import { fallbackBrief } from "@/lib/degraded";
 import { buildProfile, getLearner, dueCount } from "@/lib/server";
 import { getRivalView, ensureQuests, getChain } from "@/lib/arcade";
 import { nextBestActions } from "@/lib/next-best";
+import { contentUserId } from "@/lib/scope";
 
 import { aiRateLimit } from "@/lib/rate-limit";
 
@@ -42,11 +43,12 @@ export async function GET(req: Request) {
   const persona = (PERSONAS as Record<string, string>)[l.persona] ?? PERSONAS.mentor;
   const profile = await buildProfile();
   await ensureQuests();
+  const uB = await contentUserId().catch(() => "me");
   const [rival, due, chain, quests, nextBest] = await Promise.all([
     getRivalView(),
     dueCount(),
     getChain(),
-    db.quest.findMany({ where: { day: today } }),
+    db.quest.findMany({ where: { userId: uB, day: today } }),
     nextBestActions(),
   ]);
   const context = {

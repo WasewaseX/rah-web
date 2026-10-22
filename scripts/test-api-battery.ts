@@ -152,6 +152,13 @@ try {
   check(cookie.includes("rah_session="), "session cookie captured", cookie.slice(0, 24));
   const api = makeApi(cookie);
 
+  // Task 67: every learning table is (userId, ...) keyed now - the direct-DB
+  // seeds below must land on the SESSION user's rows, not the legacy singleton.
+  const { PrismaClient: PCUid } = await import("@prisma/client");
+  const prUid = new PCUid();
+  const UID = (await prUid.user.findUnique({ where: { email: EMAIL } }))?.id ?? "me";
+  await prUid.$disconnect();
+
   // --- auth hardening pins (P0-3/P0-4 wave) ---
   console.log("\n--- auth hardening ---");
   {
@@ -499,12 +506,12 @@ try {
   // Isolate the day: remove whatever logs the restored snapshot holds for it
   // (the final commitImport restore puts every row back), then seed exact
   // math. The assertion must never depend on ambient learner data.
-  await pr2.reviewLog.deleteMany({ where: { day: today2 } });
+  await pr2.reviewLog.deleteMany({ where: { userId: UID, day: today2 } });
   await pr2.reviewLog.createMany({
     data: [
-      { cardId: "battery-outcome-1", grade: 5, ivl: 10, day: today2, source: "review" },
-      { cardId: "battery-outcome-2", grade: 4, ivl: 6, day: today2, source: "review" },
-      { cardId: "battery-outcome-3", grade: 1, ivl: 0, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-1", grade: 5, ivl: 10, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-2", grade: 4, ivl: 6, day: today2, source: "review" },
+      { userId: UID, cardId: "battery-outcome-3", grade: 1, ivl: 0, day: today2, source: "review" },
     ],
   });
   const ocAnon = await noCookie("/api/progress/outcomes");
@@ -725,7 +732,7 @@ try {
     const prM = new PC6();
     // Fresh budget: earlier sections may have spent today's introductions.
     await prM.learner.update({ where: { id: "me" }, data: { newPerDay: 10 } });
-    await prM.cardState.deleteMany({ where: { last: Math.floor(Date.now() / 86400000), reps: 1 } });
+    await prM.cardState.deleteMany({ where: { userId: UID, last: Math.floor(Date.now() / 86400000), reps: 1 } });
 
     const matId = `m_battery${Date.now()}`;
     const c1 = `mat:batt${Date.now()}a`;
@@ -734,6 +741,7 @@ try {
     await prM.material.create({
       data: {
         id: matId,
+        userId: UID,
         title: "battery material",
         source: "battery",
         text: "The engineer decided to implement the proposal ahead of the deadline. She took the criticism on the chin and kept the momentum going.",
@@ -742,8 +750,8 @@ try {
     });
     await prM.materialCard.create({ data: { id: c1, materialId: matId, front: "The engineer decided to ___ the proposal ahead of the deadline.", answer: "implement", context: "The engineer decided to implement the proposal ahead of the deadline.", note: "to put a plan into action" } });
     await prM.materialCard.create({ data: { id: c2, materialId: matId, front: "She took the ___ on the chin and kept going.", answer: "criticism", context: "She took the criticism on the chin and kept the momentum going.", note: "to accept blame without complaining" } });
-    await prM.cardState.create({ data: { cardId: c1, due: todayM } });
-    await prM.cardState.create({ data: { cardId: c2, due: todayM } });
+    await prM.cardState.create({ data: { userId: UID, cardId: c1, due: todayM } });
+    await prM.cardState.create({ data: { userId: UID, cardId: c2, due: todayM } });
     await prM.$disconnect();
 
     const q1 = await api("/api/review/queue");
@@ -875,8 +883,8 @@ try {
       const todayS = Math.floor(Date.now() / 86400000);
       const sid = "col001";
       await prS.cardState.upsert({
-        where: { cardId: sid },
-        create: { cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
+        where: { userId_cardId: { userId: UID, cardId: sid } },
+        create: { userId: UID, cardId: sid, s: 2, d: 5, due: todayS, last: todayS - 2, lapses: 0, reps: 2, state: "review", lastivl: 2 },
         update: { suspended: false, due: todayS, state: "review" },
       });
       await prS.$disconnect();

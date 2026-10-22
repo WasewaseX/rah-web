@@ -16,7 +16,8 @@ const ITEMS = 8;
 export async function GET() {
   const [items, l] = await Promise.all([buildSpeedPool(ITEMS), getLearner()]);
   const seed = Math.floor(Date.now() / 1000) % 2_000_000_000;
-  const recent = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me"), day: { gte: dayIndex() - 14 } } });
+  const u = await contentUserId().catch(() => "me");
+  const recent = await db.dailyStat.findMany({ where: { userId: u, day: { gte: dayIndex() - 14 } } });
   const tot = recent.reduce((s, r) => s + r.reviews, 0);
   const cor = recent.reduce((s, r) => s + r.correct, 0);
   const accuracy = tot >= 20 ? cor / tot : 0.6;
@@ -28,8 +29,8 @@ export async function GET() {
     parHits,
     rivalScore: parHits * 10 + 20, // + flat time bonus: the rival is quick
     timer,
-    wins: (await db.gameStat.findUnique({ where: { key: "duel:wins" } }))?.best ?? 0,
-    streak: (await db.gameStat.findUnique({ where: { key: "duel:streak" } }))?.best ?? 0,
+    wins: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "duel:wins" } } }))?.best ?? 0,
+    streak: (await db.gameStat.findUnique({ where: { userId_key: { userId: await contentUserId().catch(() => "me"), key: "duel:streak" } } }))?.best ?? 0,
   });
 }
 
@@ -51,8 +52,9 @@ export async function POST(req: Request) {
   const win = youScore > rivalScore;
 
   if (win) {
-    const w = (await db.gameStat.findUnique({ where: { key: "duel:wins" } }))?.best ?? 0;
-    const s = (await db.gameStat.findUnique({ where: { key: "duel:streak" } }))?.best ?? 0;
+    const uW = await contentUserId().catch(() => "me");
+    const w = (await db.gameStat.findUnique({ where: { userId_key: { userId: uW, key: "duel:wins" } } }))?.best ?? 0;
+    const s = (await db.gameStat.findUnique({ where: { userId_key: { userId: uW, key: "duel:streak" } } }))?.best ?? 0;
     await bumpStat("duel:wins", w + 1);
     await bumpStat("duel:streak", s + 1);
     await progressQuest("duel_1", 1);

@@ -121,7 +121,7 @@ export async function planFor(userId?: string): Promise<GoalPlan> {
   const today = dayIndex();
 
   const dueRows = await db.cardState.findMany({
-    where: { suspended: false, due: { lte: today + 7 } },
+    where: { userId: u, suspended: false, due: { lte: today + 7 } },
     select: { due: true },
   });
   const buckets = new Map<number, number>();

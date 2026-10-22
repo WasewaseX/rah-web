@@ -6,6 +6,7 @@ import { ladderFor } from "@/lib/ladder";
 import { awardXp, bumpStat, progressQuest, registerMiss, hasPerk, learnerPerks } from "@/lib/arcade";
 import { buildDungeonFloors, normalizeAnswer, type ArcadeItem, type DungeonFloor } from "@/lib/arcade-items";
 import type { XpResult } from "@/lib/arcade";
+import { contentUserId } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,8 @@ function freshHearts(): number {
 async function loadRun(): Promise<{ id: string; state: DungeonState; isNew: boolean }> {
   const day = dayIndex();
   const id = `day:${day}`;
-  const row = await db.runState.findUnique({ where: { id } });
+  const u = await contentUserId().catch(() => "me");
+  const row = await db.runState.findUnique({ where: { userId_id: { userId: u, id } } });
   const l = await getLearner();
   if (row) {
     try {
@@ -42,7 +44,7 @@ async function loadRun(): Promise<{ id: string; state: DungeonState; isNew: bool
   const floors = await buildDungeonFloors(day, ladderFor(l.level).band);
   const maxHearts = freshHearts() + (hasPerk(l.perks, "dungeon_heart") ? 1 : 0);
   const state: DungeonState = { floors, answers: Array(ITEM_COUNT).fill(null), hearts: maxHearts, maxHearts, done: false, cleared: 0, hits: 0 };
-  await db.runState.upsert({ where: { id }, create: { id, day, state: JSON.stringify(state) }, update: { day, state: JSON.stringify(state) } });
+  await db.runState.upsert({ where: { userId_id: { userId: u, id } }, create: { userId: u, id, day, state: JSON.stringify(state) }, update: { day, state: JSON.stringify(state) } });
   return { id, state, isNew: true };
 }
 
@@ -63,7 +65,8 @@ function publicRun(state: DungeonState) {
 
 export async function GET() {
   const { state, isNew } = await loadRun();
-  const best = await db.gameStat.findUnique({ where: { key: "dungeon:best" } });
+  const u = await contentUserId().catch(() => "me");
+  const best = await db.gameStat.findUnique({ where: { userId_key: { userId: u, key: "dungeon:best" } } });
   return NextResponse.json({ ...publicRun(state), isNew, best: best?.best ?? 0 });
 }
 
@@ -122,6 +125,6 @@ export async function POST(req: Request) {
     if (out.perfect) await bumpStat("dungeon:perfect", 1);
     await bumpStat("dungeon:runs");
   }
-  await db.runState.update({ where: { id }, data: { state: JSON.stringify(state) } });
+  await db.runState.update({ where: { userId_id: { userId: await contentUserId().catch(() => "me"), id } }, data: { state: JSON.stringify(state) } });
   return NextResponse.json(out);
 }

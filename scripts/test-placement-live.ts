@@ -22,7 +22,7 @@ function check(ok: boolean, name: string, detail = "") {
 }
 
 const learnerBefore = await db.learner.findUnique({ where: { id: "me" } });
-const placementBefore = await db.placement.findUnique({ where: { id: "main" } });
+const placementBefore = await db.placement.findUnique({ where: { userId_id: { userId: "me", id: "main" } } });
 const familiesBefore = await db.mistakeFamily.findMany();
 
 // Healed families the drive's tags should reopen: proof the diagnostic counts
@@ -177,7 +177,7 @@ try {
       },
     });
   }
-  await db.placement.deleteMany({ where: { id: "main" } });
+  await db.placement.deleteMany({ where: { userId: "me", id: "main" } });
   if (placementBefore) {
     await db.placement.create({ data: placementBefore });
   }
