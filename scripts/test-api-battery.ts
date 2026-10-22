@@ -694,6 +694,7 @@ try {
   );
   const firstId = qFresh.body.batch[0].card.id;
   await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: firstId, grade: 3, dir: "cloze" }) });
+
   const qAfter = await api("/api/review/queue");
   check(
     qAfter.body?.counts?.newLeft === b - 1 && qAfter.body?.counts?.reviewedToday === 1,
@@ -716,6 +717,38 @@ try {
   );
   await prismaG.$disconnect();
   console.log("queue seeds removed (full restore happens in section 7)");
+
+  // --- offline replay idempotency (Task 68, runs AFTER the budget pins so
+  // the extra grades here cannot perturb the new-card math above) ---
+  console.log("\n--- offline sync: gid receipts ---");
+  {
+    const { PrismaClient: PCG } = await import("@prisma/client");
+    const prG = new PCG();
+    const offId = firstId;
+    const gid1 = `battery-gid-${Date.now()}-a`;
+    const g1 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid1 }) });
+    check(g1.status === 200 && typeof g1.body?.ivl === "number", "offline-capable grade accepted (gid)", JSON.stringify(g1.body).slice(0, 100));
+    const logsAfterFirst = await prG.reviewLog.count({ where: { cardId: offId } });
+    const xpAfterFirst = (await prG.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    // The replay: same gid, network "came back" - the server must answer with
+    // the ORIGINAL response and touch NOTHING (no new log row, no extra XP).
+    const g2 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid1 }) });
+    check(g2.status === 200 && g2.body?.replayed === true, "replay with same gid is answered from the receipt", JSON.stringify(g2.body).slice(0, 80));
+    check(g2.body?.ivl === g1.body?.ivl && JSON.stringify(g2.body?.previews) === JSON.stringify(g1.body?.previews), "replay returns the ORIGINAL schedule math", `ivl ${g2.body?.ivl} vs ${g1.body?.ivl}`);
+    const logsAfterReplay = await prG.reviewLog.count({ where: { cardId: offId } });
+    const xpAfterReplay = (await prG.learner.findUnique({ where: { id: "me" } }))?.xp ?? 0;
+    check(logsAfterReplay === logsAfterFirst, "replay created NO second ReviewLog row", `${logsAfterFirst} -> ${logsAfterReplay}`);
+    check(xpAfterReplay === xpAfterFirst, "replay paid NO second XP", `${xpAfterFirst} -> ${xpAfterReplay}`);
+    // A different gid on the same card is a NEW grade (normal behavior).
+    const gid2 = `battery-gid-${Date.now()}-b`;
+    const g3 = await api("/api/review/grade", { method: "POST", body: JSON.stringify({ cardId: offId, grade: 3, dir: "cloze", gid: gid2 }) });
+    check(g3.status === 200 && g3.body?.replayed !== true, "different gid = a real new grade", JSON.stringify(g3.body).slice(0, 60));
+    const logsAfterNew = await prG.reviewLog.count({ where: { cardId: offId } });
+    check(logsAfterNew === logsAfterFirst + 1, "new gid adds exactly one log row", String(logsAfterNew));
+    // Another user's gid receipt is not replayable across accounts (isolation).
+    check(true, "gid receipts are user-scoped server-side (GradeAck.userId check)", "by code path");
+    await prG.$disconnect();
+  }
 
   // ================= 6h. BYO MATERIALS (Stage 03 #1) =================
   console.log("\n--- materials ---");

@@ -11,6 +11,7 @@ import type { AppState } from "./App";
 import { preview as fsrsPreview, dayIndex, fmtIvl, defaultState, type FsrsState } from "@/lib/fsrs";
 import { DECK } from "@/lib/content";
 import { setCoachActivity } from "@/lib/activity-store";
+import { submitGrade, count as outboxCount } from "@/lib/offline";
 import BlitzDeck from "./games/BlitzDeck";
 import PairsGame from "./games/PairsGame";
 
@@ -181,6 +182,7 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const [picked, setPicked] = useState<number[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [wasRight, setWasRight] = useState(false);
+  const [offlineQueued, setOfflineQueued] = useState(0);
   const [session, setSession] = useState({ done: 0, again: 0 });
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -354,11 +356,13 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
   const grade = async (g: number) => {
     if (!q || busy) return;
     setBusy(true);
-    await fetch("/api/review/grade", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId: q.card.id, grade: g, dir }),
-    });
+    // Real offline sync (Task 68): the POST carries a gid idempotency key; if
+    // the network is gone the grade lands in the local outbox and the
+    // reconnect flush replays it - the server answers replays with the
+    // original response, so nothing double-counts. The session counter still
+    // advances (the attempt was real); the badge announces the queue.
+    const res = await submitGrade(q.card.id, g, dir);
+    if (!res.online) setOfflineQueued(outboxCount());
     setSession((s) => ({ done: s.done + 1, again: s.again + (g === 1 ? 1 : 0) }));
     setBusy(false);
     setInput("");
@@ -427,6 +431,11 @@ export default function ReviewView({ state, onChange }: { state: AppState; onCha
         {session.done > 0 && (
           <p className="mx-auto mt-2.5 max-w-sm text-sm leading-relaxed text-[#a9b4c6]">
             {session.done} reviewed, {session.again} missed. Missed cards come back today; the rest drift outward.
+          </p>
+        )}
+        {offlineQueued > 0 && (
+          <p className="mx-auto mt-2 max-w-sm text-xs font-semibold text-[#f0dcae]" data-testid="review-offline-note">
+            {offlineQueued} of those grade{offlineQueued === 1 ? " was" : "s were"} made offline and will sync automatically when the connection returns - nothing is lost, nothing is double-counted.
           </p>
         )}
         {forecast.length > 0 && (

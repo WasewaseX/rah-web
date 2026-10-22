@@ -104,6 +104,18 @@ model ReviewLog {
   @@index([userId])
 }
 
+// Offline-sync receipt (Task 68, audit P1): the client grades reviews offline
+// and replays them on reconnect. gid is the CLIENT-generated idempotency key
+// (uuid per grade attempt) - the stored response lets a replay return the
+// ORIGINAL result, so a double flush can never double-count XP, streaks or
+// quest progress. Receipts expire (7-day purge on write).
+model GradeAck {
+  gid      String   @id
+  userId   String
+  response String // the exact JSON the first attempt returned
+  at       DateTime @default(now())
+}
+
 // Transactional email ledger (audit P2): every send attempt is recorded with
 // its SMTP result so "did the email go out?" is answerable from the DB, and
 // the unique idemKey makes double-clicks / request retries idempotent - the
