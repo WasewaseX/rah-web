@@ -49,7 +49,7 @@
 | 7 | Mistake memory/mastery | **DONE (Task 65 closed the last pending clause)** | Persistent mistake families feed weakness bias; retirement rate in the outcomes ledger; NEW (Task 65): learner-side correction of wrong evidence/labels (owner-only, editedAt provenance so learner-edited text never reads as AI-mined) + forget-with-tombstone (the exact rejected pair never re-aggregates; genuinely new evidence reopens the family); per-user scoping + tombstones proven over HTTP (isolation battery 29/29, memory battery 15/15). |
 | 8 | XP/gems/quests/bot | **PARTIAL** | Practice bot self-labeled (Task 44), shop tooltips. Anti-farming pass pending. |
 | 9 | Progress reports | **PARTIAL** | Effectiveness + improvement ledgers, zero-AI numbers (Tasks 39/41). Proxy-metric caveats on spoken fluency pending. |
-| 10 | Onboarding/naming | **PARTIAL** | PRACTICE BOT badge, shop tooltips, forecast copy (Task 44). Full plain-language naming audit (e.g. beyond "Behnam Blackout") pending. |
+| 10 | Onboarding/naming | **DONE (Task 82)** | Task 44's PRACTICE BOT badge + shop tooltips + forecast copy, plus NOW the canonical naming registry (`lib/naming.ts`): every coined name carries a plain-language gloss (the whole Arcade floor renders its active tab's gloss on-screen + screen-reader text; Duel and League carry the "practice bot(s)" chip so no surface implies a real opponent); a plain-language rule (no gloss leans on another coined name) is battery-pinned 9/9. Rival names like "Behnam Blackout" are generated bot flavor — the bot chip now sits beside every surface that shows one. |
 
 ## 4. Three apps to reverse-engineer next
 

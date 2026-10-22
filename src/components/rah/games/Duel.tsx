@@ -130,7 +130,10 @@ export default function Duel({ onChange }: { onChange: () => void }) {
             <Swords className="h-4 w-4" />
           </span>
           <div>
-            <div className="text-sm font-extrabold text-[#f2f5fa]">Rival Duel</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-[#f2f5fa]">Rival Duel</span>
+              <span className="rounded-full border border-[#a78bfa]/40 bg-[#a78bfa]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#cfc3fc]" title="A simulated opponent - no other learner is on the other side">practice bot</span>
+            </div>
             <div className="text-[11px] text-[#7d889c]">
               Wins {data.wins} · streak {data.streak} · the rival parries about {data.parHits}/8
             </div>

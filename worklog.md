@@ -1337,3 +1337,18 @@ Work Log:
 
 Stage Summary:
 - The exam engine now enforces: fairly asked + answerable + key present + distractors real, distinct, and shape-plausible - with a repair attempt in between. Remaining partials after this: onboarding/naming audit (polish #10), exam-track rubric validation (external dependency), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions.
+
+---
+Task ID: 82
+Agent: Super Z (main)
+Task: The last polish partial - the full plain-language naming audit.
+
+Work Log:
+- src/lib/naming.ts: the canonical registry of every coined name (Speed Round, Boss Battle, Voice Arena, Daily Dungeon, Rival Duel, The Gauntlet, League, Flow, Talents, Trophies, Mind Reader, Sound Lab, Read Aloud, The Examiner, practice bot) each with a plain-language gloss; glossIsPlain enforces the rule that no gloss leans on another coined name.
+- Arcade floor: every tab carries its gloss (screen-reader text on the button + the ACTIVE tab's name+gloss rendered on-screen, so a new learner always knows what the jargon means before entering).
+- Duel + League: the "practice bot(s)" chip (same styling as Home's Task-44 badge) now sits on EVERY surface that shows a rival - no surface implies a real opponent anymore; tooltips spell it out.
+- BATTERY CATCH (mine, again in the fixture class): the examiner gloss itself used "Boss Battle" - the plain-language rule caught MY OWN gloss; fixed the gloss, rule pinned.
+- GATES: naming battery 9/9, tsc 0, eslint 0. Ledger: polish #10 -> DONE; category table polish 9/1 -> 10/0.
+
+Stage Summary:
+- The polish category is 10/10. Remaining PARTIALs anywhere: exam-track rubric validation (external dependency - expert-reviewed responses), dungeon/gauntlet offline redesign (deliberate), writing per-revision edit suggestions, the three deferred stores, Azure phoneme validation (needs a key), the physical PG flip + lock decision (deployment), the GitHub Support purge (account holder), and the pilot itself (weeks).
