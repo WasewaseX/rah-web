@@ -148,12 +148,12 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - ✅ Agent permissions + prompt-injection defenses (Task 51)
 - ✅ Account deletion + privacy cleanup (Task 49)
 - ✅ Isolated automated tests (Task 52)
-- 🟡 Learner data isolation — deployment lock in place (Task 48); per-user scoping + two-user tests still pending (multi-user mega-update). The evaluator's 2026-10-22 P0-architecture row — unchanged in priority.
+- ✅ Learner data isolation — deployment lock in place (Task 48) AND per-user scoping complete (Tasks 63+65+67): every learning table carries userId (content, memory, stats, goals, and as of Task 67 the FSRS queue, arcade meta, skill bands, placement history, imported materials), reads/deletes scoped, two-account battery 45/45. Remaining before public multi-user: the Postgres move + the lock decision itself.
 
 ### Critical features (3 done, 5 partial, 2 pending)
 - ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59)
 - 🟡 Exam tracks (IELTS/TOEFL/C1A) · 🟡 Acoustic pronunciation assessment · 🟡 Evidence-backed reference · 🟡 Writing-revision workspace · 🟡 Content quality console
-- ❌ Offline sync · ❌ Goal-based weekly planner
+- ✅ Offline sync (Task 68: gid-receipt grade idempotency + client outbox + reconnect flush + honest badge; review-loop scope, model surfaces refuse offline) · ✅ Goal-based weekly planner (Task 65)
 
 ### Polish (3 done, 7 partial)
 - ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier)
@@ -185,10 +185,10 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 | Priority | Remaining work | Status |
 |----------|----------------|--------|
 | P0 — privacy | **Stop publishing live learner DB snapshots; private backups only** | **CLOSED (Task 62)** — vault repo + history scrub; email treated as exposed |
-| P0 — architecture | Real per-user data isolation before public multi-user | **PARTIAL — content surfaces complete (Tasks 63+65)**: chats, essays, transcripts, review logs, the mistake memory (families + corrections + tombstones), the mastery ledger, daily activity stats, goals and all state-route counts are stamped + filtered per user, proven by the two-account battery. Residual for the next wave: CardState (the FSRS deck queue) and arcade meta tables (Quest/GameStat/League/Rival/Achievement/RunState) are still global keys — aggregate state, no learner prose, safe only while the deployment lock holds |
+| P0 — architecture | Real per-user data isolation before public multi-user | **CLOSED (Tasks 63+65+67)** — every learning table carries userId: chats, essays, transcripts, review logs, mistake memory, mastery ledger, daily stats, goals, AND (Task 67) the FSRS deck queue, arcade meta (quests/trophies/game records/rival/league/runs), measured skill bands, placement history and imported materials. Account deletion removes the caller's learner rows in both branches. Proven by the two-account isolation battery 45/45 (queue cross-user blindness, trophies, speed records, per-user quests/rival rows, placement bands, material 404s). Structural remainder: the Postgres move + the deployment-lock decision |
 | P1 — learning quality | Genuine acoustic pronunciation assessment | **DONE (Task 64) — decision shipped in code**: built-in measured word-level tier (server ASR → deterministic alignment, TTS→ASR roundtrip-validated, real-clip E2E at 100/100) + Azure phoneme-assessment adapter dormant until the learner sets AZURE_SPEECH_KEY/REGION; no phoneme claims anywhere until then |
 | P1 — curriculum | Authentic IELTS/TOEFL/C1A tracks | **PARTIAL — format tracks shipped (Task 66)**: IELTS/TOEFL/C1 Advanced-style practice built on the existing exam engine (per-track task-type mix + rubric in the generation prompt, deterministic rough band reference on grading, not-affiliated disclaimers everywhere, skill routing in the coach). Honest limit: format-faithful GENERATED practice, not licensed past papers - those stay out of scope for a zero-licensing app |
-| P1 — reliability | Offline sync + real mobile-browser testing | OPEN |
+| P1 — reliability | Offline sync + real mobile-browser testing | **DONE (Tasks 68+69)** — offline grade queue with server-side gid receipts (replays return the original response; nothing double-counts), reconnect flush, honest badge; the whole app driven at iPhone-14 viewport with fixes shipped (nav-trapped grade grid, tap targets) and an on-device offline E2E |
 | P2 — depth | Learner-memory corrections, goal planner | **DONE (Task 65)** — memory corrections: Mind Reader correct (edit quoted evidence/label, editedAt provenance) + forget with a tombstone (the exact rejected pair never re-aggregates; new evidence still reopens the family); goal planner: deterministic weekly plan from FSRS due-load forecast + observed 14-day rhythm + mastery danger tags, honest feasibility (on_track/tight/overcommitted with numbers), archive-never-delete. Writing revision history DONE (Task 63) |
 | P2 — operations | Transactional email delivery reporting + idempotency | **DONE (Task 63)** — MailLog ledger (one row per recipient+kind = the delivery report), sliding-window idempotency, SMTP messageId reporting |
 
