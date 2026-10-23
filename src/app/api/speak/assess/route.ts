@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No audio reached the server - hold the record button and read the sentence." }, { status: 400 });
   }
   if (audio.length > MAX_AUDIO_BASE64_CHARS) {
-    return NextResponse.json({ error: "Audio clip too large (10MB ceiling) - read one sentence at a time." }, { status: 413 });
+    return NextResponse.json({ error: "Audio clip too large (9MB ceiling) - read one sentence at a time." }, { status: 413 });
   }
 
   const scope = await contentScope(req);

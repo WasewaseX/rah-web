@@ -43,6 +43,10 @@ while true; do
       bash scripts/db-snapshot.sh
       # REG-2: the public repo never sees learner data - offsite = private vault
       bash scripts/vault-sync.sh
+      # Task 90: durable SQLite maintenance - refresh planner stats (stat1 was
+      # EMPTY until this ran once; the 0010 composite indexes need it to win
+      # skewed plans) + bound the WAL file after heavy days.
+      bash scripts/db-optimize.sh || true
       # Task 88: daily privacy sweep - dangling pre-scrub objects on the public
       # repo stay EVIDENCED, not forgotten. exit 1 = the GitHub Support purge
       # is still pending (the one remaining human action of the incident).

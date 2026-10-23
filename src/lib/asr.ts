@@ -11,9 +11,12 @@
 
 import ZAI from "z-ai-web-dev-sdk";
 
-// ~10MB of binary audio. Read-aloud clips are seconds long; this is a ceiling,
-// not a target (abuse-limit belt alongside aiRateLimit).
-export const MAX_AUDIO_BASE64_CHARS = 14_000_000;
+// ~7.5MB of binary audio. Read-aloud clips are seconds long (a sentence is
+// ~300-500KB base64); this is a ceiling, not a target (abuse-limit belt
+// alongside aiRateLimit). Task 90: calibrated UNDER the platform request-body
+// cap observed at ~10.5MB with the auth proxy in the path - a ceiling above
+// that would be unreachable (the body dies before the route can 413 it).
+export const MAX_AUDIO_BASE64_CHARS = 9_000_000;
 
 export interface TranscribeResult {
   text: string;
@@ -41,7 +44,7 @@ function stripDataUrl(b64: string): string {
 export async function transcribeAudio(rawBase64: string): Promise<TranscribeResult> {
   const b64 = stripDataUrl(String(rawBase64 ?? ""));
   if (!b64) throw new Error("No audio reached the server - record again.");
-  if (b64.length > MAX_AUDIO_BASE64_CHARS) throw new Error("Audio clip too large (10MB ceiling).");
+  if (b64.length > MAX_AUDIO_BASE64_CHARS) throw new Error("Audio clip too large (9MB ceiling).");
 
   const zai = await client();
   const res = (await zai.audio.asr.create({ file_base64: b64 })) as { text?: string };

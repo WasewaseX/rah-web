@@ -43,21 +43,32 @@ async function dataProvenance() {
   }
 }
 
-function gitSha(): string {
+// Task 90 optimization: the beacon used to spawn `git rev-parse` AND
+// `git status --porcelain` on EVERY request (~38ms median, measured).
+// The SHA identifies the RUNNING build - fixed at boot, so it is a boot
+// constant. The dirty flag can change while a dev server runs, so it keeps a
+// 60s TTL cache instead of per-request cost. The DB provenance probe below
+// deliberately stays live on every call: it is the data-loss tripwire.
+const BOOT_SHA = (() => {
   try {
     return execSync("git rev-parse HEAD", { cwd: process.cwd(), encoding: "utf8" }).trim().slice(0, 12);
   } catch {
     return "no-git";
   }
-}
+})();
+
+let dirtyCache: { at: number; value: number } = { at: 0, value: -1 };
+const DIRTY_TTL_MS = 60_000;
 
 function dirtyCount(): number {
+  if (Date.now() - dirtyCache.at < DIRTY_TTL_MS) return dirtyCache.value;
   try {
     const out = execSync("git status --porcelain", { cwd: process.cwd(), encoding: "utf8" });
-    return out.split("\n").filter(Boolean).length;
+    dirtyCache = { at: Date.now(), value: out.split("\n").filter(Boolean).length };
   } catch {
-    return -1;
+    dirtyCache = { at: Date.now(), value: -1 };
   }
+  return dirtyCache.value;
 }
 
 function startedAt(): string {
@@ -76,7 +87,7 @@ export async function GET() {
   const data = await dataProvenance();
   return NextResponse.json({
     app: "rah",
-    version: gitSha(),
+    version: BOOT_SHA,
     dirty: dirtyCount(),
     servedAt: new Date().toISOString(),
     startedAt: startedAt(),

@@ -588,7 +588,7 @@ try {
   check(raNoAudio.status === 400, "assess without audio is 400 with a speakable error", JSON.stringify(raNoAudio.body));
   const raBadTarget = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "x" }) });
   check(raBadTarget.status === 400, "assess with junk target is 400 before any audio work", JSON.stringify(raBadTarget.body));
-  const raBig = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "Hello world today", audio: "A".repeat(14_500_000) }) });
+  const raBig = await api("/api/speak/assess", { method: "POST", body: JSON.stringify({ target: "Hello world today", audio: "A".repeat(9_500_000) }) });
   check(raBig.status === 413, "oversized audio is 413, never 500", `status=${raBig.status}`);
 
   // ================= 6e. INTEROP + TRIAGE (7.4 wave C follow) =================
