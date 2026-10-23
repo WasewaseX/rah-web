@@ -1462,3 +1462,40 @@ Work Log:
 
 Stage Summary:
 - The Task-57 machinery actually runs at boot again. Data-survival chain: snapshot -> restore-if-missing -> repair-if-damaged -> migrate -> serve -> snapshot -> sync -> vault.
+
+---
+Task ID: 88-b
+Agent: Super Z (main)
+Task: REG-2 gate catch on the drill artifacts (claims-vs-diff, pre-push window).
+
+Work Log:
+- Session-start sync found HEAD 6 commits AHEAD of origin (unpushed) and the newest drill-evidence commit (45f828e) carrying TWO FULL LEARNER-DB BINARIES (db/drill-safety/pre-drill-full.db, probe-snap.db) for the PUBLIC (anonymously readable) repo.
+- Scrubbed from the index BEFORE push (origin never saw them - no purge request needed), db/drill-safety/*.db + *.sqlite gitignored, the 1-line count JSONs kept (already-public aggregates, needed by the re-runnable drill drivers).
+- HEAD amended to b5c31fb with a real message (the old one was a bare UUID); claims-vs-diff verified: 4 files, zero .db binaries, files remain on disk untracked for drill re-runs.
+
+Stage Summary:
+- The public repo still carries ZERO learner data. The Task-62 lesson (a commit message is not a diff) caught a fresh leak class in the exact window it created: the pre-push window.
+
+---
+Task ID: 89
+Agent: Super Z (main)
+Task: "countinue never stop also optimize the app" - optimization wave with measured baselines, advancing the review's P0s (no new feature wave, per its explicit order).
+
+Work Log:
+- BASELINE (dev mode): queue 217ms, progress 140ms, state 30ms, home 28ms.
+- PROD BOOT: the deployment ran next dev 24/7 while the repo already shipped the standalone path. First flip attempt flapped: the sandbox SUPERVISOR owns :3000 via the package "dev" script on its own pts session and killed the tool-spawned prod server. Fix: scripts/dev-or-prod.sh (prod when a verified .next/standalone/server.js + BUILD_ID exist, RAH_PROD=0 forces dev) wired as the package "dev" entry + the same rule in ensure-server.sh with a LOUD dev fallback. Self-review caught my own draft bug (an unconditional pkill would have killed the just-healthy server) before it ever ran.
+- MIGRATION 0010_perf_indexes: ReviewLog [userId,day]/[userId,cardId]/[userId,grade] (per-day rollups, the Task-87 repair trigger's per-key scan, buildProfile's recent-lapse reads), ChatMsg [userId,at], GradeAck [at] (receipt purge). EXPLAIN QUERY PLAN shows the planner USING them. Mirrored into schema.postgres.prisma.
+- SQLITE WAL: journal_mode delete -> WAL (readers never block the writer); db-guard.sh runs wal_checkpoint(TRUNCATE) before its raw-cp snapshots (the one non-.backup copy path) so no commit can be missed; .gitignore carries -wal/-shm sidecars.
+- ROUTES: /api/progress went 8 sequential queries -> one Promise.all batch AND the writing/speaking trend reads are now scoped per-user (Task-67 isolation doctrine straggler); /api/review/queue's double full-CardState scan removed (queueCounts(preloaded)); Write.tsx allFindings useMemo'd off the per-keystroke path; next.config compress:true, poweredByHeader:false.
+- PILOT VOLUME (review P1-4): /api/progress returns volume {last7,last28} for written/spoken/listened/reviews from the DailyStat ledger (zero extra queries); the Progress view renders a Practice volume card - shown even at all-zeros after browser E2E showed the hidden-when-empty design would hide the instrument exactly when the pilot needs it seen.
+- PG CUTOVER (review P0 #3): scripts/pg-cutover.sh (dry-run default / --sandbox / --pg-url / guarded --flip with .env backup + rollback) + pg_copy_data.py (COPY FROM STDIN, PG COPY escaping, Prisma epoch-ms DateTime -> ISO adaptation, sequence setval) + pg-sandbox-proof.py (atomic single-run because this environment reaps daemons between tool calls). PROVEN on the LIVE learner db: schema from the offline migrate-diff baseline (30 tables, 21 indexes), 30/30 table counts MATCH, learner checksum xp=338/streak=4 identical on both sides, SQLite read-only throughout. Found en route: Turbopack panics on the pgserver venv's python3 symlink - the PG tooling moved OUTSIDE the project tree (/home/z/rah-pg) and the rebuild went green.
+- PRIVACY CHAIN (89-i): sweep re-run 11:31 UTC - unchanged (15/16 pre-scrub SHAs dangling, blob still served at 5156b4b): the GitHub Support purge remains THE human action, now monitored daily by the watchdog; vault private=True, fresh push at boot, watchdog alive.
+- BOOT REGRESSION: the prod server deliberately withholds devCode (NODE_ENV gate - verified working security design), so boot-regression-check.mjs gained a RAH_SESSION path that drives the real authenticated learner paths directly: ALL PASS on the production server (state + coach-agent streamed reply).
+- BROWSER E2E on the prod build: home + Progress render, zero console errors, zero page errors; screenshots download/task89-prod-home.png, task89-prod-progress.png (Practice volume card visible).
+- MEASURED AFTER (prod + route fixes): queue 217ms -> 6.5ms (~33x), progress 140ms -> 7ms (~20x), home 28ms -> 3ms (~9x), state 30ms -> ~7ms.
+- GATES: isolated battery 441/441 (isolated stack; my first run hit the REAL server and correctly died on the registration lock - the canonical gate is test-isolated-battery.sh), guard 53/53, isolation 45/45, tsc 0, eslint 0, CI green on bf78aee.
+- PUSHED: a418d1c..bf78aee (7 commits incl. the scrubbed drill evidence + Tasks 87/88 that had never left the workspace).
+- OPEN FLAG: the public preview edge (preview-16721396.space-z.ai) currently returns a router-level 404 ("404 page not found", header Abc: preview-16721396) while EVERYTHING internal is 200 (app direct, Caddy :81 with the right Host, /api/version). The app is healthy; this is the same edge layer Task 5 saw, this time with the server ALIVE - likely edge re-probe/propagation after the restarts. If the user reports the link still dead: the next lever is a full boot-cycle restart so the edge re-registers, or the platform's own refresh.
+
+Stage Summary:
+- The optimization directive is fulfilled with before/after numbers, the review's P0s advanced as far as the environment allows (purge = monitored human action; recovery drill = proven in Task 87 AND the app now runs the repaired boot path in production mode; PG cutover = executable one-command runbook with a passing data-copy proof on the live data), and the pilot's missing volume instrumentation now exists end to end (ledger -> API -> UI).
