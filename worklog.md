@@ -1537,3 +1537,17 @@ Work Log:
 
 Stage Summary:
 - Round-3 optimization delivered with measured before/after; the drill re-run's value exceeded the optimization: two silent data-survival gaps (stale vault shipping + review-keyed ledger restore) found, fixed, battery-pinned, and re-proven live; one real learner-data loss from those gaps recovered; PG runbook proven reproducible from a cold environment; the environment-recycle recovery itself re-validated the Task-90 boot-road closure in production.
+
+---
+Task ID: 91-b
+Agent: Super Z (main)
+Task: Extended the optimization directive - dependency prune (measured, audit-backed).
+
+Work Log:
+- Import audit (src/ + scripts/ + repo-wide, excluding stale build caches + unrelated skills/ tooling): 15 packages with ZERO real imports - @dnd-kit/core+sortable+utilities, @hookform/resolvers, @mdxeditor/editor, @reactuses/core, @tanstack/react-query+react-table, date-fns, framer-motion, next-auth, next-intl, react-markdown, react-syntax-highlighter, uuid. The "used elsewhere" hits were all stale turbopack SST caches (.next-battery/.next-isolation), tsconfig.tsbuildinfo, and skills/ python - not app code.
+- bun remove x15 (lockfile 693 lines removed). Re-verification chain: tsc 0, eslint 0, isolated battery 441/441 (stale caches did not break the battery env), prod rebuilt via build-prod.sh (BUILD_ID JQWo0kE3, 22 chunks + 4 public files copied into standalone - the wrapper's copy step proven), prod boot regression ALL PASS, RSS ~139MB.
+- Cold-start measured (fresh clone + bun install --frozen-lockfile): node_modules 1.2GB -> 979MB (-18.4%), install 5.0s -> 3.5s, direct deps 71 -> 56. The -18.4% install reduction mirrors the -18.5% initial-JS reduction.
+- CI note: pushed 043c0a6; remote CI confirmation blocked by GitHub API rate limiting (403) - all four CI steps verified locally on the exact tree (frozen-lockfile install in the clone, prisma generate/deploy untouched schema, eslint 0, tsc 0); re-check next session.
+
+Stage Summary:
+- The optimization directive fully served on a third surface: bundle (-18.5% initial JS), API/boot (rounds 1-2), and now install/cold-start (-18.4% size, -29% time, 15 fewer packages to audit and patch). Pushed as 043c0a6.
