@@ -11,6 +11,30 @@
 # refresh both snapshot stores and keep the watchdog alive.
 cd /home/z/my-project || exit 1
 
+# CLIENT-SYNC GUARD (Task 87, the Oct-23 live incident): `prisma migrate deploy`
+# applies SQL but NEVER regenerates the TS client. After any tree sync/reset,
+# a generated client from an older schema boots silently and every query that
+# uses a newer column 500s at runtime (Oct-23: CardState.userId unknown ->
+# /api/state eternal loading + coach-agent dead). Stamp-based check: prisma
+# rewrites the schema copy on generate (not byte-identical), so we record the
+# source schema's hash in a stamp file after each generate; on boot a missing
+# or mismatched stamp means the client predates the current schema -> regen.
+# Never blocks boot: a failed regenerate falls through to the health check,
+# which will fail loudly.
+SCHEMA="prisma/schema.prisma"
+STAMP="node_modules/.prisma/client/.rah-schema-stamp"
+if [ -f "$SCHEMA" ] && [ -d node_modules/.prisma/client ]; then
+  SRC_HASH="$(sha256sum "$SCHEMA" | cut -d' ' -f1)"
+  if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$SRC_HASH" ]; then
+    echo "$(date -Is) prisma client stale (schema stamp drift) - regenerating"
+    if bunx prisma generate >> /tmp/prisma-generate.log 2>&1; then
+      echo "$SRC_HASH" > "$STAMP"
+    else
+      echo "$(date -Is) WARNING: prisma generate failed - see /tmp/prisma-generate.log"
+    fi
+  fi
+fi
+
 bash scripts/db-guard.sh boot || true   # Task 86 wiring: snapshot-if-used BEFORE any schema work / restore-if-fresh
 bash scripts/db-restore.sh || true
 bash scripts/db-migrate-safe.sh || echo "(migrate skipped/failed - see /tmp/db-migrate.log)"
