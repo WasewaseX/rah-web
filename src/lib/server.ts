@@ -65,11 +65,14 @@ export interface QueueCounts {
   due3days: number;
 }
 
-export async function queueCounts(): Promise<QueueCounts> {
+export async function queueCounts(preloaded?: { cardId: string; suspended: boolean; state: string; due: number; last: number; reps: number }[]): Promise<QueueCounts> {
   const l = await getLearner();
   const today = dayIndex();
   const u = await contentUserId().catch(() => "me");
-  const all = await db.cardState.findMany({ where: { userId: u } });
+  // Task 89 perf: callers that already hold the user's CardState rows (the
+  // queue route loads them to build the batch) pass them in - one full scan
+  // per request instead of two.
+  const all = preloaded ?? (await db.cardState.findMany({ where: { userId: u } }));
   // BYO-material cards (cardId "mat:<id>") share the SAME queue, budget and
   // badge truth as deck cards - the Task-44 lesson: one source of truth.
   const deckStates = all.filter((s) => !s.cardId.startsWith("mat:"));

@@ -39,6 +39,7 @@ interface Data {
   skillLevels: { skill: string; level: string; score: number; samples: number }[];
   bands?: { band: string; skills: { skill: string; score: number; samples: number }[]; exams: { graded: number; passed: number; bestPct: number }; proven: boolean }[];
   placementBand?: string;
+  volume?: { last7: { reviews: number; written: number; spoken: number; listened: number }; last28: { reviews: number; written: number; spoken: number; listened: number } };
   totals: { reviews: number; lapses: number; cards: number; started: number };
 }
 
@@ -90,6 +91,32 @@ export default function ProgressView({ state, go }: { state: AppState; go: (v: V
           <div className="mt-2 text-xs font-semibold text-[#7d889c]">day streak</div>
         </Card>
       </div>
+
+      {/* Task 89 (review P1-4): the weekly pilot's VOLUME line. The study needs
+          writing/speaking/dictation counts per week - not just review first
+          attempts - and the learner should see the same numbers the pilot
+          reads. Rendered even at all-zeros: an empty week is exactly what the
+          learner (and the pilot) needs to SEE. */}
+      {data.volume && (
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-extrabold tracking-tight text-[#f2f5fa]">Practice volume</span>
+            <span className="text-xs font-bold text-[#7d889c]">last 7 days · 28-day total in the tooltip</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            {([
+              ["essays written", data.volume.last7.written, data.volume.last28.written],
+              ["speaking rounds", data.volume.last7.spoken, data.volume.last28.spoken],
+              ["dictation items", data.volume.last7.listened, data.volume.last28.listened],
+            ] as const).map(([label, v7, v28]) => (
+              <div key={label} className="rounded-2xl bg-[#1a2130] px-3 py-3" title={`28-day total: ${v28}`}>
+                <div className="text-xl font-black leading-none tracking-tight text-[var(--rah-primary)]">{v7}</div>
+                <div className="mt-1.5 text-xs font-semibold text-[#7d889c]">{label}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Streak forge */}
       <Card>

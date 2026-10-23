@@ -13,7 +13,7 @@
 //  - The graded result carries a "practice estimate" average with the
 //    standing claim-precision label (not an official CEFR grade).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PenLine, ArrowRight, SpellCheck2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, ScoreRow, Spinner } from "./ui";
 import type { AppState } from "./App";
@@ -156,12 +156,20 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
     return () => clearTimeout(id);
   }, [text, checkOn, busy]);
 
-  const allFindings: GcFinding[] = gc
-    ? [
-        ...gc.errors.map((f) => ({ ...f, kind: "error" as const })),
-        ...gc.style.map((f) => ({ ...f, kind: "style" as const })),
-      ].filter((f) => !ignored.has(`${f.ruleId}:${f.excerpt}`))
-    : [];
+  // Task 89 perf: this rebuild ran on EVERY render (every keystroke) even when
+  // neither the check response nor the ignore set changed. The mirror layer
+  // must follow the text per keystroke (inherent), but the finding merge does
+  // not - it is keyed to the response and the user's ignore decisions only.
+  const allFindings: GcFinding[] = useMemo(
+    () =>
+      gc
+        ? [
+            ...gc.errors.map((f) => ({ ...f, kind: "error" as const })),
+            ...gc.style.map((f) => ({ ...f, kind: "style" as const })),
+          ].filter((f) => !ignored.has(`${f.ruleId}:${f.excerpt}`))
+        : [],
+    [gc, ignored],
+  );
   const visibleFindings = allFindings.slice(0, 12);
 
   const applyReplacement = useCallback((f: GcFinding, rep: string) => {

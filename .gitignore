@@ -59,6 +59,8 @@ server.log
 
 # runtime data - not for the public repo
 db/custom.db
+db/custom.db-wal
+db/custom.db-shm
 
 # REG-2 doctrine (2026-10-22): the PUBLIC repo carries ZERO learner data.
 # Snapshots (backups/, db/sync/) go to the PRIVATE vault repo only.

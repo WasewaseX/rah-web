@@ -54,9 +54,39 @@ fi
 echo "$(date -Is) server down; reviving"
 pkill -f "next dev -p 3000" 2>/dev/null
 pkill -f "next-server" 2>/dev/null
+pkill -f "standalone/server.js" 2>/dev/null
 sleep 2
-nohup bun run dev >> dev.log 2>&1 &
-disown
+
+# PRODUCTION BOOT (Task 89): the deployment ran `next dev` 24/7 - on-demand
+# compilation, no minification, no response caching - while the repo already
+# shipped a standalone build path (bun run build / standalone/server.js).
+# When a verified production build exists, boot it; the health check below is
+# the same gate either way, and a prod failure falls back to the dev boot
+# LOUDLY (this log) so the learner is never left with a dead app.
+booted=0
+if [ "${RAH_PROD:-1}" != "0" ] && [ -f .next/standalone/server.js ] && [ -f .next/BUILD_ID ]; then
+  set -a; . ./.env 2>/dev/null; set +a
+  export NODE_ENV=production
+  nohup node .next/standalone/server.js >> server.log 2>&1 &
+  disown
+  for _ in $(seq 1 10); do
+    sleep 2
+    if curl -sf -o /dev/null --max-time 5 http://localhost:3000/api/version; then
+      echo "$(date -Is) server healthy (production standalone build)"
+      booted=1
+      break
+    fi
+  done
+  if [ "$booted" = "0" ]; then
+    echo "$(date -Is) production boot failed health check - falling back to dev"
+    pkill -f "standalone/server.js" 2>/dev/null   # failed attempt: clear the port
+    sleep 1
+  fi
+fi
+if [ "$booted" = "0" ]; then
+  nohup bun run dev >> dev.log 2>&1 &
+  disown
+fi
 
 for _ in $(seq 1 30); do
   sleep 2

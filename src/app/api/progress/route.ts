@@ -10,7 +10,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const today = dayIndex();
-  const stats = await db.dailyStat.findMany({ where: { userId: await contentUserId().catch(() => "me"), day: { gte: today - 34 } } });
+  const u = await contentUserId().catch(() => "me");
+  // Task 89 perf: this route used to await eight queries in sequence (~140ms
+  // in dev). None of them depends on another's result, so they go out as one
+  // parallel batch. diagnose() keeps its own internals.
+  const [stats, states, diag, writes, speaks, totalReviews, totalLapses, skillLevels, learner, gradedExams] = await Promise.all([
+    db.dailyStat.findMany({ where: { userId: u, day: { gte: today - 34 } } }),
+    db.cardState.findMany({ where: { userId: u } }),
+    diagnose(),
+    db.writingSub.findMany({ where: { userId: u }, orderBy: { id: "desc" }, take: 6 }),
+    db.speakSession.findMany({ where: { userId: u }, orderBy: { id: "desc" }, take: 6 }),
+    db.reviewLog.count({ where: { userId: u } }),
+    db.reviewLog.count({ where: { userId: u, grade: 1 } }),
+    getSkillLevels(),
+    db.learner.findUnique({ where: { id: "me" } }),
+    db.exam.findMany({ where: { status: "graded" }, orderBy: { createdAt: "desc" }, take: 20 }),
+  ]);
   const statMap = new Map(stats.map((s) => [s.day, s]));
   const days = Array.from({ length: 35 }, (_, i) => {
     const d = today - 34 + i;
@@ -18,7 +33,6 @@ export async function GET() {
     return { day: d, reviews: s?.reviews ?? 0, correct: s?.correct ?? 0, xp: s?.xp ?? 0 };
   });
 
-  const states = await db.cardState.findMany({ where: { userId: await contentUserId().catch(() => "me") } });
   const byUnit: Record<string, { total: number; started: number; mature: number }> = {};
   for (const c of DECK) {
     byUnit[c.unit] ??= { total: 0, started: 0, mature: 0 };
@@ -31,9 +45,25 @@ export async function GET() {
     if (st.s >= 21) byUnit[c.unit].mature += 1;
   }
 
-  const diag = await diagnose();
-  const writes = await db.writingSub.findMany({ orderBy: { id: "desc" }, take: 6 });
-  const speaks = await db.speakSession.findMany({ orderBy: { id: "desc" }, take: 6 });
+  // Task 89 (the review's P1-4 ask): the weekly pilot needs WRITING, SPEAKING
+  // and DICTATION volume, not just first attempts - the DailyStat ledger
+  // already counts them, so the rollup costs zero extra queries. last7 is the
+  // week-N report row; last28 is the trend the multi-week study reads.
+  const sumVol = (from: number, to: number) => {
+    let reviews = 0,
+      written = 0,
+      spoken = 0,
+      listened = 0;
+    for (const s of stats)
+      if (s.day >= from && s.day <= to) {
+        reviews += s.reviews;
+        written += s.written;
+        spoken += s.spoken;
+        listened += s.listened;
+      }
+    return { reviews, written, spoken, listened };
+  };
+  const volume = { last7: sumVol(today - 6, today), last28: sumVol(today - 27, today) };
 
   const writeTrend = writes
     .map((w) => {
@@ -61,20 +91,11 @@ export async function GET() {
     .filter((x): x is { at: Date; avg: number } => !!x)
     .reverse();
 
-  // Scoped (Task 67 straggler, caught during the Task-72 polish): these are
-  // the learner's lifetime review numbers - another account's rows must not
-  // inflate them.
-  const uT = await contentUserId().catch(() => "me");
-  const totalReviews = await db.reviewLog.count({ where: { userId: uT } });
-  const totalLapses = await db.reviewLog.count({ where: { userId: uT, grade: 1 } });
-  const skillLevels = await getSkillLevels();
-
   // P5: the CEFR band map's evidence, computed from real rows only - the
   // engine decides what is proven, nothing here asks the AI. A band is
   // PROVEN when a measured skill sits at that level or a recent graded exam
   // targeted it; otherwise the band is honestly unproven.
-  const learner = await db.learner.findUnique({ where: { id: "me" } });
-  const gradedExams = await db.exam.findMany({ where: { status: "graded" }, orderBy: { createdAt: "desc" }, take: 20 });
+  // (learner + gradedExams arrive in the parallel batch above.)
   const examByBand: Record<string, { graded: number; passed: number; bestPct: number }> = {};
   for (const e of gradedExams) {
     try {
@@ -106,6 +127,7 @@ export async function GET() {
     speakTrend,
     skillLevels,
     bands,
+    volume,
     placementBand: learner?.level ?? "?",
     totals: {
       reviews: totalReviews,

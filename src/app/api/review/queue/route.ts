@@ -82,7 +82,9 @@ export async function GET(req: Request) {
   const l = await getLearner();
 
   let pool: Card[] = [];
-  const counts = await queueCounts();
+  // Task 89 perf: `all` was already loaded above - passing it here removes the
+  // second full CardState scan this route used to pay on every request.
+  const counts = await queueCounts(all);
   let mode: "normal" | "ahead" = "normal";
 
   if (ahead) {

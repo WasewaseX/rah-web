@@ -112,6 +112,20 @@ rotate() {
 do_backup() {
   local tag="$1" dest ts ok
   is_fresh && { log "live DB is fresh/empty - no snapshot taken ($tag)"; return 0; }
+  # WAL safety (Task 89): the live db runs in WAL mode now (readers never block
+  # the writer). A raw cp of a WAL database can miss commits still sitting in
+  # db/custom.db-wal, so fold them into the main file first. Checkpoint is
+  # online and non-destructive; when the -wal file is absent (fresh restore)
+  # this is a harmless no-op that costs ~1ms.
+  python3 -c "
+import sqlite3, sys
+try:
+    c = sqlite3.connect('$GUARD_DB')
+    c.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    c.close()
+except Exception as e:
+    print(f'checkpoint skipped: {e}', file=sys.stderr)
+" 2>/dev/null || true
   ts="$(date +%Y%m%d-%H%M%S)"
   ok=1
   for dest in "$GUARD_LOCAL" "$GUARD_OFFSITE"; do

@@ -40,7 +40,8 @@
     ".next-isolation/types/**/*.ts",
     ".next-isolation/dev/types/**/*.ts",
     ".next-mobile/types/**/*.ts",
-    ".next-mobile/dev/types/**/*.ts"
+    ".next-mobile/dev/types/**/*.ts",
+    ".next/dev/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

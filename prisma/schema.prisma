@@ -102,6 +102,11 @@ model ReviewLog {
   source String   @default("review") // review | exam | dictation | shadow: where the outcome was earned
 
   @@index([userId])
+  // Task 89 perf indexes: per-day rollups, the repair trigger's per-key scan,
+  // and buildProfile's recent-lapse reads.
+  @@index([userId, day])
+  @@index([userId, cardId])
+  @@index([userId, grade])
 }
 
 // Offline-sync receipt (Task 68, audit P1): the client grades reviews offline
@@ -114,6 +119,8 @@ model GradeAck {
   userId   String
   response String // the exact JSON the first attempt returned
   at       DateTime @default(now())
+
+  @@index([at]) // Task 89: the 7-day receipt purge scans by age
 }
 
 // Transactional email ledger (audit P2): every send attempt is recorded with
@@ -151,6 +158,7 @@ model ChatMsg {
   at      DateTime @default(now())
 
   @@index([userId])
+  @@index([userId, at]) // Task 89: history reads order by time within a user
 }
 
 model WritingSub {
