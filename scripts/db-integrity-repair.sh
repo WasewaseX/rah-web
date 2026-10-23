@@ -79,6 +79,16 @@ if [ -z "$SRC" ]; then
 fi
 
 # The repair itself, insert-only, logged.
+# Task 87-c (drill-found gap): the original trigger was coarse - a user with
+# even ONE surviving CardState row got NO repair, so a PARTIAL scheduling loss
+# (9 of 17 rows gone) sailed through exactly like the Oct-23 total loss did
+# before Task 86. The trigger is now per-key: every (userId, cardId) in
+# ReviewLog whose CardState row is absent is provably lost (both ReviewLog
+# writers upsert CardState in the same flow - verified in src), and every
+# reviewed day missing from DailyStat likewise. Still strictly INSERT-ONLY:
+# a row is restored ONLY if a verified snapshot holds it; rows written after
+# the snapshot have no snapshot row and are left absent (honest loss, never
+# invented); existing rows are never touched (no clobber).
 python3 - "$GUARD_DB" "$SRC" "$GUARD_LOG" <<'PY'
 import sqlite3, sys, datetime
 
@@ -97,33 +107,45 @@ def cols(c, t):
     return [r[1] for r in c.execute(f"PRAGMA table_info({t})")]
 
 repaired = 0
-for table, pk in (("CardState", ("userId", "cardId")), ("DailyStat", ("userId", "day"))):
+for table, key in (("CardState", "cardId"), ("DailyStat", "day")):
     sc, lc = cols(snap, table), cols(live, table)
     if not sc or not lc:
         continue
     common = [c for c in sc if c in lc]
-    # Users with review history in the live DB but NO rows in this table.
-    affected = []
+    # (userId, key) pairs the review history proves but the live table lacks.
     try:
-        affected = [r[0] for r in live.execute(
-            f"SELECT DISTINCT userId FROM ReviewLog WHERE userId NOT IN (SELECT DISTINCT userId FROM {table})")]
+        affected = live.execute(
+            f"SELECT DISTINCT rl.userId, rl.{key} FROM ReviewLog rl "
+            f"WHERE NOT EXISTS (SELECT 1 FROM {table} t WHERE t.userId = rl.userId AND t.{key} = rl.{key})"
+        ).fetchall()
     except Exception:
-        pass
+        continue
     if not affected:
         continue
-    for u in affected:
-        missing = []
-        for row in snap.execute(f"SELECT {', '.join(common)} FROM {table} WHERE userId=?", (u,)):
-            where = " AND ".join(f"{k}=?" for k in pk)
-            vals = tuple(row[common.index(k)] for k in pk)
-            if not live.execute(f"SELECT 1 FROM {table} WHERE {where}", vals).fetchone():
-                missing.append(row)
-        if not missing:
+    inserted = 0
+    absent = 0
+    for u, k in affected:
+        row = snap.execute(
+            f"SELECT {', '.join(common)} FROM {table} WHERE userId=? AND {key}=?", (u, k)
+        ).fetchone()
+        if row is None:
+            # Reviewed after the last verified snapshot (or a no-schedule flow):
+            # no verified source holds this row - never invent one.
+            absent += 1
             continue
-        ph = ", ".join("?" for _ in common)
-        live.executemany(f"INSERT INTO {table} ({', '.join(common)}) VALUES ({ph})", missing)
-        log(f"REPAIRED {table} for user '{u}': restored {len(missing)} scheduling rows (insert-only) from {snap_path}")
-        repaired += len(missing)
+        live.execute(
+            f"INSERT OR IGNORE INTO {table} ({', '.join(common)}) VALUES ({', '.join('?' for _ in common)})",
+            row,
+        )
+        inserted += 1
+    if inserted:
+        msg = f"REPAIRED {table}: restored {inserted} scheduling row(s) (insert-only from {snap_path})"
+        if absent:
+            msg += f"; {absent} reviewed key(s) absent from every verified snapshot - left absent (post-snapshot work, honest loss)"
+        log(msg)
+        repaired += inserted
+    elif absent:
+        log(f"integrity: {absent} reviewed {table} key(s) missing but no verified snapshot holds them - nothing to restore")
 
 live.commit()
 live.close()

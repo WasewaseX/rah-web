@@ -224,19 +224,21 @@ assert "9c ReviewLog untouched"          python3 -c "import sqlite3; c=sqlite3.c
 assert "9d schedule values from snapshot" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20749"
 ok "9 scheduling-loss repair restores the FSRS schedule"
 
-# --- 10. healthy DB is a no-op ---------------------------------------------
+# --- 10. partial loss: missing rows restored, existing rows never clobbered -
+# Task 87-c: the per-key trigger fires even when ONE row survived - the two
+# lost rows come back from the snapshot while the newer live value wins.
 newenv
 damaged_db "$T/db/custom.db"
-python3 - "$T/db/custom.db" <<'PY'   # give the live DB its own CardState row
+python3 - "$T/db/custom.db" <<'PY'   # live DB kept ONE row - with a NEWER due than the snapshot's
 import sqlite3, sys
 c = sqlite3.connect(sys.argv[1]); c.execute('INSERT INTO CardState VALUES ("me","phr080",20751,2)'); c.commit(); c.close()
 PY
-cp "$T/db/custom.db" "$T/before.db"
 snapshot_db "$T/db/sync/rah-latest.db"
 runrepair
-assert "10a existing row not duplicated" python3 -c "import sqlite3; a=sqlite3.connect('$T/before.db'); b=sqlite3.connect('$T/db/custom.db'); assert a.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0] == b.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0]"
+assert "10a missing rows restored despite one survivor" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
 assert "10b live value wins (no clobber)" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20751"
-ok "10 repair never clobbers an existing schedule"
+assert "10c restored rows carry snapshot values" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT due FROM CardState WHERE cardId='phr086'\").fetchone()[0]==20750"
+ok "10 repair restores partial loss, never clobbers an existing row"
 
 # --- 11. post-snapshot learner progress survives ----------------------------
 newenv
@@ -257,6 +259,54 @@ damaged_db "$T/db/custom.db"
 runrepair
 assert "12a no source, DB untouched" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM ReviewLog\").fetchone()[0]==3 and c.execute(\"SELECT COUNT(*) FROM CardState\").fetchone()[0]==0"
 ok "12 missing source never blocks boot"
+
+# --- 13. partial loss with post-snapshot work: restore proven rows only -----
+newenv
+damaged_db "$T/db/custom.db"
+python3 - "$T/db/custom.db" <<'PY'   # reviewed a NEW card post-snapshot, then lost TWO of three schedule rows
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute('INSERT INTO ReviewLog (userId, cardId, grade, day) VALUES ("me","new001",3,20749)')
+c.execute('DELETE FROM CardState WHERE cardId IN ("phr086","awl114")')
+c.commit(); c.close()
+PY
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+assert "13a snapshot-proven rows restored" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
+assert "13b no invented schedule for the post-snapshot card" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE cardId='new001'\").fetchone()[0]==0"
+assert "13c history untouched" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM ReviewLog\").fetchone()[0]==4"
+ok "13 partial loss repairs exactly what the snapshot proves"
+
+# --- 14. DailyStat partial loss: missing day restored, existing day kept ----
+newenv
+damaged_db "$T/db/custom.db"
+python3 - "$T/db/custom.db" <<'PY'   # today's stat row survived with NEWER numbers; the snapshot only knows day 20746
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute('DELETE FROM ReviewLog WHERE day=20747')            # day 20747 has no snapshot DailyStat either
+c.execute('INSERT INTO DailyStat VALUES ("me", 20746, 9)')    # newer live value the snapshot must not clobber
+c.commit(); c.close()
+PY
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+assert "14a newer live DailyStat kept (no clobber)" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT reviews FROM DailyStat WHERE day=20746\").fetchone()[0]==9"
+assert "14b no invented row for the unsnapshotted day" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM DailyStat\").fetchone()[0]==1"
+ok "14 DailyStat partial loss is honest (restore only what the snapshot proves)"
+
+# --- 15. repair is idempotent: second run is a no-op ------------------------
+newenv
+damaged_db "$T/db/custom.db"
+snapshot_db "$T/db/sync/rah-latest.db"
+runrepair
+cp "$T/db/custom.db" "$T/after1.db"
+runrepair
+assert "15a second repair changes nothing" python3 -c "
+import sqlite3
+a=sqlite3.connect('$T/after1.db'); b=sqlite3.connect('$T/db/custom.db')
+for t in ('CardState','DailyStat','ReviewLog'):
+    assert a.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0] == b.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
+assert b.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20749"
+ok "15 repair is idempotent (safe to run at every boot)"
 
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
