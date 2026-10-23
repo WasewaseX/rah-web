@@ -308,6 +308,19 @@ for t in ('CardState','DailyStat','ReviewLog'):
 assert b.execute(\"SELECT due FROM CardState WHERE cardId='phr080'\").fetchone()[0]==20749"
 ok "15 repair is idempotent (safe to run at every boot)"
 
+# --- 16. vault clone is a boot-restore source (Task 87-d) -------------------
+# No db/sync, NO OSS mount, no dated backups - ONLY the private vault clone's
+# rah-latest.db. The first boot responder must recover the learner from it
+# instead of "starting clean" (the drill-found gap: migrate would then create
+# an empty db and the later restore-if-missing would no-op against it).
+newenv
+mkdir -p "$T/db/vault-work/rah-web"
+snapshot_db "$T/db/vault-work/rah-web/rah-latest.db"
+run boot
+assert "16a vault-only boot restores the learner" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT xp FROM Learner WHERE id='me'\").fetchone()[0]==210"
+assert "16b vault-restored db holds the schedule" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
+ok "16 boot restore includes the vault clone (offsite last defense)"
+
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

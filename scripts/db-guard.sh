@@ -38,6 +38,10 @@ GUARD_DB="${GUARD_DB:-$GUARD_ROOT/db/custom.db}"
 GUARD_LOCAL="${GUARD_LOCAL:-$GUARD_ROOT/db/backups}"
 GUARD_OFFSITE="${GUARD_OFFSITE:-$GUARD_ROOT/upload/rah-backups}"
 GUARD_LOG="${GUARD_LOG:-$GUARD_ROOT/db/boot-guard.log}"
+# Task 87-d (drill-found gap): the vault clone is a valid restore source -
+# without it, an unavailable OSS mount left the boot path "starting clean"
+# while a verified offsite copy sat in db/vault-work.
+GUARD_VAULT="${GUARD_VAULT:-$GUARD_ROOT/db/vault-work/rah-web/rah-latest.db}"
 GUARD_KEEP="${GUARD_KEEP:-14}"
 MODE="${1:-boot}"
 STAMP_FILE="$GUARD_OFFSITE/.last-backup-day"
@@ -131,10 +135,12 @@ do_restore() {
   local src
   # Freshest sources first (REG-1/REG-2 lessons): the hourly db-sync snapshot,
   # then its OSS-mount mirror (the copy that survives a workspace rebuild),
+  # then the private vault clone (Task 87-d: the offsite last defense must be
+  # reachable from the FIRST boot responder, not only from db-restore.sh),
   # then the dated rotating backups.
-  for fixed in "$GUARD_ROOT/db/sync/rah-latest.db" "$GUARD_OFFSITE/rah-latest.db"; do
+  for fixed in "$GUARD_ROOT/db/sync/rah-latest.db" "$GUARD_OFFSITE/rah-latest.db" "$GUARD_VAULT"; do
     if probe "$fixed"; then
-      log "FRESH LIVE DB - restoring freshest db-sync snapshot: ${fixed#$GUARD_ROOT/}"
+      log "FRESH LIVE DB - restoring from verified source: ${fixed#$GUARD_ROOT/}"
       cp -f "$fixed" "$GUARD_DB"
       if probe "$GUARD_DB"; then
         log "RESTORE OK: learner data recovered from ${fixed#$GUARD_ROOT/}"

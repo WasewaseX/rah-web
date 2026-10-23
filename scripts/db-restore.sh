@@ -16,7 +16,12 @@
 # then bring the schema forward and record history (fixes the P3005 hole that
 # a bare `db push` restore used to leave behind).
 set -u
-cd /home/z/my-project || exit 1
+# Task 87-d: GUARD_ROOT-aware (same convention as db-guard.sh). The hardcoded
+# cd made this script silently operate on the CANONICAL workspace even when
+# GUARD_DB pointed elsewhere - a clone drill could not exercise the vault
+# source, and any non-canonical deployment path would restore the wrong tree.
+ROOT="${GUARD_ROOT:-/home/z/my-project}"
+cd "$ROOT" || exit 1
 
 DB="db/custom.db"
 

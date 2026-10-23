@@ -7,7 +7,10 @@
 # NEVER `migrate reset`, NEVER `db push --accept-data-loss` - those are how
 # learner data dies. This script may only move the schema FORWARD.
 set -u
-cd /home/z/my-project || exit 1
+# Task 87-d: GUARD_ROOT-aware (same convention as db-guard.sh) - the hardcoded
+# cd made clone-scoped drills and non-canonical deployment paths impossible.
+ROOT="${GUARD_ROOT:-/home/z/my-project}"
+cd "$ROOT" || exit 1
 
 if bun run db:deploy > /tmp/db-migrate.log 2>&1; then
   echo "migrate: clean deploy (no pending or all applied)"
