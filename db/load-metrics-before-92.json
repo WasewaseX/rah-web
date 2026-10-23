@@ -1,0 +1,90 @@
+{
+  "label": "before-92",
+  "url": "http://localhost:3000/",
+  "harness": {
+    "device": "iPhone 13",
+    "cpuThrottle": "4x",
+    "net": "1.6Mbps/150ms RTT"
+  },
+  "at": "2026-10-23T22:42:17.128Z",
+  "cold": {
+    "runs": [
+      {
+        "ttfb": 8,
+        "fcp": 2532,
+        "dcl": 1009,
+        "load": 2193,
+        "jsBytes": 329826,
+        "totalBytes": 333649,
+        "requests": 18
+      },
+      {
+        "ttfb": 7,
+        "fcp": 2564,
+        "dcl": 1036,
+        "load": 2209,
+        "jsBytes": 329826,
+        "totalBytes": 333649,
+        "requests": 18
+      },
+      {
+        "ttfb": 4,
+        "fcp": 2720,
+        "dcl": 1007,
+        "load": 2275,
+        "jsBytes": 329826,
+        "totalBytes": 333649,
+        "requests": 18
+      }
+    ],
+    "summary": {
+      "ttfb": 7,
+      "fcp": 2564,
+      "dcl": 1009,
+      "load": 2209,
+      "jsBytes": 329826,
+      "totalBytes": 333649,
+      "requests": 18
+    }
+  },
+  "warm": {
+    "runs": [
+      {
+        "ttfb": 6,
+        "fcp": 496,
+        "dcl": 181,
+        "load": 281,
+        "jsBytes": 0,
+        "totalBytes": 976,
+        "requests": 18
+      },
+      {
+        "ttfb": 4,
+        "fcp": 388,
+        "dcl": 162,
+        "load": 191,
+        "jsBytes": 0,
+        "totalBytes": 976,
+        "requests": 18
+      },
+      {
+        "ttfb": 30,
+        "fcp": 456,
+        "dcl": 179,
+        "load": 231,
+        "jsBytes": 0,
+        "totalBytes": 976,
+        "requests": 18
+      }
+    ],
+    "summary": {
+      "ttfb": 6,
+      "fcp": 456,
+      "dcl": 179,
+      "load": 231,
+      "jsBytes": 0,
+      "totalBytes": 976,
+      "requests": 18
+    }
+  }
+}

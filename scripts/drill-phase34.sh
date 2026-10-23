@@ -96,6 +96,11 @@ else
 fi
 kill $CLONE_PID 2>/dev/null; pkill -f "next dev -p 3100" 2>/dev/null; pkill -f "drill-clone" 2>/dev/null || true
 
+# Task 92: the clone is a drill artifact - leaving it inside the tree broke
+# tsc/eslint (the clone legitimately lacks node_modules and tsc scans it).
+# Remove it so the tree is always gate-clean after a drill run.
+rm -rf "$CLONE"
+
 echo "=== PHASE 4a: vault privacy (anonymous access must fail) ==="
 cd "$MAIN"
 if git -c credential.helper= ls-remote https://github.com/WasewaseX/vault.git HEAD >/dev/null 2>&1; then

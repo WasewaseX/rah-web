@@ -58,8 +58,13 @@ def esc(v, kind: str = "") -> str:
 
 
 def run_psql(psql_args, sql_input: str) -> str:
+    # -t -A (tuples-only, unaligned): count probes must return JUST the number.
+    # Without them psql appends a "(N rows)" footer and the parser reads that
+    # as the count (Task 92: found by the full external rehearsal - the Task-89
+    # sandbox proof used pg-sandbox-proof.py's own verify, so this exact path
+    # was never exercised until now).
     p = subprocess.run(
-        ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-q", *psql_args],
+        ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-q", "-t", "-A", *psql_args],
         input=sql_input, capture_output=True, text=True,
     )
     if p.returncode != 0:

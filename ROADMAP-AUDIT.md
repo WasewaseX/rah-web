@@ -1,6 +1,6 @@
 # ROADMAP AUDIT — checklist, incidents, and open items
 
-**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-22 (REG-1/REG-2 waves + **Task 67 reconciliation**: this file is the canonical ledger; `ROADMAP-STATUS.md` now agrees with it on offline, goal planner, pronunciation, exam tracks, email and Azure — disagreements found and removed, see §3 bookkeeping) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
+**Created:** 2026-10-20 (Task 60 wave) · **Updated:** 2026-10-24 (**Task 92 reconciliation**: this file's summary headings now agree with the canonical ledger table — the reviewer's 2026-10-24 re-review caught that the October 22 headings still carried pre-wave counts while the ledger carried post-wave counts; Task 90/91/91-b/92 records folded in) · **Companion to:** `ROADMAP-STATUS.md` (per-item evidence) · **Audience:** the builder + any future evaluator wave.
 
 Purpose: one place that tracks (a) incident post-mortems with acceptance tests, (b) the standing audit checklist, (c) what an external evaluator praised vs. what actually broke. Update it every wave; do not let "DONE" claims outrun the drills that prove them.
 
@@ -172,7 +172,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - ✅ Isolated automated tests (Task 52)
 - ✅ Learner data isolation — deployment lock in place (Task 48) AND per-user scoping complete (Tasks 63+65+67): every learning table carries userId (content, memory, stats, goals, and as of Task 67 the FSRS queue, arcade meta, skill bands, placement history, imported materials), reads/deletes scoped, two-account battery 45/45. Remaining before public multi-user: the Postgres move + the lock decision itself.
 
-### Critical features (4 done, 6 partial — reconciled to the post-wave state, Task 73)
+### Critical features (7 done, 3 partial — headings reconciled to the ledger, Task 92)
 - ✅ Bring-your-own-materials (Task 54) · ✅ CEFR curriculum graph (Task 58) · ✅ Anki .apkg import (Task 59) · ✅ Goal-based weekly planner (Task 65: FSRS due-load forecast + observed rhythm + honest feasibility, deterministic)
 - 🟡 Exam tracks (IELTS/TOEFL/C1A) — format-faithful tracks shipped (Task 66); **scores are practice estimates** until grading is validated against expert-reviewed responses and exam-specific rubrics
 - 🟡 Acoustic pronunciation assessment — **word-level measured tier shipped (Task 64)**; NOT a complete phonetic/accent assessment until the Azure phoneme adapter is configured AND validated
@@ -180,12 +180,12 @@ Legend: ✅ done · 🟡 partial · ❌ not started · 🔺 NEW risk found this 
 - ✅ Writing-revision workspace — revision chain + revise flow (Task 63) + criterion-level rubric history (Task 77) + per-revision change summaries (Task 83: fixed/remaining/introduced with the grader's own corrections as evidence)
 - ✅ Evidence-backed reference (Task 79) · ✅ Content quality console (Task 80: per-flag regression instrument + batteries)
 
-### Polish (8 done, 2 partial — the parallel wave closed transparency/placement/reports/anti-farming)
+### Polish (10 done, 0 partial — headings reconciled to the ledger, Task 92)
 - ✅ Review queue/FSRS (Task 56) · ✅ Talk v1 · ✅ Sound Lab (inference tier) · ✅ Mistake memory/mastery (Task 65) · ✅ Coach transparency — verified already-shipped (Task 72: next-best actions carry per-action measured reasons) · ✅ Placement confidence (Task 72: per-skill sample counts + stated uncertainty) · ✅ Progress reports (Task 70: first-try recall curve + standing proxy-metric caveat) · ✅ XP/gems/quests anti-farming (Task 72: per-mode daily XP budgets, 25% engagement floor, ledger==sum-of-paids invariant)
 - ✅ Exam generation/grading (Task 81) · ✅ Onboarding/naming (Task 82: the naming registry + on-screen glosses + bot chips everywhere)
 
-### Reverse-engineering targets (3 done, 1 partial)
-- ✅ Anki · ✅ Duolingo · ✅ LingQ (Task 71: RE study + MaterialReader imported-reading workflow — tap-to-lookup in context, grades through the same FSRS queue, offline-safe via the outbox; per-token known-word ledger deliberately not copied, honest reason recorded) · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key)
+### Reverse-engineering targets (4 done, 1 partial)
+- ✅ Anki · ✅ Duolingo · ✅ LingQ (Task 71: RE study + MaterialReader imported-reading workflow — tap-to-lookup in context, grades through the same FSRS queue, offline-safe via the outbox; per-token known-word ledger deliberately not copied, honest reason recorded) · ✅ Grammarly (Task 85: live revision-and-rubric writing surface — offset-anchored pre-flight while typing, deterministic accept-splice, register goals, practice-estimate strip; the proprietary 0-100 score/tone detector/plagiarism loops deliberately not copied with reasons recorded) · 🟡 ELSA (measured word-level acoustic tier shipped; phoneme tier awaits an Azure key)
 
 ### External stores / APIs (deliberately deferred, single-user era)
 - ❌ PostgreSQL · ❌ Redis/Valkey · ❌ R2/S3 · ✅ LLM structured outputs · 🟡 Azure Speech (pronunciation-assessment adapter shipped, dormant until AZURE_SPEECH_KEY/REGION are set) · ✅ Transactional email delivery ledger + idempotency (Task 63; SMTP credentials remain a config gap, not a code gap)
@@ -231,6 +231,17 @@ The evaluator's third re-review replaced the flat 39-item count with per-categor
 | Three recommended API integrations | 2 | 1 | 0 |
 
 Notes: (a) the critical-fix row is for the currently LOCKED single-learner deployment with documented security controls — PostgreSQL and the public-registration decision remain separate launch requirements; (b) category totals are not additive (features support more than one recommendation); (c) deltas vs the evaluator's snapshot (features 4/6, polish 3/7, RE 2/1/1): Task 65 closed memory corrections, Tasks 70+72 closed progress reports / placement confidence / coach transparency / anti-farming, Task 71 closed LingQ, Task 85 closed Grammarly (writing editor now a live revision-and-rubric surface: offset-anchored pre-flight, deterministic accept-splice, register goals, practice-estimate strip) — offline stays PARTIAL because the shipped offline loop covers grades, not every write surface; (d) the evaluator's earlier 17/15/7 flat ledger is superseded by this table. CI note kept for the record: pushes to main never triggered CI until Task 57-bis fixed the `on.push.branches` corruption.
+
+### Bookkeeping (Task 92, 2026-10-24) — October 24 re-review reconciliation + real-environment proof day
+
+The evaluator's October 24 re-review (8.6/10 product, 9.4/10 engineering, 6.8/10 production readiness) re-affirmed the three priorities (privacy purge, PG cutover, teaching validation) and added: reconcile this audit with the tested state. What Task 92 did, with evidence:
+
+1. **Claims-vs-diff gate** — Tasks 90/91/91-b SHAs fixed and diff-verified (9ff9133: 14 files incl. instrumentation.ts + proxy.ts; 95779d3: App.tsx lazy-loading + build-prod.sh + repair/vault fixes; 043c0a6: package.json/bun.lock prune).
+2. **Recovery drills re-run on the live deployment (all GREEN)** — phase 2 (FSRS-only loss: schedule + DailyStat restored insert-only, ReviewLog untouched), phase 2b (no-clobber partial loss + idempotent second boot), phase 3 (fresh git clone → install → real boot serves the LIVE learner: xp=394, streak=4, createdAt tripwire 2026-10-20), phase 4a/b/c (vault private, snapshots scrubbed Session=0/LoginCode=0, vault-ONLY boot restore). Today's environment recycle ALSO exercised the real boot chain live: boot guard restored the fresh DB from the offsite mount, integrity OK (db/boot-guard.log 22:26 UTC).
+3. **PostgreSQL: the COMPLETE migration + restore rehearsal ran on the actual deployment** (not just the sandbox): userspace PG 16.2 with TCP → schema (30 tables/21 indexes) → live-data COPY → 30/30 counts match, checksum identical (xp=394/streak=4) → the standalone prod bundle REBUILT with a PostgreSQL client booted on :3100 and served the authenticated learner (state 200 + coach 200) → pg_dump/drop/recreate/restore → verify GREEN. **Three drill-found flip gaps fixed and codified in scripts/pg-cutover.sh**: (G1) the .env swap alone boots a SQLite query engine — provider switch + client regenerate + bundle rebuild are now flip steps; (G2) the migration history is SQLite-locked (P3019) — the flip now creates a one-time PG baseline history and preserves the SQLite history aside; (G3) pg_copy_data.py's verify parsed psql's "(N rows)" footer as the count (-1 false mismatch) — fixed with tuples-only output. The physical flip on the live deployment remains a DECISION gated on the multi-user launch; the runbook is now complete and drill-hardened.
+4. **Real-user loading measured (the review's "not bundle size alone")** — new harness scripts/load-metrics.mjs (real Chromium, iPhone 13 emulation, 4x CPU throttle, 1.6Mbps/150ms): COLD FCP 2564ms → **1128ms (−56%)**, WARM FCP 456ms → 220ms (−52%), DCL/bytes unchanged. Root cause found with scripts/paint-probe.mjs: the SSR shell painted only a bare spinner (Chrome does not count spinners as contentful), so first contentful paint waited for hydration. The boot splash now renders the branded wordmark (identical SSR/client markup, zero layout shift).
+5. **Privacy sweep re-run 2026-10-24**: 15/16 pre-scrub SHAs still dangling-retrievable, blob STILL SERVED at 5156b4b — but **9b9c360 is now GONE (first observed purge progress)**. The GitHub Support purge remains the human action; the watchdog keeps daily evidence in db/privacy-sweep.log.
+6. **Security re-verified live**: all 12 learner-data endpoints return 401 to anonymous callers on the prod build; /api/version + auth legs public. Gates: guard 58/58, isolated battery 441/441 (one transient 438 caused by external LanguageTool unavailability — re-run green), isolation 45/45, tsc 0, eslint 0.
 
 ### Open critical list (evaluator 2026-10-22, third re-review — reconciled)
 

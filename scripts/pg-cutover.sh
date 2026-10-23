@@ -90,10 +90,14 @@ plan (dry-run - nothing executed):
   1. psql <target> -f $SCHEMA_SQL          (fresh schema; refuses if rah has tables unless TRUNCATE leg is run)
   2. python3 scripts/pg_copy_data.py copy $SQLITE <psql args>   (TRUNCATE + COPY of 30 tables, ids preserved, sequences reset)
   3. python3 scripts/pg_copy_data.py verify $SQLITE <psql args> (per-table counts + learner checksum)
-  4. flip (only with --flip): backup .env, swap DATABASE_URL, then YOU run:
-       bunx prisma migrate resolve --applied 0010_perf_indexes   (baseline bookkeeping)
-       bash scripts/ensure-server.sh                             (restart on PG)
-     rollback: restore .env.bak.<ts>, restart. SQLite stays untouched the whole time.
+  4. flip (only with --flip): backup .env + schema.prisma, swap DATABASE_URL,
+        switch the schema provider, rebuild a PG-baseline migration history
+        (SQLite history preserved aside), regenerate the client + rebuild the
+        standalone bundle, then YOU run:
+       bunx prisma migrate resolve --applied 00000000000000_pg_baseline
+       bash scripts/ensure-server.sh
+     rollback: restore .env + schema.prisma backups, restore the SQLite
+     migration history, regenerate + rebuild, restart. SQLite stays untouched the whole time.
 run --sandbox to prove steps 1-3 against a userspace PG now.
 EOF
   exit 0
@@ -117,6 +121,7 @@ if [ "$MODE" = "flip" ]; then
   fi
   TS=$(date +%Y%m%d-%H%M%S)
   cp .env ".env.bak.$TS"
+  cp prisma/schema.prisma "prisma/schema.prisma.bak.$TS"
   python3 - "$PG_URL" <<'PYEOF'
 import sys, re
 url = sys.argv[1]
@@ -131,12 +136,41 @@ for ln in lines:
 if not seen:
     out.append(f"DATABASE_URL={url}")
 open(".env", "w").write("\n".join(out) + "\n")
-print(f"flip: .env DATABASE_URL swapped (backup .env.bak)")
+print(f"flip: .env DATABASE_URL swapped (backup .env.bak.{TS})")
 PYEOF
+
+  # Task 92 drill-found GAP 1: the .env swap alone boots a SQLITE query
+  # engine against PostgreSQL - every real DB call fails. The provider must
+  # switch with it and the client must be REGENERATED + the standalone bundle
+  # REBUILT (the client is a build-time copy inside .next/standalone).
+  sed -i 's|provider = "sqlite"|provider = "postgresql"|' prisma/schema.prisma
+  echo "flip: schema provider sqlite -> postgresql (backup prisma/schema.prisma.bak.$TS)"
+
+  # Task 92 drill-found GAP 2: the migration history is SQLite-locked
+  # (migration_lock.toml + dialect-specific migration SQL). A PG cutover needs
+  # a one-time PG baseline: preserve the SQLite history aside, then create a
+  # fresh history holding ONE baseline migration generated from the PG schema.
+  mv prisma/migrations "prisma/migrations.sqlite.bak.$TS"
+  mkdir -p prisma/migrations/00000000000000_pg_baseline
+  printf 'provider = "postgresql"' > prisma/migrations/migration_lock.toml
+  cp scripts/out/pg-schema.sql prisma/migrations/00000000000000_pg_baseline/migration.sql
+  echo "flip: PG migration baseline created (SQLite history preserved as prisma/migrations.sqlite.bak.$TS)"
+
+  echo "flip: regenerating client + rebuilding standalone (required - do not skip)"
+  bunx prisma generate --schema prisma/schema.prisma || { echo "ABORT: generate failed - RESTORE the backups"; exit 1; }
+  bash scripts/build-prod.sh || { echo "ABORT: rebuild failed - RESTORE the backups"; exit 1; }
+
   cat <<EOF
 flip leg done. Now run BY HAND (deliberate, not automated):
-  bunx prisma migrate resolve --applied 0010_perf_indexes
+  bunx prisma migrate resolve --applied 00000000000000_pg_baseline --schema prisma/schema.prisma
   bash scripts/ensure-server.sh
-ROLLBACK: cp .env.bak.$TS .env && bash scripts/ensure-server.sh
+VERIFY: /api/version data.xp must match the SQLite preflight value.
+ROLLBACK (all four artifacts): \
+cp ".env.bak.$TS" .env && \
+cp "prisma/schema.prisma.bak.$TS" prisma/schema.prisma && \
+rm -rf prisma/migrations && mv "prisma/migrations.sqlite.bak.$TS" prisma/migrations && \
+bunx prisma generate && bash scripts/build-prod.sh && bash scripts/ensure-server.sh
+NOTE: a shell-exported DATABASE_URL silently overrides .env (dotenv semantics:
+process env wins). Check `env | grep DATABASE_URL` before diagnosing.
 EOF
 fi

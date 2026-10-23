@@ -136,3 +136,4 @@ db/drill-safety/*
 db/.optimize.lock
 db/.boot-guard.lock
 scripts/.perf-baseline.json
+drill-clone/

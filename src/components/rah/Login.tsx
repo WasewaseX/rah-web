@@ -89,9 +89,22 @@ export default function Login({ onSignedIn }: { onSignedIn: (user: { email: stri
   };
 
   if (checking) {
+    // Contentful boot splash (Task 92): the SSR shell previously painted only a
+    // bare spinner, and Chrome does not count a spinner as a contentful paint -
+    // real-user FCP waited for full hydration (~2.6s on a throttled mobile
+    // profile). Rendering the same wordmark block the sign-in view uses (static
+    // markup, identical on the server and the client's first render, zero layout
+    // shift on swap) lets the browser paint real text as soon as CSS lands.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--rah-bg)]">
-        <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
+      <div className="flex min-h-screen items-center justify-center bg-[var(--rah-bg)] px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[var(--rah-primary)] to-[#2f62c4] text-2xl font-black text-white shadow-[0_16px_40px_-12px_rgba(78,140,255,.6)]">
+            R
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-[#f2f5fa]">Rah</h1>
+          <p className="mt-1 text-sm font-medium text-[#7d889c]">B2 to C1, your road. Sign in to continue.</p>
+          <span className="mx-auto mt-6 block h-6 w-6 animate-spin rounded-full border-2 border-[#2a3242] border-t-[var(--rah-primary)]" />
+        </div>
       </div>
     );
   }
