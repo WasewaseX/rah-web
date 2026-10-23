@@ -43,6 +43,14 @@ while true; do
       bash scripts/db-snapshot.sh
       # REG-2: the public repo never sees learner data - offsite = private vault
       bash scripts/vault-sync.sh
+      # Task 88: daily privacy sweep - dangling pre-scrub objects on the public
+      # repo stay EVIDENCED, not forgotten. exit 1 = the GitHub Support purge
+      # is still pending (the one remaining human action of the incident).
+      if bash scripts/privacy-sweep-watchdog.sh >> db/privacy-sweep.log 2>&1; then
+        echo "$(date -Is) watchdog: privacy sweep CLEAN (purge request can be closed)"
+      else
+        echo "$(date -Is) watchdog: privacy sweep -> dangling objects STILL served; Support purge still pending"
+      fi
     } >> watchdog.log 2>&1
   fi
 done

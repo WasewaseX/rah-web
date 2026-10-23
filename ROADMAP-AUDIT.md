@@ -138,6 +138,8 @@ Purpose: one place that tracks (a) incident post-mortems with acceptance tests, 
 
 Re-run the sweep any time: `python3 scripts/privacy-sweep.py` (exit 1 = human action still pending). This addendum closes the SWEEP half of incident-response item #2; the purge-request half stays open until the learner files it and the sweep returns clean.
 
+**Re-run evidence (Task 88, 2026-10-23):** 15/16 pre-scrub SHAs still dangling-retrievable; the leaked snapshot blob is STILL served at 5156b4b; vault private=True; public tree still carries zero learner-data paths; events API clean. State UNCHANGED from the Task-75 sweep — the Support purge remains the single remaining human action. The sweep is now MONITORED, not manual: `watchdog.sh`'s daily tick runs `scripts/privacy-sweep-watchdog.sh`, which appends a date-stamped evidence line to gitignored `db/privacy-sweep.log` and flips to "CLEAN - can be closed" the day the purge lands.
+
 ---
 
 ### REG-3 (2026-10-22 06:51 UTC, 4th wipe, CONTAINED-BY-DESIGN): stale reprovision from 9b9c360 — the guard held, the freshness window didn't
