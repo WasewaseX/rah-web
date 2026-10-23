@@ -321,6 +321,41 @@ assert "16a vault-only boot restores the learner" python3 -c "import sqlite3; c=
 assert "16b vault-restored db holds the schedule" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
 ok "16 boot restore includes the vault clone (offsite last defense)"
 
+# --- 17. DailyStat ledger extension (Task 91): non-review days restored -----
+# Found by the Task-91 phase-2 drill re-run: the review-keyed pass restores
+# only days with ReviewLog rows, so a REAL practice day whose activity was
+# xp/listening-only (no reviews) was dropped even though the verified
+# snapshot held it (2026-10-23: xp 60 + one listen, zero reviews). The ledger
+# extension restores every snapshot-held DailyStat row for a triggered user:
+# snapshot-present + live-absent = provably deleted. Here day 20748 has NO
+# ReviewLog backing but IS in the snapshot - it must come back; day 20747 is
+# review-backed but NOT in the snapshot - it must stay absent (never invent).
+newenv
+damaged_db "$T/db/custom.db"
+mkdir -p "$T/db/sync"
+python3 - "$T/db/sync/rah-latest.db" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.executescript('''
+CREATE TABLE "Learner" (id TEXT PRIMARY KEY, xp INTEGER, streak INTEGER, lastActiveDay INTEGER, gems INTEGER, sp INTEGER);
+CREATE TABLE "ReviewLog" (id INTEGER PRIMARY KEY, userId TEXT, cardId TEXT, grade INTEGER, day INTEGER);
+CREATE TABLE "CardState" (userId TEXT, cardId TEXT, due INTEGER, reps INTEGER, PRIMARY KEY (userId, cardId));
+CREATE TABLE "DailyStat" (userId TEXT, day INTEGER, reviews INTEGER, PRIMARY KEY (userId, day));
+''')
+c.execute('INSERT INTO Learner VALUES ("me", 210, 2, 20746, 70, 0)')
+c.executemany('INSERT INTO CardState VALUES (?,?,?,?)',
+              [("me", "phr080", 20749, 1), ("me", "phr086", 20750, 1), ("me", "awl114", 20749, 1)])
+c.execute('INSERT INTO DailyStat VALUES ("me", 20746, 2)')   # review-backed day
+c.execute('INSERT INTO DailyStat VALUES ("me", 20748, 0)')   # non-review xp/listen day - the Task-91 class
+c.commit(); c.close()
+PY
+runrepair
+assert "17a non-review snapshot day restored by the ledger extension" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM DailyStat WHERE day=20748\").fetchone()[0]==1"
+assert "17b review-backed snapshot day restored" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM DailyStat WHERE day=20746\").fetchone()[0]==1"
+assert "17c unsnapshotted review day still never invented" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM DailyStat WHERE day=20747\").fetchone()[0]==0"
+assert "17d schedule restored alongside" python3 -c "import sqlite3; c=sqlite3.connect('$T/db/custom.db'); assert c.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me'\").fetchone()[0]==3"
+ok "17 DailyStat ledger extension: non-review practice days survive (Task 91)"
+
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

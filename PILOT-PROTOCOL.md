@@ -49,3 +49,7 @@ Substrate track: **consistency** (active days, weekly volume) — the pilot's va
 - One learner, no control group: the verdict language is "the learner's measured recall/accuracy improved over N weeks while using the app" — never "Rah raises IELTS scores" or any population claim.
 - Engagement metrics (XP, streaks, gems) are proxies and stay labeled as proxies (the Task 70 caveat block).
 - The pilot gates PRODUCT claims, not the release decision — the deployment-lock decision is separate (ROADMAP-AUDIT.md open critical list #1).
+
+## 6. Weekly roll log (Task 90 mechanics, appended per week)
+
+**2026-10-23 (interim checkpoint, mid-week — not a verdict cell):** reviews 20 (last-7), 4 active days in last-28, **listened 1 (last-7) — the first non-zero listening volume since the instrument went live**; written 0, spoken 0 (the writing/speaking tracks still hold their honest zeros until the learner touches them). `pilot-metrics.mjs`: all weekly cells below the 50-first-attempt bar → no trend language anywhere, per the section-3 rules. The Task-91 incident note: today's 60xp listening day had zero reviews, which is exactly the row class the pre-Task-91 repair would have dropped — the ledger extension now protects it.

@@ -109,8 +109,15 @@ else
   enc() { cp -f "$1" "$2"; }
 fi
 
-# ---- freshest snapshot: make it if absent, ship it always -------------------
-if [ ! -s "$LOCAL_SNAP" ] && [ -s "$LIVE_DB" ]; then
+# ---- freshest snapshot: ALWAYS rebuild it, ship it always -------------------
+# Task 91 fix: the old guard `[ ! -s "$LOCAL_SNAP" ]` only built a snapshot
+# when db/sync/rah-latest.db was ABSENT - an existing (stale) file shipped
+# as-is to the vault. When db-sync.sh's driver (the watchdog) is dead, the
+# stale file ships silently (found 2026-10-23: the vault held a 2-row
+# DailyStat chain while the live db had 4 days). backup() is milliseconds -
+# rebuild on EVERY vault push so the offsite copy is never older than the
+# moment of the push.
+if [ -s "$LIVE_DB" ]; then
   mkdir -p db/sync
   RAH_DB_PATH="$LIVE_DB" python3 - "$LOCAL_SNAP" <<'PY'
 import os, sqlite3, sys

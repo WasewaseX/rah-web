@@ -130,6 +130,7 @@ db/privacy-sweep.log
 # REG-2: drill working copies of the learner db stay LOCAL (never in the public repo)
 db/drill-safety/*.db
 db/drill-safety/*.sqlite
+db/drill-safety/*
 
 # Task 90: runtime single-flight locks (never state, never committed)
 db/.optimize.lock

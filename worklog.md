@@ -1499,3 +1499,41 @@ Work Log:
 
 Stage Summary:
 - The optimization directive is fulfilled with before/after numbers, the review's P0s advanced as far as the environment allows (purge = monitored human action; recovery drill = proven in Task 87 AND the app now runs the repaired boot path in production mode; PG cutover = executable one-command runbook with a passing data-copy proof on the live data), and the pilot's missing volume instrumentation now exists end to end (ledger -> API -> UI).
+
+---
+Task ID: 90
+Agent: Super Z (main)
+Task: "countinue never stop" - boot-road closure + round-2 optimization + the anonymous-read privacy fix (worklog entry backfilled during Task 91; the commit 9ff9133 was verified claims-vs-diff: 14 files, 432 insertions, exactly as claimed).
+
+Work Log:
+- PRIVACY FIX (P0-class): the deployment-lock era folded anonymous callers into the singleton learner - on the public preview URL anyone could read /api/state, /api/review/queue (the actual cards), /api/progress, goals, curriculum, flow items, arcade view, exam replays and writing prompts with NO session. src/proxy.ts (Next 16 proxy convention): deny-by-default session gate on every /api path with a real hashed-token DB lookup; public allowlist = /api/version + /api/auth/*. Verified live: 12 learner-data endpoints 401 anonymous; beacon + auth legs stay 200; anonymous AI abuse now dies at 401 BEFORE the rate limiter.
+- BOOT-ROAD CLOSURE: src/instrumentation.ts mirrors the ensure-server guard order on EVERY boot road (supervisor restart, ensure-server revive, dev, standalone prod) with stale-tolerant lockfile, per-step SIGKILL timeouts, failure isolation; live-proven (snapshot 391ms, migrate 916ms, repair 41ms, then serve).
+- MEASURED round-2: /api/version 38.7ms -> 2.9ms (boot-constant SHA + 60s dirty TTL); prod fleet boot-to-healthy 11-15s, RSS 121.8MB (dev ~1GB).
+- CACHE POLICY: the static renderer pinned the HTML shell s-maxage=31536000 while rebuilds delete the hash-named chunks it references (stale-shell -> 404 JS -> blank page class); now shell max-age=0 must-revalidate, APIs no-store, static immutable - verified live.
+- PLANNER STATS: sqlite_stat1 did not exist on the live db; scripts/db-optimize.sh (PRAGMA optimize + ANALYZE + WAL truncate, flock) ran once (stat1 0 -> 23 rows) and joined the watchdog daily tick.
+- HONEST RECALIBRATION: the platform request-body cap (~10.5MB) sits below the 14M-char audio ceiling - the 413 guard was unreachable; ceiling recalibrated to 9M chars, battery pin moved.
+- PROD REGRESSION RUNNER: scripts/run-boot-regression-prod.sh mints a real hashed session (auth-user id from User, NOT Learner.id), drives state + coach streaming on prod, deletes the session in a trap.
+- Gates: isolated battery 441/441, guard 53/53, isolation 45/45, tsc 0, eslint 0, boot regression ALL PASS on prod, anonymous gate verified live, REG-2 clean.
+
+Stage Summary:
+- The platform's biggest unauthenticated exposure closed; the guard family runs on every boot road; cache policy correct; round-2 numbers recorded. Committed + pushed as 9ff9133 (CI green).
+
+---
+Task ID: 91
+Agent: Super Z (main)
+Task: "countinue never stop" - optimization round 3 (client bundle) + drill repeatability re-run (which found and fixed two REAL data-survival gaps) + environment-recycle recovery.
+
+Work Log:
+- ENVIRONMENT RECYCLE RECOVERY (session start): the sandbox recycled at 15:54 - server fell back to dev (no prod build), watchdog dead, vault-sync not run this boot. Found: the Task-90 instrumentation boot chain RAN on the recycled environment (boot snapshot custom-20261023-155433-boot.db present) - the boot-road closure worked exactly as designed. Re-armed: ensure-watchdog (pid 1925), hand-run vault-sync (fresh scrubbed push 16:07), privacy sweep (16:08, unchanged: 15/16 dangling, blob still served - purge still the monitored human action), rebuilt prod and flipped via the supervisor's own restart path (prod RSS 119.6MB).
+- BUNDLE BASELINE (same method both sides - scripts parsed from the prerendered / shell): initial JS 970.3KB across 10 scripts; total static 970.3KB. Dependency audit: @mdxeditor/editor, react-syntax-highlighter, @dnd-kit/*, recharts imported NOWHERE (zero bundle impact, recorded as cleanup).
+- CODE-SPLITTING: App.tsx keeps the daily loop static (Home, Review, CoachSidebar, Login, PwaBootstrap, OfflineBadge); 7 non-boot surfaces -> next/dynamic (ssr:false, layout-safe fallback): Placement, Write, Listen, Speak, Read, Progress, Arcade (+ games cascade). AFTER: initial 790.6KB (-18.5%), gzip wire 234.6KB, 8 lazy chunks (~192KB). Turbopack honesty note: identical source chunked differently run-to-run (596.8KB also observed); claim uses the final build's conservative number.
+- BLANK-PAGE REGRESSION CAUGHT BY E2E (the batch's engineering lesson): the optimized prod build served fresh HTML but 404'd EVERY chunk - bare `next build` regenerates .next/standalone WITHOUT static assets (Next's documented standalone step), and any rebuild wipes previously-copied files. Fixed at the root: scripts/build-prod.sh (sanctioned wrapper) + self-healing static/public re-sync in dev-or-prod.sh on EVERY prod boot. Re-verified: chunks 200, app renders, all four probed lazy tabs (Writing/Progress/Arcade/Speaking) load through on-demand chunks, zero console/page errors; boot regression ALL PASS; screenshots download/task91-prod-*.png.
+- DRILL REPEATABILITY RE-RUN -> TWO REAL DATA-SURVIVAL FIXES: (1) vault-sync shipped STALE snapshots - the fresh-snapshot step was guarded by [ ! -s db/sync/rah-latest.db ] (build only when ABSENT), so a stale file shipped to the private vault as-is; with the watchdog dead post-recycle the vault held a 2-day DailyStat ledger vs the live 4 days. Fix: vault-sync now rebuilds the snapshot on EVERY push; verified db/sync == vault clone == live (4-day ledger identical). (2) The integrity repair's DailyStat restore was review-KEYED - non-review practice days (2026-10-23: xp 60 + one listening, zero reviews) were unrestorable BY CONSTRUCTION even from a correct snapshot. Ledger extension added: for every triggered user, all snapshot-held DailyStat rows absent from live are restored (snapshot-present + live-absent = provably deleted; strictly insert-only). Pinned by guard battery case 17 (4 checks): 53 -> 58/58.
+- LEARNER DATA RECOVERED LIVE: the drill's total-loss damage cost the learner 2 DailyStat rows (Oct 22-23) through gap(1)+(2) combined; both recovered insert-only from the pre-drill boot snapshot (20748 all-zero day, 20749 xp=60 listened=1). Final live state: DailyStat(me)=4 days, CardState=17, ReviewLog=17, Learner xp=378 streak=4.
+- DRILL REDESIGN: phase-2's no-clobber-through-TOTAL-loss assertions were the known Task-87-b mis-design - now assert snapshot-exact restore + documented honest loss; phase-2b (correct partial-loss no-clobber test) passes 11/11 with outcome-based idempotence (single-flight skips no longer fail the check) and post-assert plant cleanup (drill runs no longer leave synthetic rows in the learner ledger; planted day captured at plant time so cleanup can never touch a real all-zero learner day).
+- PG DRESS REHEARSAL #2 on a rebuilt toolchain: the recycle wiped the PG venv + generated schema; both regenerated from the runbook (venv + prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.postgres.prisma); sandbox proof PASS: 30/30 table counts match, learner checksum identical (xp=378 streak=4), SQLite read-only throughout.
+- PILOT WEEK-ROLL: first roll with non-zero listening volume (listened=1 last-7; reviews 20; written/spoken still honest zeros); interim checkpoint appended to PILOT-PROTOCOL.md section 6 (labeled mid-week, not a verdict cell).
+- Gates: isolated battery 441/441, guard 58/58, isolation 45/45, tsc 0, eslint 0, prod boot regression ALL PASS, browser E2E zero errors (Home + 4 lazy tabs), REG-2 scan before push.
+
+Stage Summary:
+- Round-3 optimization delivered with measured before/after; the drill re-run's value exceeded the optimization: two silent data-survival gaps (stale vault shipping + review-keyed ledger restore) found, fixed, battery-pinned, and re-proven live; one real learner-data loss from those gaps recovered; PG runbook proven reproducible from a cold environment; the environment-recycle recovery itself re-validated the Task-90 boot-road closure in production.

@@ -107,6 +107,7 @@ def cols(c, t):
     return [r[1] for r in c.execute(f"PRAGMA table_info({t})")]
 
 repaired = 0
+triggered_users = set()
 for table, key in (("CardState", "cardId"), ("DailyStat", "day")):
     sc, lc = cols(snap, table), cols(live, table)
     if not sc or not lc:
@@ -122,6 +123,7 @@ for table, key in (("CardState", "cardId"), ("DailyStat", "day")):
         continue
     if not affected:
         continue
+    triggered_users.update(u for u, _ in affected)
     inserted = 0
     absent = 0
     for u, k in affected:
@@ -146,6 +148,38 @@ for table, key in (("CardState", "cardId"), ("DailyStat", "day")):
         repaired += inserted
     elif absent:
         log(f"integrity: {absent} reviewed {table} key(s) missing but no verified snapshot holds them - nothing to restore")
+
+# Task 91 extension: DailyStat is a per-day LEDGER (reviews AND spoken/
+# written/listened/xp from non-review flows). Review-keying restored only
+# review-backed days, so real non-review practice days (2026-10-23: xp 60 +
+# one listening, no reviews that day) were dropped even when the verified
+# snapshot held them - found by the Task 91 phase-2 drill re-run. For every
+# user the review pass already triggered, restore any snapshot-held DailyStat
+# row absent from the live table: snapshot-present + live-absent = provably
+# deleted. Still INSERT-ONLY (INSERT OR IGNORE): existing rows win, rows the
+# snapshot does not hold are never invented.
+ds_ledger = 0
+if triggered_users:
+    ds_cols = [r[1] for r in live.execute("PRAGMA table_info(DailyStat)")]
+    snap_ds_cols = [r[1] for r in snap.execute("PRAGMA table_info(DailyStat)")]
+    common_ds = [c for c in snap_ds_cols if c in ds_cols]
+    if common_ds:
+        for u in sorted(triggered_users):
+            for row in snap.execute(
+                f"SELECT {', '.join(common_ds)} FROM DailyStat WHERE userId=?", (u,)
+            ).fetchall():
+                day = row[common_ds.index("day")]
+                exists = live.execute(
+                    "SELECT COUNT(*) FROM DailyStat WHERE userId=? AND day=?", (u, day)
+                ).fetchone()[0]
+                if not exists:
+                    live.execute(
+                        f"INSERT INTO DailyStat ({', '.join(common_ds)}) VALUES ({', '.join('?' for _ in common_ds)})",
+                        row,
+                    )
+                    ds_ledger += 1
+if ds_ledger:
+    log(f"REPAIRED DailyStat ledger: restored {ds_ledger} non-review day row(s) (insert-only, snapshot-backed - the review-keyed pass alone drops real non-review practice days)")
 
 live.commit()
 live.close()

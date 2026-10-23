@@ -215,3 +215,35 @@ Directive: "countinue never stop". Round 2 kept the measured discipline and clos
 | GET /api/state | 27.0 ms | 15.8 ms | ~2x |
 | GET /api/review/queue | 8.5 ms | 4.3 ms | ~2x |
 | GET /api/progress | 9.8 ms | 5.7 ms | ~2x |
+
+---
+
+## 11. Task 91 — optimization round 3 + the drill-found data-survival fixes (2026-10-23, evidence-first)
+
+Directive: "countinue never stop". Round 3 targeted the one optimization surface rounds 1–2 had not touched (the client bundle), and the drill repeatability re-run turned into the batch's most valuable find: two real data-survival gaps.
+
+### Client bundle (measured, same method both sides: scripts parsed from the prerendered `/` shell)
+
+| Metric | Before | After | Delta |
+|---|---|---|---|
+| Initial JS (raw, on-disk) | 970.3 KB (10 scripts) | 790.6 KB (11 scripts) | **−18.5%** |
+| Initial JS (gzip wire) | — | 234.6 KB | measured |
+| Lazy on-demand chunks | 0 | 8 chunks (~192 KB) | Write / Listen / Speak / Read / Progress / Arcade / Placement + games |
+
+- `App.tsx` kept the daily loop static (Home, Review, CoachSidebar, Login, PwaBootstrap, OfflineBadge); the seven non-boot surfaces moved to `next/dynamic` with a layout-safe fallback. Browser E2E on the prod build: all four probed lazy tabs (Writing, Progress, Arcade, Speaking) render through their on-demand chunks, zero console errors, zero page errors.
+- **Blank-page regression caught by the E2E and fixed at the root**: a bare `next build` regenerates `.next/standalone` WITHOUT static assets (Next's documented standalone step) — the prod server served fresh HTML referencing chunks it then 404'd (blank page, zero console errors). Fix: `scripts/build-prod.sh` (the sanctioned build wrapper) + a self-healing static/public re-sync in `dev-or-prod.sh` on EVERY prod boot, so the boot road is immune to forgotten copies. Turbopack note recorded honestly: identical source can chunk differently run-to-run (596.8 KB and 790.6 KB were both observed for the same optimized tree); the claim uses the conservative number from the final build.
+- **Dependency audit**: `@mdxeditor/editor`, `react-syntax-highlighter`, `@dnd-kit/*`, `recharts` are installed but imported nowhere (zero bundle impact; node_modules bloat only) — recorded as future cleanup, not touched this wave.
+
+### Drill repeatability re-run → two REAL data-survival fixes (the batch's core value)
+
+Re-running the Task-87 drills on the post-Task-90 machinery (WAL mode, 0010 indexes, instrumentation boot) surfaced a chain of findings, each fixed and re-proven live:
+
+1. **vault-sync shipped stale snapshots** — the fresh-snapshot step was guarded by `[ ! -s db/sync/rah-latest.db ]`: it built a snapshot only when the file was ABSENT, so an existing stale file shipped to the private vault as-is. With the watchdog dead after the environment recycle, the vault held a 2-day DailyStat ledger while the live db held 4 days. Fix: vault-sync now rebuilds the fresh snapshot on EVERY push (backup() is milliseconds). Verified end-to-end: db/sync, the vault clone, and live now hold identical 4-day ledgers.
+2. **The repair's DailyStat restore was review-keyed** — non-review practice days (2026-10-23: xp 60 + one listening, zero reviews) were unrestorable BY CONSTRUCTION even from a correct snapshot. The Task-91 ledger extension restores every snapshot-held DailyStat row for a triggered user: snapshot-present + live-absent = provably deleted; still strictly insert-only. Pinned by guard battery case 17 (4 checks) — battery 53 → **58/58**.
+3. **Learner data recovered live**: the drill's total-loss damage cost the learner 2 DailyStat rows (Oct 22–23) because of gap 1+2 combined; both rows were recovered insert-only from a pre-drill boot snapshot and the fix class is closed above.
+4. **Drill redesign for honest semantics** — phase-2's no-clobber-through-TOTAL-loss assertions were the known Task-87-b mis-design (total damage deletes the plant by definition); they now assert snapshot-exact restore + documented honest loss, and phase-2b (the correct partial-loss no-clobber test) passes 11/11 with outcome-based idempotence and post-assert plant cleanup (drill runs no longer leave synthetic rows in the learner's ledger).
+5. **PG cutover dress rehearsal #2: PASS on a rebuilt toolchain** — the recycle had wiped the PG venv and the generated schema; both were regenerated from the runbook (venv + `prisma migrate diff`), then the sandbox proof ran green: 30/30 table counts match, learner checksum identical (xp=378/streak=4), SQLite read-only throughout. The one-command flip runbook is reproducible from a cold environment.
+
+### Gates (this wave)
+
+isolated battery 441/441 · guard 58/58 (was 53) · isolation 45/45 · tsc 0 · eslint 0 · prod boot regression ALL PASS (authenticated) · browser E2E zero errors across Home + 4 lazy tabs · privacy sweep re-run 16:08 UTC (unchanged: 15/16 dangling, blob still served — purge still pending, monitored daily) · watchdog re-armed + fresh vault push after the recycle.

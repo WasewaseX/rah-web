@@ -71,23 +71,38 @@ for _ in $(seq 1 20); do
   sleep 2
 done
 
-# 5) verify
+# 5) verify - TOTAL-loss semantics (Task 91 recalibration).
+# The damage step deletes EVERYTHING for 'me', including the planted rows, so
+# the only honest assertions are against the SNAPSHOT (what the verified chain
+# can prove): the repair must restore exactly the snapshot-backed rows - with
+# the Task-91 DailyStat ledger extension that includes non-review practice
+# days - and nothing else. Post-snapshot rows are honestly lost through total
+# damage BY DESIGN ("never invent"); the no-clobber property (post-snapshot
+# rows survive PARTIAL loss) is drill-phase2b.sh's test, which is why that
+# driver exists (the Task-87-b honest note).
+SNAP="db/sync/rah-latest.db"
+SNAP_CS="$(q "SELECT COUNT(*) FROM CardState WHERE userId='me'")"
+SNAP_DS="$(q "SELECT COUNT(*) FROM DailyStat WHERE userId='me'")"
 CS_AFTER="$(q "SELECT COUNT(*) FROM CardState WHERE userId='me'")"
 DS_AFTER="$(q "SELECT COUNT(*) FROM DailyStat WHERE userId='me'")"
 RL_AFTER="$(q "SELECT COUNT(*) FROM ReviewLog WHERE userId='me'")"
 NOCLobber="$(q "SELECT COUNT(*) FROM CardState WHERE userId='me' AND cardId='drill-noclobber-card'")"
-DS_TOM="$(q "SELECT COUNT(*) FROM DailyStat WHERE userId='me' AND day=(SELECT MAX(day) FROM DailyStat WHERE userId='me')")"
+
+echo "pre-loss: CardState=$CS_BEFORE DailyStat=$DS_BEFORE | snapshot: CardState=$SNAP_CS DailyStat=$SNAP_DS | after repair: CardState=$CS_AFTER DailyStat=$DS_AFTER"
 
 [ "$RL_AFTER" = "$RL_BEFORE" ] && pass "ReviewLog untouched ($RL_AFTER rows)" || fail "ReviewLog changed: $RL_BEFORE -> $RL_AFTER"
-[ "$NOCLobber" = "1" ] && pass "newer legitimate CardState row SURVIVED (insert-only repair, no clobber)" || fail "planted future row was clobbered/lost"
-[ "$CS_AFTER" = "$CS_BEFORE" ] && pass "CardState count exact after repair ($CS_AFTER = restored 17 + 1 survivor)" || fail "CardState count wrong: $CS_BEFORE -> $CS_AFTER"
-[ "$DS_AFTER" = "$DS_BEFORE" ] && pass "DailyStat count exact after repair ($DS_AFTER = restored 2 + 1 survivor)" || fail "DailyStat count wrong: $DS_BEFORE -> $DS_AFTER"
-[ "$DS_TOM" = "1" ] && pass "future DailyStat row survived" || fail "future DailyStat row lost"
+[ "$CS_AFTER" = "$SNAP_CS" ] && pass "CardState restored exactly to the verified snapshot ($CS_AFTER rows)" || fail "CardState after=$CS_AFTER but snapshot holds $SNAP_CS"
+[ "$DS_AFTER" = "$SNAP_DS" ] && pass "DailyStat ledger restored exactly to the verified snapshot ($DS_AFTER rows incl. non-review days)" || fail "DailyStat after=$DS_AFTER but snapshot holds $SNAP_DS"
+if [ "$NOCLobber" = "0" ]; then
+  pass "planted post-snapshot rows honestly absent through TOTAL loss (never invented - by design; no-clobber is phase 2b's partial-loss test)"
+else
+  fail "planted rows present after total-loss repair - impossible unless damage or restore misfired"
+fi
 
 # 6) the app must serve the recovered schedule
 curl -s -o /dev/null -w "state-route status: %{http_code}\n" http://localhost:3000/api/version --max-time 5
 if python3 -c "
-import sqlite3
+import sqlite3, sys
 con = sqlite3.connect('$DB')
 due = con.execute(\"SELECT COUNT(*) FROM CardState WHERE userId='me' AND due >= 0\").fetchone()[0]
 print(f'restored scheduled cards with due dates: {due}')

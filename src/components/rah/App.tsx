@@ -22,20 +22,31 @@ import {
   GraduationCap,
   Gamepad2,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Chip } from "./ui";
 import HomeView from "./Home";
 import PwaBootstrap from "./PwaBootstrap";
 import OfflineBadge from "./OfflineBadge";
 import ReviewView from "./Review";
-import PlacementView from "./Placement";
-import WriteView from "./Write";
-import ListenView from "./Listen";
-import SpeakView from "./Speak";
-import ReadView from "./Read";
-import ProgressView from "./Progress";
-import ArcadeView from "./Arcade";
 import CoachSidebar from "./CoachSidebar";
 import LoginView from "./Login";
+
+// Round-3 bundle optimization (Task 91): the daily loop (Home, Review, Coach,
+// Login gate) stays in the initial chunk so first paint and the core SRS action
+// never wait on a lazy fetch; every other surface is code-split and fetched the
+// first time its tab opens, with a layout-safe fallback in the gap.
+const ViewFallback = () => (
+  <div className="flex h-full min-h-[40vh] w-full items-center justify-center text-sm opacity-60">
+    Loading&hellip;
+  </div>
+);
+const PlacementView = dynamic(() => import("./Placement"), { ssr: false, loading: ViewFallback });
+const WriteView = dynamic(() => import("./Write"), { ssr: false, loading: ViewFallback });
+const ListenView = dynamic(() => import("./Listen"), { ssr: false, loading: ViewFallback });
+const SpeakView = dynamic(() => import("./Speak"), { ssr: false, loading: ViewFallback });
+const ReadView = dynamic(() => import("./Read"), { ssr: false, loading: ViewFallback });
+const ProgressView = dynamic(() => import("./Progress"), { ssr: false, loading: ViewFallback });
+const ArcadeView = dynamic(() => import("./Arcade"), { ssr: false, loading: ViewFallback });
 import { applyTheme } from "@/lib/theme-bus";
 import { installOfflineSync, flush } from "@/lib/offline";
 

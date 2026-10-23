@@ -11,6 +11,21 @@ cd /home/z/my-project || exit 1
 if [ "${RAH_PROD:-1}" != "0" ] && [ -f .next/standalone/server.js ] && [ -f .next/BUILD_ID ]; then
   set -a; . ./.env 2>/dev/null; set +a
   export NODE_ENV=production
+  # Task 91: self-healing static sync. `next build` regenerates .next/standalone
+  # WITHOUT the static assets (Next's documented standalone step), so a bare
+  # build leaves a prod server that 404s every chunk -> blank page (caught by
+  # the Task 91 browser E2E). Re-sync static + public on EVERY prod boot; the
+  # copy is milliseconds and makes the boot road immune to forgotten copies.
+  if [ -d .next/static ] && ! diff -rq .next/static .next/standalone/.next/static > /dev/null 2>&1; then
+    rm -rf .next/standalone/.next/static
+    cp -r .next/static .next/standalone/.next/static
+    echo "$(date -Is) standalone static re-synced from the fresh build"
+  fi
+  if [ -d public ] && ! diff -rq public .next/standalone/public > /dev/null 2>&1; then
+    mkdir -p .next/standalone/public
+    cp -r public/. .next/standalone/public/
+    echo "$(date -Is) standalone public/ re-synced from the fresh build"
+  fi
   echo "$(date -Is) booting PRODUCTION standalone build (RAH_PROD=${RAH_PROD:-1}, BUILD_ID=$(cat .next/BUILD_ID 2>/dev/null))"
   node .next/standalone/server.js 2>&1 | tee server.log
   exit 0
