@@ -140,3 +140,4 @@ db/.boot-guard.lock
 scripts/.perf-baseline.json
 drill-clone/
 pron-validation-clips/
+db/.sweep-state

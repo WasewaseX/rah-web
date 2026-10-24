@@ -1697,3 +1697,17 @@ Work Log:
 
 Stage Summary:
 - The reviewer's two reconciliations are closed with hard evidence and the three feature prompts are now bounded implementation plans awaiting only the human gates - exactly the "documentation, architecture, and test preparation only" their P0 doctrine demands. Recycle #8 was caught by the alert layer and recovered with zero data loss (4-way MATCH, tripwire intact, pilot history restored from the vault). Standing launch gates unchanged: GitHub Support purge (HUMAN, monitored daily), PG flip signature (HUMAN), pilot weeks (time + learner volume).
+
+---
+Task ID: 96-b
+Agent: Super Z (main)
+Task: Task 96 follow-up - record CI run #121 evidence (the section-17 promise), the deliberate-restart operational lesson, and sweep-state gitignore hygiene.
+
+Work Log:
+- Run #121 (97dce66, the Task 96 reconciliation push) confirmed PASSING via the public ci.yml badge + the atom feed (the anonymous REST API hit its rate limit mid-session; the badge is authoritative for the latest push to main). ROADMAP-STATUS.md section 17 gates line updated with the evidence.
+- Operational lesson exercised twice: ensure-server deliberately does NOT auto-restart a HEAD-stale prod process (95-b's alert-without-flapping contract) - after a commit the operator runs build-prod + ensure-server + a deliberate kill of the next-server process; pkill -f "next-server" is the correct pattern (the 95-b process-title lesson holds).
+- db/.sweep-state (privacy-sweep state file, untracked since Task 95) added to .gitignore so the tree stays clean without committing sweep evidence.
+- Post-recovery verification: served 97dce66 == HEAD, drift OK (build lmLW99jrwuucOxLF2zfyp == intended), tripwire intact (2026-10-20T20:31:51.265Z), freshness 4-way MATCH xp=475 SCRUBBED, watchdog alive.
+
+Stage Summary:
+- The reviewer's caveat is now closed with a full evidence chain: runs 118/119/120 (API) + run 121 (badge) all green against their commits; the repo serves its own HEAD; every claim in this segment is diff-audited.
