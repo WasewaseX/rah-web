@@ -1666,3 +1666,17 @@ Work Log:
 
 Stage Summary:
 - The reviewer's roadmap is now a governed backlog with acceptance criteria + regression tests + human gates, and its autonomously-executable P0/P1 surface is closed: pilot history survives recycles (proven), drift alerts fire (proven live), failures alert instead of hiding, the purge request is durable and filed-ready, and the three validation packs make the remaining P1s executable the moment their owner inputs (phone test, Azure key, SMTP creds) exist. Standing launch gates unchanged: GitHub Support purge (HUMAN), PG flip signature (HUMAN decision), pilot weeks (time + learner volume).
+
+---
+Task ID: 95-b
+Agent: Super Z (main)
+Task: Drift check amendment discovered while verifying the Task 95 commit - the served-version-vs-HEAD gap.
+
+Work Log:
+- Rebuilt prod after the Task 95 commit (so the served version label would match HEAD) and found the 15:11 standalone STILL serving: it had baked BOOT_SHA=038dc4c at boot, HEAD had moved to e4527ec, and every health check stayed green - the /api/version beacon's own doctrine ("served SHA must equal git HEAD") was unenforced.
+- deploy-drift-check.sh check 4 added: served /api/version .version vs git HEAD (WARN, not CRITICAL - content drift, not outage; auto-restart deliberately NOT added: alert-without-flapping is the contract, restarts stay deliberate).
+- Verified live: WARN fired with both SHAs; restart served e4527ec; after the 95-b commit + restart, served 27587a8 == HEAD, dirty:0, drift FULLY OK.
+- Process-title lesson recorded: pkill -f "standalone/server.js" misses the renamed "next-server (v16.x)" title; ensure-server's patterns (next-server / next dev) are correct - the manual one-liner was the mistake.
+
+Stage Summary:
+- Drift detection now covers all four states the reviewer's P1 #5 names: missing prod build (CRITICAL), dev serving while prod exists (WARN), build != intended release (WARN), running process predates HEAD (WARN). Evidence chain: db/alerts.log + vault digest. Gates: tsc 0, batteries unchanged-green, freshness MATCH+SCRUBBED, watchdog alive, served 27587a8b7c9a == HEAD dirty:0.
