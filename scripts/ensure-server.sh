@@ -45,10 +45,24 @@ bash scripts/db-migrate-safe.sh || echo "(migrate skipped/failed - see /tmp/db-m
 bash scripts/db-integrity-repair.sh || true
 
 if curl -sf -o /dev/null --max-time 5 http://localhost:3000/api/version; then
-  bash scripts/db-snapshot.sh || true
-  bash scripts/db-sync.sh || true
-  bash scripts/ensure-watchdog.sh || true
-  exit 0
+  # Task 95 (review P1 #5): "healthy" is not enough - it must be the INTENDED
+  # release. Recycle #7's exact state: boot fell back to dev because .next/
+  # was wiped, then build-prod.sh produced BUILD_ID, and the dev server kept
+  # serving while every health check passed. If a dev server answers while a
+  # prod build exists, flip it - kill and fall through to the prod boot below.
+  if [ -s .next/BUILD_ID ] && pgrep -f "next dev" >/dev/null 2>&1; then
+    echo "$(date -Is) healthy but DEV is serving while a prod build exists - flipping to the release build"
+    pkill -f "next dev" 2>/dev/null
+    pkill -f "next-server" 2>/dev/null
+    pkill -f "standalone/server.js" 2>/dev/null
+    sleep 2
+  else
+    bash scripts/db-snapshot.sh || true
+    bash scripts/db-sync.sh || true
+    bash scripts/ensure-watchdog.sh || true
+    bash scripts/deploy-drift-check.sh || true
+    exit 0
+  fi
 fi
 
 echo "$(date -Is) server down; reviving"
@@ -95,6 +109,10 @@ for _ in $(seq 1 30); do
     bash scripts/db-snapshot.sh || true
     bash scripts/db-sync.sh || true
     bash scripts/ensure-watchdog.sh || true
+    # Task 95 (review P1 #5): boot-time drift check - if what just came up
+    # is not the intended release (e.g. dev fallback because the recycle
+    # wiped .next/), the alert log records it instead of nobody noticing.
+    bash scripts/deploy-drift-check.sh || true
     exit 0
   fi
 done

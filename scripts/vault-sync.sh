@@ -13,6 +13,11 @@
 # What it ships:
 #   rah-web/rah-latest.db          - newest snapshot (Session/LoginCode scrubbed)
 #   rah-web/history/rah-<UTC>.db   - dated history, newest $VAULT_KEEP kept
+#   rah-web/pilot/series.md        - Task 95: the weekly pilot checkpoint log
+#                                    (restore-if-missing on boot + ship every
+#                                    run, so environment recycles can no longer
+#                                    erase pilot history - review P0 #4; it was
+#                                    lost in recycles #6 AND #7)
 #
 # Snapshots already exist? It ships them (pure transport). Missing? It makes
 # the freshest one from the live DB first (same scrub as db-sync.sh).
@@ -64,6 +69,7 @@ else
   mkdir -p "$(dirname "$VAULT_DIR")"
   if ! git clone -q "$VAULT_URL" "$VAULT_DIR" 2>>"$LOG"; then
     log "ERROR: could not clone the vault repo - offsite sync skipped"
+    bash scripts/alert.sh CRITICAL vault-sync "vault clone failed - offsite backup chain broken" || true
     exit 1
   fi
 fi
@@ -107,6 +113,57 @@ if [ "${RAH_VAULT_ENC:-0}" = "1" ]; then
   log "encryption ON (AES-256-CBC/PBKDF2) - vault will hold .enc only"
 else
   enc() { cp -f "$1" "$2"; }
+fi
+
+# ---- Task 95: PILOT HISTORY survives recycles (review P0 #4) ----------------
+# db/pilot/series.md is the weekly pilot checkpoint log (REG-2: gitignored
+# locally because it is learner-derived). It died in recycles #6 and #7 with
+# zero durable copies. The private vault is its durable home in BOTH
+# directions, riding the existing choke point (no new moving parts). Placed
+# AFTER the encryption block on purpose: it needs enc()/$ENC/$PASSARGS.
+#   RESTORE - local series missing (fresh recycle) && vault has it -> copy back
+#   SHIP    - local series exists -> staged into the vault clone so the
+#             commit+push below carries it offsite the same run.
+PILOT_LOCAL="db/pilot/series.md"
+PILOT_VAULT="$DEST/pilot/series.md"
+if [ ! -s "$PILOT_LOCAL" ]; then
+  mkdir -p db/pilot
+  if [ $ENC = 1 ] && [ -s "$PILOT_VAULT.enc" ]; then
+    if openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$PILOT_VAULT.enc" -out "$PILOT_LOCAL" "${PASSARGS[@]}"; then
+      log "restored pilot history from vault (.enc)"
+    else
+      log "WARNING: pilot restore failed (decrypt)"; rm -f "$PILOT_LOCAL"
+    fi
+  elif [ -s "$PILOT_VAULT" ]; then
+    cp -f "$PILOT_VAULT" "$PILOT_LOCAL" && log "restored pilot history from vault"
+  fi
+fi
+if [ ! -s "$PILOT_LOCAL" ]; then
+  # Cold start (no local, no vault copy): seed the series so the record has a
+  # beginning instead of a silent hole - same move Task 94 made by hand after
+  # recycle #6. The tracked PILOT-PROTOCOL.md remains the canonical protocol.
+  printf '%s\n' "" "## Re-seed - $(date -u +%Y-%m-%d)" \
+    "Pilot history before this point was lost to environment recycles (#6, #7)." \
+    "From Task 95 the series is vault-backed: vault-sync restores it on boot" \
+    "and ships it on every run. Protocol + checkpoint definitions: PILOT-PROTOCOL.md." \
+    >> "$PILOT_LOCAL"
+  log "seeded empty pilot series (cold start) - will ship with this run"
+fi
+if [ -s "$PILOT_LOCAL" ]; then
+  mkdir -p "$DEST/pilot"
+  if [ $ENC = 1 ]; then
+    if enc "$PILOT_LOCAL" "$PILOT_VAULT.enc"; then rm -f "$PILOT_VAULT"; else log "WARNING: pilot ship failed (encrypt)"; fi
+  else
+    cp -f "$PILOT_LOCAL" "$PILOT_VAULT"
+  fi
+fi
+
+# ---- Task 95: alerts digest rides the same push (review P1 #10) -------------
+# db/alerts.log is machine-local and dies with the workspace on recycle; the
+# vault copy is the durable alert history. Bounded tail keeps the clone small.
+if [ -s "db/alerts.log" ]; then
+  mkdir -p "$DEST/alerts"
+  tail -c 262144 db/alerts.log > "$DEST/alerts/recent.log"
 fi
 
 # ---- freshest snapshot: ALWAYS rebuild it, ship it always -------------------
@@ -160,6 +217,7 @@ done
 # old vault commits until the vault repo itself is history-scrubbed).
 if [ $ENC = 1 ]; then
   find "$DEST" -name '*.db' -type f -exec rm -f {} + 
+  rm -f "$PILOT_VAULT"
   git -C "$VAULT_DIR" add -A "$VAULT_FOLDER" 2>/dev/null || true
 fi
 
@@ -171,6 +229,7 @@ if git -C "$VAULT_DIR" status --porcelain -- "$VAULT_FOLDER" | grep -q .; then
     log "pushed learner snapshots to PRIVATE vault ($VAULT_FOLDER/)"
   else
     log "ERROR: vault push failed (offline?) - committed locally in $VAULT_DIR"
+    bash scripts/alert.sh CRITICAL vault-sync "vault push failed - offsite copy stale (committed locally)" || true
     exit 1
   fi
 else

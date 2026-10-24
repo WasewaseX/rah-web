@@ -18,5 +18,11 @@ mkdir -p .next/standalone/public
 cp -r public/. .next/standalone/public/
 
 echo "build-prod: BUILD_ID=$(cat .next/BUILD_ID)"
+# Task 95 (review P1 #5): record the intended release so deploy-drift-check
+# can alert when the served build ever differs from what was last built
+# here on purpose.
+mkdir -p backups
+cat .next/BUILD_ID > backups/.intended-build-id
+echo "build-prod: intended-release record -> backups/.intended-build-id"
 echo "build-prod: standalone static chunks: $(ls .next/standalone/.next/static/chunks | wc -l)"
 echo "build-prod: standalone public files:  $(ls .next/standalone/public | wc -l)"

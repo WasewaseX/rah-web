@@ -1,0 +1,233 @@
+# TASK-95-BACKLOG — prioritized engineering and product roadmap, made executable
+
+Written 2026-10-24. This is the external reviewer's six-section roadmap
+turned into a backlog with acceptance criteria, regression tests, and an
+explicit human-gate ledger — per their closing offer: "prioritized issues,
+acceptance criteria and specific regression tests for each change."
+
+Reading guide:
+- **Status** values: `DONE (Task 95)` / `IN PROGRESS` / `READY` (agent can
+  start) / `HUMAN GATE` (requires the account holder's hands or decision) /
+  `BLOCKED` (waiting on another item).
+- Every item names its regression test — a change that cannot name its test
+  does not ship (house rule since Task 62).
+- No feature work starts while a P0 in Part A is open (the reviewer's
+  central recommendation, adopted as doctrine).
+
+---
+
+## Part A — the ten critical fixes
+
+### A-1 · P0 · Finish the GitHub privacy purge — `HUMAN GATE` (filing) + `DONE (Task 95)` (everything around it)
+- **Outcome**: old commit objects stop being anonymously retrievable; the
+  cached db blob is evicted; the daily sweep returns 0/16 clean twice.
+- **Task 95 shipped**: the ready-to-file request —
+  `PRIVACY-PURGE-REQUEST.md` (tracked, recycle-proof) with all 15 dangling
+  SHAs in FULL 40-char form (10 resolved locally, 5 via the public atom
+  feed — which is itself fresh retrievability evidence), the blob's three
+  evidence URLs, and the closure criteria. Copy at
+  `download/GITHUB-SUPPORT-PURGE-REQUEST.md`. Fresh evidence 2026-10-24:
+  raw CDN serves the blob with HTTP 200; sweep 15/16 + blob-still-served.
+- **Acceptance**: `scripts/privacy-sweep.py` exits 0; the raw URL 404s; two
+  consecutive daily sweeps clean (the alert layer fires an INFO the day it
+  happens — impossible to miss).
+- **Regression test**: the daily sweep itself (watchdog tick) + sweep-state
+  change alert. **Who**: the ACCOUNT HOLDER files the request (nobody else
+  can — Support requires account identity).
+
+### A-2 · P0 · Make the production database decision — `HUMAN GATE`
+- **Outcome**: a signed decision: single-learner SQLite (Option A) or
+  multi-user PostgreSQL (Option B). Registration stays LOCKED until the
+  decision + (if B) a completed cutover.
+- **Everything the decision needs is packaged**: `PG-DECISION.md`
+  (Option A/B framing), `scripts/pg-cutover.sh` (dry-run default, guarded
+  `--flip`, proven rollback), the 30-table rehearsal GREEN (counts +
+  checksums + backup/restore), and the reviewer's constraint: "Do not
+  unlock public registration before the production migration and recovery
+  tests are complete."
+- **Acceptance**: one line appended to `ROADMAP-STATUS.md`: "Decision:
+  Option A/B, signed by the account holder, date." **Regression test**:
+  if B — the full isolation battery must pass against the PG URL before
+  any unlock (the suite already runs a throwaway stack; adding a PG URL
+  profile is a listed task under D-1).
+
+### A-3 · P0 · PostgreSQL production cutover (only if A-2 = Option B) — `BLOCKED on A-2`
+- **Outcome**: `pg-cutover.sh --flip` executed against production, row
+  counts + checksums verified live, rollback path proven, isolation suite
+  green on PG.
+- **Acceptance**: freshness chain extended with a PG leg (five-way match);
+  one full week of PG operation with zero critical alerts before any
+  registration unlock. **Regression test**: `pg-sandbox-proof.py` re-run
+  post-flip + the isolation battery against PG.
+
+### A-4 · P0 · Make pilot measurements survive recycling — `DONE (Task 95)`
+- **Outcome**: the weekly pilot series can no longer be destroyed by an
+  environment recycle (it was lost in recycles #6 AND #7 — the reviewer
+  flagged the exact gap).
+- **Shipped**: `vault-sync.sh` now restores `db/pilot/series.md` from the
+  private vault when missing (boot + daily cadence, both directions
+  proven by a byte-identical round-trip test), cold-start seeding, ENC
+  support, and the watchdog's weekly append now runs BEFORE the vault
+  push so a fresh checkpoint ships the same day. The alert layer + the
+  alerts digest give the series an audit trail offsite.
+- **Acceptance**: delete `db/pilot/` → next vault-sync restores it; a
+  recycle followed by boot leaves the series intact. **Regression test**:
+  the round-trip (delete → restore → `diff -q` identical), re-runnable by
+  hand; the vault holds `rah-web/pilot/series.md` from commit b38fe69 on.
+
+### A-5 · P1 · Remove dependence on ephemeral workspace state — `IN PROGRESS` (drift + alerts done; immutable-deploy hardening remains)
+- **Outcome**: recycles become non-events: prod-preferred boot (done,
+  Task 89), drift detection (done, Task 95), watchdogs outside the
+  workspace lifecycle (ensure-watchdog self-start, done), alert on
+  served-build != intended release (done).
+- **Task 95 shipped, with a live catch**: on 2026-10-24 the recycle wiped
+  `.next/` and boot silently fell back to `next dev`; the new
+  `deploy-drift-check.sh` fired CRITICAL, `build-prod.sh` now records
+  `backups/.intended-build-id`, and `ensure-server.sh` flips a
+  dev-serving state to the release build instead of accepting "healthy".
+  Prod build `2pW8kL9VVbfgQsn8nUCwz` == intended; drift OK.
+- **Remaining**: build once, deploy the artifact (copy the standalone dir
+  rather than rebuilding in-place) — acceptance: a fresh recycle restores
+  the EXACT intended BUILD_ID without a new build. **Regression test**:
+  `deploy-drift-check.sh` (exit 0 after a true restore; CRITICAL when
+  `.next/BUILD_ID` is missing).
+
+### A-6 · P1 · Complete transactional email configuration — `READY` (machinery tested; provider config is the account holder's 10-minute step)
+- **Outcome**: real SMTP/provider configured; verification, failure,
+  retry, and duplicate-suppression behavior validated in that mode.
+- **Task 95 shipped**: `EMAIL-OPERATIONS.md` (Resend/Gmail runbooks, SPF/
+  DKIM note, the four validation steps) + `scripts/test-email-delivery.ts`
+  battery: 7 pass / 0 fail / 1 honest skip (real-send needs credentials).
+  The ledger contract (sliding 60s idempotency window, one row per
+  recipient, `status=sent|failed|dev`, provider messageId) is pinned.
+- **Acceptance**: battery green WITH SMTP configured and a real send
+  received; a deliberate wrong-password run records `failed` and surfaces
+  a speakable error. **Regression test**: the battery itself.
+
+### A-7 · P1 · Configure and validate the Azure pronunciation tier — `READY` (harness + protocol shipped; key + clips are the account holder's)
+- **Outcome**: phoneme-level feedback validated against real recordings
+  BEFORE any UI claim (the review's exact wording).
+- **Task 95 shipped**: `PRONUNCIATION-VALIDATION.md` (7 acceptance
+  criteria, clip set, post-validation claim-flip rules) +
+  `scripts/azure-pron-validate.ts` (mirrors the adapter's REST contract;
+  honest SKIP without a key — verified; exits 1 on any failed criterion).
+  The word-level `measured:asr-alignment` tier and its 23-test battery are
+  untouched and remain the fallback.
+- **Acceptance**: harness ALL CHECKS PASS with key + clips; then, and only
+  then, the UI may label the Azure tier. **Regression test**: the harness
+  + the existing degradation pins.
+
+### A-8 · P1 · Test offline behavior on physical devices — `READY` (protocol shipped; execution needs a physical phone)
+- **Outcome**: airplane mode, reconnects, duplicate replays, browser
+  closure, storage eviction, and account switching verified on real
+  hardware — the browser E2E cannot represent real radios.
+- **Task 95 shipped**: `OFFLINE-TEST-PROTOCOL.md` — 7 scenarios, each with
+  steps, expected outcomes, and the code contract it exercises
+  (`rah-outbox-v1` gid/GradeAck dedupe, the 4xx-drop rule, the refuse-
+  offline honesty rule, the outbox cap), plus a results-recording route
+  into the vault-backed pilot series.
+- **Acceptance**: 7/7 PASS recorded with device model + OS + browser;
+  any FAIL becomes a backlog entry named by its scenario number.
+  **Regression test**: scenario 2 (duplicate replay) is the candidate for
+  automation into the existing E2E family afterward.
+
+### A-9 · P1 · Run a real multi-week learner study — `IN PROGRESS` (instrumentation + cadence automated; only weeks of real use can finish it)
+- **Outcome**: measured retention, writing, listening, speaking deltas over
+  multiple weeks — E2E activity is not educational evidence (reviewer's
+  words, adopted as doctrine).
+- **Standing state**: weekly checkpoints append automatically to the
+  vault-backed series (Task 92-bis automation + Task 95 durability);
+  writing/speaking volumes are honestly zero until the learner produces
+  volume; the series labels every small-sample week as such.
+- **Acceptance**: ≥4 consecutive weekly checkpoints with non-zero writing
+  and speaking volumes; retention trend computable across ≥3 weeks with
+  ≥30 first attempts each. **Regression test**: `pilot-metrics.mjs`
+  output shape pinned by the battery.
+
+### A-10 · P1 · Add alerts for data-integrity and monitoring failures — `DONE (Task 95)`
+- **Outcome**: the failure classes the review listed — freshness-chain
+  mismatch, unexpected zero activity, failed backup pushes, restore
+  failures, watchdog disappearance — surface as events, not buried lines.
+- **Shipped**: `scripts/alert.sh` (append-only `db/alerts.log`, never
+  fatal) wired into: watchdog site-DOWN/recovery, db-integrity repair
+  firings, vault clone/push failures, daily freshness-chain check
+  (LIVE=SYNC=VAULT=UPLOAD + scrub), deployment drift, and privacy-sweep
+  STATE CHANGES (dangling count moves, blob flips, the CLEAN day). The
+  digest ships to the private vault (`rah-web/alerts/recent.log`), so
+  alert history survives recycles too. Watchdog disappearance is covered
+  structurally: ensure-server's boot path re-runs ensure-watchdog, and a
+  dead watchdog is exactly the condition A-5's drift check + the recycle
+  recovery chain now surface at next boot.
+- **Acceptance**: each wire-in demonstrated (the live dev-fallback catch
+  is recorded in the digest). **Regression test**: kill the server →
+  watchdog revive + CRITICAL alert row; corrupt freshness → CRITICAL row.
+
+---
+
+## Part B — the ten critical features (NO implementation while a Part-A P0 is open)
+
+| # | Feature | Acceptance criteria (measurable) | Regression test | Status |
+|---|---|---|---|---|
+| F-1 | Validated phoneme-level pronunciation feedback | Azure tier passes A-7's harness; UI shows sound-level error + replayable example + targeted retry; word-level and phoneme tiers never merged in metrics | harness + degradation pins | `BLOCKED on A-7` |
+| F-2 | Expert-calibrated exam scoring | band RANGES with uncertainty + sample size on every exam result; calibrated against ≥20 human-rated responses; no false-precision band numbers | battery pin on the uncertainty shape; rubric battery | `READY` (see MAGOOSH-IELTS-RE §2.3) |
+| F-3 | Cross-device draft sync | server-side draft store, version history, conflict resolution, explicit consent before grading submit; local autosave keeps working offline | writing battery + new sync battery; offline protocol S4/S5 re-run | `READY` after A-2 (multi-user store decision shapes the schema) |
+| F-4 | Structured listening library | graded B2–C1 audio, multiple accents, transcripts, replayable segments, comprehension items; skill-deltas (not play counts) land in DailyStat | provenance battery extends to audio sources; listening battery | `READY` |
+| F-5 | Voice-shadowing mode | listen→imitate→compare→retry loop; recurring errors auto-link to review cards; uses the same measured tier labels as read-aloud | pronunciation battery extension | `BLOCKED on A-7` (phoneme claims gated) but the word-tier loop is `READY` |
+| F-6 | Farsi-specific transfer-error explanations | content built from REVIEWED learner examples (mistake memory), minimal contrasts + follow-ups; every explanation cites its evidence pattern | mistake-memory battery; content review checklist | `READY` |
+| F-7 | Broader document/web import | PDF/EPUB/article import with source attribution preserved, extraction-failure detection, learner-selected passages before exercise generation | pdf-engine battery + provenance battery extension | `READY` |
+| F-8 | Expression/collocation training | multi-word items as first-class cards; register + phrasal patterns; FSRS revisits them in varied contexts | fsrs parity battery with multi-word items | `READY` (see SPEAK-RE §2.2) |
+| F-9 | Optional human tutor review | permission-controlled sharing of SELECTED attempts; tutor comments stored separately from AI grading, labeled at render | isolation battery (new sharing scope tests) | `BLOCKED on A-2` (sharing presumes the multi-user answer) |
+| F-10 | Versioned curriculum/content release | versioned items + prerequisites; content-quality tests run before publish; history preserved to explain any past assignment | curriculum battery + new version-pin test | `READY` |
+
+## Part C — the ten polish items (improve value/explainability/resilience of shipped features)
+
+| # | Surface | Meaningful polish | Regression test | Status |
+|---|---|---|---|---|
+| C-1 | Review queue + FSRS | "why due now" explanation, new-vs-revision distinction, scheduling confidence, full-queue recovery test | fsrs parity battery + new explanation-shape pin | `READY` |
+| C-2 | Talk conversation mode | interruption handling, mic recovery, typed fallback, mobile-browser behavior, session recording | e2e talk extension | `READY` |
+| C-3 | Sound Lab | measured word-level vs inferred sound-contrast clearly separated; confidence + replayable examples; phoneme scoring only after A-7 | pronunciation 23-battery labels | `READY` |
+| C-4 | AI coach + agent | evidence panel: which tools ran, what changed, what failed, how to resume a stopped task | agent battery extension | `READY` |
+| C-5 | Exam generation/grading | more benchmark questions, distractor-plausibility tests, rubric calibration vs human-rated answers | fuzzy/grading batteries | `READY` |
+| C-6 | CEFR placement/progress | skill-specific sample counts + uncertainty + history; no C1 claims off small samples | ladder battery + shape pins | `READY` |
+| C-7 | Mistake memory/mastery | exact evidence per recurring weakness; learner correctable; per-error decline measured over time | mistake-memory battery | `READY` |
+| C-8 | XP/gems/quests/games | rewards tied to measured practice; anti-farming retained; progress possible without constant gamification | arcade/goal batteries | `READY` |
+| C-9 | Writing workspace | cross-device drafts (F-3), clearer rubric explanations, before/after measurable deltas | writing 31-battery | `READY` |
+| C-10 | Progress dashboard/pilot | activity vs test-events separation, sample sizes shown, "insufficient evidence" explicit states, durable checkpoints (done via A-4) | e2e progress + series-shape pin | `READY` |
+
+## Part D — the three data stores (timing depends on A-2)
+
+| # | Store | Take only when | Acceptance | Status |
+|---|---|---|---|---|
+| D-1 | PostgreSQL (primary) | A-2 decides Option B, or multi-user | A-3's criteria + isolation battery on PG | `BLOCKED on A-2` |
+| D-2 | Redis/Valkey (shared operational state) | >1 app instance must agree (rate limits, locks, cache) | never authoritative for FSRS/XP/progress; single-node in-process controls stay | `NOT NEEDED` in the single-learner era |
+| D-3 | R2/S3 (private object storage) | hosted durable files (docs, audio, reports) beyond the workspace | metadata+checksums+ownership in the DB; contents in object storage; REG-2 rules extended to it | `READY` after A-1 closes (do NOT let it postpone the purge — the reviewer's exact warning) |
+
+## Part E — the three APIs
+
+| # | API | What to do | Acceptance | Status |
+|---|---|---|---|---|
+| E-1 | LLM API (structured outputs + tool calling) | improve evals, cost controls, retries, deterministic validation; NO new provider | eval suite for coach/writing/quiz outputs; cost log per day | `READY` |
+| E-2 | Azure AI Speech pronunciation assessment | configure key+region, run A-7, keep honest fallback | A-7's harness green | `BLOCKED on A-7` |
+| E-3 | Transactional email | configure provider per A-6 runbook, validate the four behaviors | A-6's battery green with SMTP | `BLOCKED on A-6 config` |
+
+---
+
+## Execution order (the review's four phases, adopted)
+
+1. **Security and durability** — A-1 filing (human), A-4 ✅, A-5 (drift ✅ /
+   artifact-deploy remaining), A-10 ✅.
+2. **Production architecture** — A-2 decision (human) → A-3 only if B.
+3. **Learning quality** — A-6, A-7, then F-1/F-5/F-2/C-3/C-5.
+4. **Evidence of improvement** — A-9 continues weekly; features F-* queue
+   ONLY behind open Part-A P0s.
+
+## Task 95's own claim ledger (audited against the tree at commit time)
+
+| Claim | Proof to find in the tree |
+|---|---|
+| Pilot history is vault-backed, both directions | `scripts/vault-sync.sh` pilot section; vault commit b38fe69 contains `rah-web/pilot/series.md`; round-trip diff identical |
+| Purge request filed-ready | `PRIVACY-PURGE-REQUEST.md` (15 full SHAs) + `download/GITHUB-SUPPORT-PURGE-REQUEST.md` |
+| Drift detection + intended-release record | `scripts/deploy-drift-check.sh`, `scripts/build-prod.sh` record write, `backups/.intended-build-id` == `.next/BUILD_ID` |
+| Alert layer wired | `scripts/alert.sh` + wire-ins in `watchdog.sh`/`ensure-server.sh`/`vault-sync.sh`; `db/alerts.log` rows incl. the live dev-fallback catch; vault digest `rah-web/alerts/recent.log` |
+| Offline/pron/email validation packs | `OFFLINE-TEST-PROTOCOL.md`, `PRONUNCIATION-VALIDATION.md` + harness, `EMAIL-OPERATIONS.md` + battery (7/0/1) |
+| Three RE docs | `ELSA-SPEAK-RE.md`, `SPEAK-RE.md`, `MAGOOSH-IELTS-RE.md` |
