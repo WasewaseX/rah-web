@@ -56,6 +56,19 @@ else
     bash "$ALERT" WARN deploy-drift "no intended-release record ($INTENDED_FILE missing) - run scripts/build-prod.sh once to record it"
     drift=1
   fi
+
+  # 4. running build vs HEAD (the /api/version beacon's own doctrine: served
+  # SHA must equal git HEAD after every change; a mismatch means the RUNNING
+  # process predates the code on disk - e.g. a commit landed after boot and
+  # every health check stayed green). WARN, not CRITICAL: content drift only.
+  if command -v curl >/dev/null 2>&1; then
+    SERVED_SHA="$(curl -sf --max-time 5 http://localhost:3000/api/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4)"
+    HEAD_SHA="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+    if [ -n "$SERVED_SHA" ] && [ "$SERVED_SHA" != "$HEAD_SHA" ] && [ "$SERVED_SHA" != "no-git" ]; then
+      bash "$ALERT" WARN deploy-drift "running build serves $SERVED_SHA but HEAD is $HEAD_SHA - the process predates the current code; restart via scripts/ensure-server.sh to serve the release"
+      drift=1
+    fi
+  fi
 fi
 
 if [ "$drift" = 0 ]; then
