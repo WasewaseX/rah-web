@@ -20,6 +20,7 @@ restore on the actual deployment."*
 | Real app serves the authenticated learner FROM PostgreSQL | Task 92 (standalone bundle rebuilt with PG client, :3100, state 200 + coach 200) | complete rehearsal on the actual deployment |
 | Restore drill on PG (pg_dump / drop / create / pg_restore → verify) | Task 92 | GREEN |
 | Flip runbook with drill-found gap fixes (G1 provider switch + client regen + rebuild; G2 one-time PG baseline migration history with SQLite history preserved + full rollback; G3 verify footer-parse fix) | Task 92, `scripts/pg-cutover.sh` | executed end-to-end, workspace rollback verified clean |
+| Identity-split class closed before any second account can exist (the coach surface wrote under the legacy id while session writes used the auth id; reconciled 78 rows / 10 collisions, coach now stamps the session user) | Task 92-ter, `02248f0` + merge script re-runnable | per-user keying verified live: zero legacy rows across all user-keyed tables; the October 24 review's Task 92-ter findings |
 
 ## 2. The decision, with consequences
 
@@ -66,7 +67,7 @@ the app boots.
 
 ## 4. What stays true either way
 
-Per-user isolation is complete in code and schema (Tasks 63/65/67, isolation battery 45/45);
+Per-user isolation is complete in code and schema (Tasks 63/65/67, isolation battery 47/47 since Task 92-ter's coach-stamp pins);
 the deployment lock decision is independent of the storage engine; the privacy doctrine (zero
 learner data in the public repo, vault-only offsite copies) is engine-agnostic; and the
 `/api/version` `createdAt` tripwire verifies learner-data continuity across any cutover.

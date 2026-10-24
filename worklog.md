@@ -1607,3 +1607,22 @@ Work Log:
 
 Stage Summary:
 - The learner's history is ONE identity again; the split class is closed in code + pinned by battery + the migration script is re-runnable/idempotent for any future deployment. Pilot metrics get their real numbers back (18 reviews, listening visible).
+
+---
+Task ID: 93
+Agent: Super Z (main)
+Task: October 24 (latest) review response - "countinue never stop": claims-vs-diff on Task 92-ter, full verification pass, roadmap reconciliation completed (review next-step #4), purge-request deliverable pre-filled, PG decision brief updated, prod re-flipped to a HEAD-current build.
+
+Work Log:
+- Claims-vs-diff on 02248f0 + c3820ea (Task 92-ter): 6 files exactly as claimed (merge script 211 lines, isolation battery +19, coach route +9); reviewer numbers (78 rows / 10 collisions / 45->47) match commit + worklog. LIVE data verified: zero 'me' rows across all user-keyed tables (ReviewLog 18, ChatMsg 26, CardState 18, DailyStat 5, GameStat 16, Quest 12, Achievement 1 - all on the single auth cuid); Learner xp=435 streak=5, createdAt tripwire unchanged. Code comment mislabel fixed (the stamp comment said 92-bis; the fix is 92-ter).
+- Batteries re-run green: isolation 47/47, guard 58/58, isolated main 441/441, tsc 0, eslint 0.
+- Privacy sweep re-run (twice): 15/16 pre-scrub SHAs still dangling-retrievable, blob STILL SERVED at 5156b4b (9b9c360 remains gone); vault private=True; public tree zero learner-data paths. The purge remains THE human action -> produced download/GITHUB-SUPPORT-PURGE-REQUEST.md: the FULLY pre-filled request (15 SHAs inline, blob evidence URLs, where-to-file steps, full-SHA derivation, closure criteria) so the account holder's filing is copy-paste.
+- Freshness chain: LIVE == SYNC == VAULT == UPLOAD (xp=435/streak=5/reviews=18/days=5) MATCH+SCRUBBED.
+- Pilot metrics re-run on the merged identity: week-0 18 first attempts @33% recall, 39 total reviews, 5 active days/28; writing/speaking honest zeros (learner-volume gap, not instrumentation).
+- PROD RESTORED TO CURRENT: the environment recycle had reverted serving to the 07:10 build (predating the 92-ter commits) - rebuilt via build-prod.sh (BUILD_ID O6YSPWco, 29 chunks + 4 public files), clean kill + single ensure-server boot; version stamp c3820ea, boot regression ALL PASS (authenticated state 200 + coach streaming 200), anonymous 401 gate live (14 probed learner endpoints 401; version + auth legs public), home + chunks 200, vault push at boot.
+- Mobile probes re-run on the fresh build: cold FCP median 1124ms / warm 200ms (reviewer-cited 1.13s reproduces); first lazy-tab settle 82ms with 0 chunk bytes on the wire (idle-prefetch hit - reviewer-cited ~83ms reproduces or betters). Evidence: db/load-metrics-after-93.json, db/interactivity-run.json.
+- ROADMAP RECONCILIATION (review next-step #4) COMPLETED: ROADMAP-STATUS.md header -> Task 92-ter + the newest review scores (8.7/9.5/6.8); new sections 13 (92-bis) and 14 (92-ter + the post-review verification pass) with a combined gates line; section-1 isolation row updated 45->47. ROADMAP-AUDIT.md header -> Task 92-ter; the dual-userId split given its own Bookkeeping (Task 92-ter) section (was folded under 92-bis item 6) including the full verification pass; REG-2 open-critical item carries this session's dated sweep evidence + the pre-filled request pointer. PG-DECISION.md: 92-ter identity-split closure added as multi-user evidence (isolation 47/47).
+- Gates: tsc 0 (post-comment-fix), eslint 0, isolation 47/47, guard 58/58, main 441/441, boot regression ALL PASS, REG-2 scan before push.
+
+Stage Summary:
+- Every number the newest review cites is now independently re-verified on a HEAD-current production build, and the two status documents agree with the tested state through Task 92-ter (the reviewer's explicit next-step #4 is closed). The privacy purge is reduced to a copy-paste filing; the PG decision is a signature; the pilot needs learner weeks, not code. Standing launch gates unchanged: GitHub Support purge (monitored daily), PG flip signature, teaching validation over coming weeks.

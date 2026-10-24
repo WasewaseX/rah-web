@@ -1,0 +1,53 @@
+{
+  "label": "run",
+  "url": "http://localhost:3000/",
+  "tab": "Progress",
+  "harness": {
+    "device": "iPhone 13",
+    "cpuThrottle": "4x",
+    "net": "1.6Mbps/150ms RTT"
+  },
+  "at": "2026-10-24T08:18:57.181Z",
+  "bootBlocking": {
+    "supported": true,
+    "count": 6,
+    "tbt": 157,
+    "worst": 170,
+    "tasks": [
+      {
+        "dur": 170,
+        "start": 2010
+      },
+      {
+        "dur": 59,
+        "start": 2215
+      },
+      {
+        "dur": 56,
+        "start": 2524
+      },
+      {
+        "dur": 66,
+        "start": 2611
+      },
+      {
+        "dur": 55,
+        "start": 2678
+      },
+      {
+        "dur": 51,
+        "start": 2832
+      }
+    ]
+  },
+  "lazyTabSettleMs": 82,
+  "lazyFirstChunkMs": 24,
+  "lazyChunkBytes": 0,
+  "lazyChunks": [
+    {
+      "url": "7328ade70f159297.js",
+      "bytes": 0,
+      "ms": 24
+    }
+  ]
+}

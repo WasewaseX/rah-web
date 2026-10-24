@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       }
 
       // Persist the turn (user text + final agent answer) so the sidebar has memory.
-      // Task 92-bis: STAMP the userId - this surface was the isolation-sweep
+      // Task 92-ter: STAMP the userId - this surface was the isolation-sweep
       // straggler (schema default 'me' while every other write resolved the
       // session user), which split the learner's history across two ids until
       // scripts/merge-legacy-user-rows.py re-unified it.
