@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildProfile, bumpDaily, touchStreak } from "@/lib/server";
 import { getSessionUserWithRequest } from "@/lib/auth";
+import { contentUserId } from "@/lib/scope";
 import { awardXp } from "@/lib/arcade";
 import { runAgent, type AgentEvent } from "@/lib/coach-agent/loop";
 
@@ -77,11 +78,17 @@ export async function POST(req: Request) {
       }
 
       // Persist the turn (user text + final agent answer) so the sidebar has memory.
-      await db.chatMsg.create({ data: { role: "user", content: text } });
+      // Task 92-bis: STAMP the userId - this surface was the isolation-sweep
+      // straggler (schema default 'me' while every other write resolved the
+      // session user), which split the learner's history across two ids until
+      // scripts/merge-legacy-user-rows.py re-unified it.
+      const chatUid = await contentUserId(req);
+      await db.chatMsg.create({ data: { role: "user", content: text, userId: chatUid } });
       await db.chatMsg.create({
         data: {
           role: "coach",
           content: JSON.stringify({ skill: "agent", reply: turn.reply, corrections: turn.corrections, commands: turn.commands, toolsUsed: turn.toolsUsed }),
+          userId: chatUid,
         },
       });
 

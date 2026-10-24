@@ -95,6 +95,25 @@ check "B does NOT see A's chats"    "$A_LEAK" "0"
 ANON=$(curl -s "$BASE/api/chat" | python3 scripts/iso-parse.py chat_len)
 check "unauthenticated sees nothing" "$ANON" "0"
 
+# --- coach-agent ChatMsg stamp (Task 92-bis: the isolation-sweep straggler) ---
+# The agent surface wrote ChatMsg with the schema default 'me' while every
+# other content write resolved the session user - the split that required
+# scripts/merge-legacy-user-rows.py. Pinned here: a coach turn through the
+# agent route must stamp user A's id, never the 'me' default.
+CA_RES=$(curl -s --max-time 90 -b "$JA" -X POST "$BASE/api/coach-agent" -H 'content-type: application/json' -d '{"message":"isolation stamp probe"}' -o /dev/null -w "%{http_code}")
+check "coach-agent responds for A" "$CA_RES" "200"
+CA_STAMP=$(python3 - "$DB" <<'PY'
+import sqlite3, sys, json
+c = sqlite3.connect(sys.argv[1].replace("file:", ""))
+ids = json.load(open("/tmp/isolation-ids.json"))
+me_rows = c.execute("SELECT COUNT(*) FROM ChatMsg WHERE userId='me' AND content LIKE '%isolation stamp probe%'").fetchone()[0]
+a_rows = c.execute("SELECT COUNT(*) FROM ChatMsg WHERE userId=? AND content LIKE '%isolation stamp probe%'", (ids["a"],)).fetchone()[0]
+print(f"{a_rows}/{me_rows}")
+c.close()
+PY
+)
+check "coach-agent stamps A's id (a-rows/me-rows)" "$CA_STAMP" "1/0"
+
 # --- writing + revision chain ------------------------------------------------
 W_A=$(curl -s -b "$JA" "$BASE/api/writing" | python3 scripts/iso-parse.py writing_recent)
 W_B_IN_A=$(curl -s -b "$JA" "$BASE/api/writing" | python3 scripts/iso-parse.py writing_recent_foreign "pB")

@@ -1591,3 +1591,19 @@ Work Log:
 
 Stage Summary:
 - The audit-reconciliation mandate is CLOSED with code-verified rows (the exact conflict class the reviewer named cannot recur silently - each flipped row carries its code evidence). The PG decision is packaged to a signature. The Azure boundary is pinned by battery. Mobile perf round 2 measured and improved the metric that matters (first lazy-tab open 1300 -> ~80ms throttled) with FCP/TBT unharmed. The pilot's weekly cadence is now mechanical. Remaining launch gates unchanged: GitHub Support purge (monitored daily), the PG signature itself, learner volume on writing/speaking.
+
+---
+Task ID: 92-ter
+Agent: Super Z (main)
+Task: Follow-through on live learner data: the dual-userId ledger split found, fixed in code AND data, battery-pinned.
+
+Work Log:
+- DISCOVERY: freshness-check flagged xp growing with no DailyStat row under 'me'. Root cause chain: (1) the coach-agent route wrote ChatMsg with the schema default 'me' (the Task-63 isolation sweep's straggler - it postdated the chat route's stamping), while (2) session-scoped writes elsewhere resolved the auth User cuid, so user-keyed rows split across TWO ids (me: 17 reviews/24 chats/17 cards/4 stat days; cuid: the post-Oct-22 rows). cuid-scoped readers (Progress, volume card) could not see 17 real reviews or the listening ledger row.
+- LIVE EVIDENCE: the learner earned +24 xp today (3 coach turns) + streak 4->5; their own Progress view showed 1 review instead of 18. ReviewLog cuid=1 row vs me=17.
+- CODE FIX: coach-agent stamps both ChatMsg creates with contentUserId(req) - the class fix. Isolation battery 45 -> 47/47 (new pins: a coach turn through the agent route must stamp user A's id, never 'me'; request shape lesson: the route takes {message}, not {text}).
+- DATA FIX: scripts/merge-legacy-user-rows.py (read-only default, --apply gated, one transaction, idempotent, tripwire-guarded): plain re-id for ReviewLog/ChatMsg/CardState/etc + field-wise merge for PK collisions (DailyStat=sum 6 counters, GameStat=best max/plays sum, Quest=progress sum capped/done OR/xp max, Achievement=earliest at). Tested on a copy first (drill doctrine; the copy's cp missed WAL pages - noted, harmless for the logic test), then applied live: 78 rows re-id'd, 10 collisions merged, 0 legacy rows left, Learner.createdAt tripwire unchanged.
+- POST-VERIFY: Progress now reports reviews=18 and volume last-7 reviews=38/listened=1 (the listening activity visible again); boot regression ALL PASS; guard 58/58; isolation 47/47; main battery 441/441; tsc 0; eslint 0. Prod rebuilt with the stamp fix.
+- HONEST NOTES: (a) DailyStat 'reviews' is also bumped by coach turns (a pre-existing counter-semantics quirk, recorded here, NOT renamed mid-fix); (b) the 'me' userId remains the schema default + unauthenticated fallback by design (scope.ts doctrine), now consistent because every real write resolves the session user; (c) my first SUM SQL had a bindings-order bug - caught by the copy test, rollback held, fixed before any live contact.
+
+Stage Summary:
+- The learner's history is ONE identity again; the split class is closed in code + pinned by battery + the migration script is re-runnable/idempotent for any future deployment. Pilot metrics get their real numbers back (18 reviews, listening visible).
