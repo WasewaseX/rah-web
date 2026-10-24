@@ -15,16 +15,12 @@ PATHS = {
 }
 
 
-def sig(path):
-    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    try:
-        xp = con.execute("SELECT xp, streak FROM Learner WHERE id='me'").fetchone()
-        rev = con.execute("SELECT COUNT(*) FROM ReviewLog WHERE userId='me'").fetchone()[0]
-        days = con.execute("SELECT COUNT(*) FROM DailyStat WHERE userId='me'").fetchone()[0]
-        sess = con.execute("SELECT COUNT(*) FROM Session").fetchone()[0]
-        codes = con.execute("SELECT COUNT(*) FROM LoginCode").fetchone()[0]
-    finally:
-        con.close()
+def sig(con, uid):
+    xp = con.execute("SELECT xp, streak FROM Learner WHERE id='me'").fetchone()
+    rev = con.execute("SELECT COUNT(*) FROM ReviewLog WHERE userId=?", (uid,)).fetchone()[0]
+    days = con.execute("SELECT COUNT(*) FROM DailyStat WHERE userId=?", (uid,)).fetchone()[0]
+    sess = con.execute("SELECT COUNT(*) FROM Session").fetchone()[0]
+    codes = con.execute("SELECT COUNT(*) FROM LoginCode").fetchone()[0]
     return {
         "xp": xp[0] if xp else None,
         "streak": xp[1] if xp else None,
@@ -32,17 +28,29 @@ def sig(path):
         "days": days,
         "sessions": sess,
         "login_codes": codes,
+        "ledger_uid": uid[:8],
     }
 
 
 def main():
     out = {}
     missing = []
+    uid = None
     for name, path in PATHS.items():
         if not os.path.exists(path):
             missing.append(f"{name}: {path}")
             continue
-        out[name] = sig(path)
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            # Task 92-ter: resolve the REAL ledger user (the auth User cuid).
+            # The legacy 'me' id was merged away - filtering 'me' here would
+            # read zeros everywhere and false-green the whole chain.
+            if uid is None:
+                row = con.execute("SELECT id FROM User ORDER BY createdAt LIMIT 1").fetchone()
+                uid = row[0] if row else "me"
+            out[name] = sig(con, uid)
+        finally:
+            con.close()
         print(f"{name:7s}: {out[name]}")
     if missing:
         print("MISSING:\n  " + "\n  ".join(missing))
