@@ -41,7 +41,9 @@
     ".next-isolation/dev/types/**/*.ts",
     ".next-mobile/types/**/*.ts",
     ".next-mobile/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts"
+    ".next/dev/dev/types/**/*.ts",
+    ".next-teach/types/**/*.ts",
+    ".next-teach/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

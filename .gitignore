@@ -97,9 +97,11 @@ data/coach-workspace/
 .next-battery/
 .next-isolation/
 .next-mobile/
+.next-teach/
 db/battery-isolated.db*
 db/battery-isolation.db*
 db/battery-mobile.db*
+db/battery-teach.db*
 
 # deploy-pipeline artifacts - never commit or package these (Task 60)
 db/admin-token

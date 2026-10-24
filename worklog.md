@@ -1626,3 +1626,20 @@ Work Log:
 
 Stage Summary:
 - Every number the newest review cites is now independently re-verified on a HEAD-current production build, and the two status documents agree with the tested state through Task 92-ter (the reviewer's explicit next-step #4 is closed). The privacy purge is reduced to a copy-paste filing; the PG decision is a signature; the pilot needs learner weeks, not code. Standing launch gates unchanged: GitHub Support purge (monitored daily), PG flip signature, teaching validation over coming weeks.
+
+---
+Task ID: 94
+Agent: Super Z (main)
+Task: "countinue never stop" - teaching-experience validation (the review's priority #3), the essay-draft-loss gap closed, input-latency measurement round, recycle recovery #6.
+
+Work Log:
+- Claims-vs-diff on my own Task 93 (c792849): 7 files match the commit claims exactly.
+- RECYCLE #6 at 09:51 UTC (mid-batch): boot guard restored from upload/rah-backups (xp=443/streak=5/tripwire intact - 5th live boot-road proof); reprovision pulled Task-93 code. Restored db/sync + vault (one transient push failure retried OK) + watchdog (pid 3781) + sweep log (15/16 dangling, blob still served - unchanged) + prod rebuild x2 (qEDfxzNq then LSSUMsbc with the batch's code) + freshness MATCH+SCRUBBED. Honest loss: gitignored db/pilot/series.md died - re-seeded with a dated note pointing at the tracked PILOT-PROTOCOL.md checkpoints (the canonical record).
+- OFFLINE GAP CLOSED for the highest-harm surface: essays refuse offline (honest) but a blip mid-draft DESTROYED the draft while writing volume is the pilot's zero track. New src/lib/write-draft.ts (device-local, injectable store, corrupt-safe) wired into Write.tsx: restore-once on mount, debounced save, clear ONLY on server acceptance; honesty line "Draft saved on this device - nothing was submitted or sent". Writing battery 19 -> 31/31 (12 pins). Tooling lesson: a MultiEdit reported atomic failure but had double-applied two edits (530->603 lines) - caught by rg line counts, reverted to HEAD, reapplied stepwise with verification after each Edit.
+- TEACH-CHAIN E2E (scripts/e2e-task94-teach.mjs, throwaway stack :3112, real browser) 10/10: register -> write -> autosave indicator -> RELOAD restores draft verbatim -> restore indicator -> grade -> practice-estimate label -> draft cache cleared -> volume ledger written=1 -> speak session -> ledger spoken=1. The pilot's instrumentation chain is now proven end-to-end in a real browser for BOTH zero-volume tracks.
+- INPUT-LATENCY ROUND (scripts/input-latency-probe.mjs + run-input-probe.sh): iPhone 13 emulation, 4x CPU, throttled network - review Check-tap -> response 15ms; writing keystroke -> editor update 8ms (Task-89 per-keystroke work holds); coach send -> first streamed byte ~1.5-2.4s (model-dominated, first-byte honest). Probe adapts to the live queue's typed-card flow and records pane state instead of inventing numbers. Evidence db/input-latency-94.json.
+- UI CLAIMS SWEEP on the shipped bundle: "not an official" + "practice estimate" + the new draft honesty line all present (2 chunks each); "measured:asr-alignment" is server-delivered via the assess API + server chunk (battery-pinned 23/23) - no phoneme claims without a real key.
+- Gates: tsc 0, eslint 0 (removed an unused eslint-disable), writing 31/31, isolation 47/47, guard 58/58, main battery 441/441 (one 438 run = external LanguageTool 503, direct probe 200, re-run green), boot regression ALL PASS, anonymous 401 gate live, REG-2 scan before push. Learner actively using the app during the batch (xp 443 -> 459).
+
+Stage Summary:
+- The review's teaching-validation priority now has browser-level proof that nothing the learner writes or speaks is lost and everything counts in the pilot ledger; the draft-loss gap is closed with honesty pins; the third measurement round (input latency) shows single/double-digit-ms interactions on throttled mobile. Standing launch gates unchanged: GitHub Support purge (human action, monitored daily), PG flip signature, pilot weeks.

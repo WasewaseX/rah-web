@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PenLine, ArrowRight, SpellCheck2 } from "lucide-react";
 import { Btn, Card, Chip, FA, Note, ScoreRow, Spinner } from "./ui";
+import { clearWriteDraft, loadWriteDraft, saveWriteDraft } from "@/lib/write-draft";
 import type { AppState } from "./App";
 
 interface Result {
@@ -113,6 +114,13 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
   const [gc, setGc] = useState<GcReport | null>(null);
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
   const [goalSel, setGoalSel] = useState<string>("");
+  // Draft autosave (Task 94): the unsent draft survives reloads/offline blips
+  // on this device. Restored once on mount, saved debounced, cleared when the
+  // server accepts the submission. The indicator is honest: "saved on this
+  // device", never "synced".
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftSeq = useRef(0);
   const checkSeq = useRef(0);
   const layerRef = useRef<HTMLDivElement | null>(null);
 
@@ -129,6 +137,33 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
   useEffect(() => {
     loadRecent();
   }, [loadRecent]);
+
+  // Draft autosave: restore-once on mount, then debounced saves. The draft
+  // store is device-local by design - nothing here claims a submission or a
+  // sync; the server only ever receives the draft when the learner submits.
+  useEffect(() => {
+    const d = loadWriteDraft(window.localStorage);
+    if (d) {
+      setText(d.text);
+      setGoalSel(d.goalSel);
+      if (d.revisingId !== null) setRevisingId(d.revisingId);
+      setDraftSavedAt(d.at);
+      setDraftRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const mine = ++draftSeq.current;
+      const at = Date.now();
+      const ok = saveWriteDraft({ text, goalSel, revisingId, at }, window.localStorage);
+      if (ok && mine === draftSeq.current) {
+        setDraftSavedAt(text.trim().length > 0 ? at : null);
+        if (text.trim().length === 0) setDraftRestored(false);
+      }
+    }, 500);
+    return () => clearTimeout(id);
+  }, [text, goalSel, revisingId]);
 
   // Live pre-flight: 1.2s after typing goes idle, screen the CURRENT text.
   // Stale responses are dropped by sequence number; errors are silent (the
@@ -217,6 +252,10 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
       setResult(j);
       setRevisingId(null);
       setGc(null);
+      // The server now holds the content - the local draft cache's job is done.
+      clearWriteDraft(window.localStorage);
+      setDraftSavedAt(null);
+      setDraftRestored(false);
       onChange();
       loadRecent();
     } catch (e) {
@@ -369,6 +408,16 @@ export default function WriteView({ state, onChange }: { state: AppState; onChan
             {busy ? "Grading" : revisingId !== null ? "Grade this revision" : "Grade my essay"}
           </Btn>
         </div>
+        {/* Draft autosave honesty line (Task 94): states exactly what the local
+            cache is - a device-local draft, not a submission or a sync. */}
+        {draftSavedAt !== null && (
+          <div className="text-[11px] text-[#7d889c]">
+            {draftRestored ? "Restored your unsent draft" : "Draft saved"} on this device
+            {" · "}
+            {new Date(draftSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {" · nothing was submitted or sent"}
+          </div>
+        )}
         {checkOn && gc && visibleFindings.length > 0 && (
           <div className="mt-4 rounded-2xl border border-[#2a3242] bg-[#10151f] p-3.5">
             <div className="mb-2.5 flex flex-wrap items-center gap-2">

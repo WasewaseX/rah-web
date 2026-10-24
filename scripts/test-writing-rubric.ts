@@ -80,5 +80,51 @@ const chain3 = [
 const ch3 = revisionChanges(chain3);
 check(ch3.length === 1 && ch3[0].fixed === 0 && ch3[0].introduced === 0, "clean pair -> honest zero row");
 
+// --- Task 94: writing-draft autosave store (device-local, honesty-pinned) ---
+import { WRITE_DRAFT_KEY, clearWriteDraft, loadWriteDraft, saveWriteDraft } from "../src/lib/write-draft";
+
+function fakeStore() {
+  const m = new Map<string, string>();
+  return {
+    getItem: (k: string) => (m.has(k) ? (m.get(k) as string) : null),
+    setItem: (k: string, v: string) => void m.set(k, v),
+    removeItem: (k: string) => void m.delete(k),
+    _m: m,
+  };
+}
+
+check(loadWriteDraft(null) === null, "null storage -> no draft, no throw");
+check(loadWriteDraft(fakeStore()) === null, "empty storage -> no draft");
+
+const s1 = fakeStore();
+check(saveWriteDraft({ text: "My draft text.", goalSel: "exam", revisingId: null, at: 100 }, s1), "save returns true");
+check(s1._m.get(WRITE_DRAFT_KEY)?.includes("My draft text.") === true, "draft persisted under the canonical key");
+
+const l1 = loadWriteDraft(s1);
+check(l1 !== null && l1.text === "My draft text." && l1.goalSel === "exam" && l1.revisingId === null && l1.at === 100, "round-trip preserves every field");
+
+// empty text is NOT a draft: saving it clears, loading returns null
+const s2 = fakeStore();
+saveWriteDraft({ text: "x", goalSel: "", revisingId: null, at: 1 }, s2);
+check(saveWriteDraft({ text: "   ", goalSel: "", revisingId: null, at: 2 }, s2), "saving whitespace-only clears (returns true)");
+check(loadWriteDraft(s2) === null, "empty draft -> load returns null (nothing to restore)");
+check(!s2._m.has(WRITE_DRAFT_KEY), "empty save removed the key");
+
+// corrupt payloads ignored, never thrown
+const s3 = fakeStore();
+s3._m.set(WRITE_DRAFT_KEY, "{not json");
+check(loadWriteDraft(s3) === null, "corrupt JSON -> null, no throw");
+s3._m.set(WRITE_DRAFT_KEY, JSON.stringify({ text: 42, goalSel: 7 }));
+check(loadWriteDraft(s3) === null, "wrong-shape payload -> null, no throw");
+s3._m.set(WRITE_DRAFT_KEY, JSON.stringify({ text: "ok", goalSel: 7, revisingId: "junk", at: "x" }));
+const l3 = loadWriteDraft(s3);
+check(l3 !== null && l3.text === "ok" && l3.goalSel === "" && l3.revisingId === null && l3.at === 0, "partial-shape payload -> sanitized draft");
+
+// clearing removes the key; a junk revisingId is dropped, not preserved
+const s4 = fakeStore();
+saveWriteDraft({ text: "keep", goalSel: "", revisingId: 9, at: 5 }, s4);
+check(clearWriteDraft(s4) && !s4._m.has(WRITE_DRAFT_KEY), "clear removes the key");
+check(clearWriteDraft(null) === false, "clear with null storage -> false, no throw");
+
 console.log(`\n=== WRITING RUBRIC BATTERY: ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);

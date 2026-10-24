@@ -1,0 +1,13 @@
+{
+  "reviewNote": "typed-card flow at probe time - pane: Classic | Blitz | Pairs | Card 1 of 20 | Spot the phrase | B2 | grammar | Last seen 3d ago · 1 review · normally returns every 1d | saw | Which chunk is the point of this phrase? Type it. | Check | Suspend this card | 17 due",
+  "reviewTapMs": 15,
+  "keystrokeMs": 8,
+  "coachFirstByteMs": 2360,
+  "harness": {
+    "device": "iPhone 13 emulation",
+    "cpu": "4x throttle",
+    "network": "1.6Mbps/150ms",
+    "at": "2026-10-24T10:57:01.945Z",
+    "label": "94"
+  }
+}
