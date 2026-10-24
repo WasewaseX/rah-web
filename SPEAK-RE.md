@@ -85,3 +85,14 @@ a proprietary loop based on three steps…"), their current App Store listing
 (the four STEP lines), and the independent 209-day review + 2026 comparison
 articles — all cited inline by name. No proprietary material was accessed;
 the weaknesses quoted are the independent sources', not ours.
+
+## 6. Implementation plan (Task 96)
+
+The §2 architecture is now fully specified in **`SPEAK-PLAN.md`**: a
+versioned scenario library (content-as-code), the Learn/Practice frame
+rotation over already-met phrases, the earned D0→D1→D2 difficulty gate with
+its exact arithmetic, the round-3 exit receipt contract, and the
+fumbled/avoided → mistake-memory/FSRS feedback rules — plus a 10-case
+deterministic test plan. Implementation is gated behind the open Part-A P0s
+per `TASK-95-BACKLOG.md`; no further research iterations on this doc until
+the plan ships.

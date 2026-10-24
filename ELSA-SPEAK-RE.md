@@ -76,3 +76,14 @@ pronunciation feedback work?") and current product pages, cross-checked
 against independent 2026 comparisons. No proprietary material was accessed.
 Where ELSA's behavior is described in marketing language, the table in §4
 states the OBSERVABLE behavior only.
+
+## 6. Implementation plan (Task 96)
+
+The reviewer's direction after Task 95: implementation planning and
+evidence-backed integration — not more high-level research. The loop in §2
+is now fully specified in **`ELSA-PLAN.md`**: three wires (flag→family,
+family→FSRS drill via existing paths, re-measure→before/after), a
+field-level data contract, the idempotency/isolation rules, and a 10-case
+deterministic test plan. Per `TASK-95-BACKLOG.md` the implementation is
+gated behind the open Part-A P0s; this RE doc will not be extended further
+until the plan ships or the gates force a redesign.

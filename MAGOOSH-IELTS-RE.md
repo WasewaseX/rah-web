@@ -78,3 +78,16 @@ guide) — all published marketing/product documentation, quoted sparingly and
 by name. The count claims (850+ questions, 10 tests) are THEIRS and are
 described as advertised claims, not verified inventory. No proprietary
 question content was accessed.
+
+## 6. Implementation plan (Task 96)
+
+The §2 system is now fully specified in **`MAGOOSH-PLAN.md`**: tracks as
+versioned content-as-code documents (no new tables before the A-2
+decision), the six-fields-per-day schedule contract, the first-class
+explanation + distractor-rationale item contract, band RANGES with sample
+size and the per-rubric-version ≥20-human-rated calibration gate, and the
+goal-planner-based re-planning rules — plus a 10-case deterministic test
+plan. Implementation is gated behind the open Part-A P0s per
+`TASK-95-BACKLOG.md`; the calibration set cannot be manufactured by the
+agent, so `calibrated: false` remains the only honest render until the
+human-rated evidence exists.

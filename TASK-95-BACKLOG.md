@@ -75,17 +75,27 @@ Reading guide:
   the round-trip (delete → restore → `diff -q` identical), re-runnable by
   hand; the vault holds `rah-web/pilot/series.md` from commit b38fe69 on.
 
-### A-5 · P1 · Remove dependence on ephemeral workspace state — `IN PROGRESS` (drift + alerts done; immutable-deploy hardening remains)
+### A-5 · P1 · Remove dependence on ephemeral workspace state — `IN PROGRESS` (drift + alerts done incl. Task 95-b's fourth state; immutable-deploy hardening remains)
 - **Outcome**: recycles become non-events: prod-preferred boot (done,
-  Task 89), drift detection (done, Task 95), watchdogs outside the
-  workspace lifecycle (ensure-watchdog self-start, done), alert on
-  served-build != intended release (done).
+  Task 89), drift detection (done, Task 95 + 95-b — all FOUR states:
+  missing prod build CRITICAL, dev-serving while prod exists WARN, build
+  != intended release WARN, running process predates HEAD WARN),
+  watchdogs outside the workspace lifecycle (ensure-watchdog self-start,
+  done), alert on served-build != intended release (done).
 - **Task 95 shipped, with a live catch**: on 2026-10-24 the recycle wiped
   `.next/` and boot silently fell back to `next dev`; the new
   `deploy-drift-check.sh` fired CRITICAL, `build-prod.sh` now records
   `backups/.intended-build-id`, and `ensure-server.sh` flips a
   dev-serving state to the release build instead of accepting "healthy".
   Prod build `2pW8kL9VVbfgQsn8nUCwz` == intended; drift OK.
+- **Task 95-b amendment (reconciled into this backlog 2026-10-25)**: a
+  fourth drift state was found live and closed — the 15:11 standalone kept
+  serving `038dc4c` after `e4527ec` landed (every health check green, the
+  /api/version doctrine unenforced). Check 4 now compares served
+  `/api/version` .version vs git HEAD (WARN; auto-restart deliberately NOT
+  added — alert-without-flapping is the contract, restarts stay
+  deliberate). Verified live: WARN fired with both SHAs, restart served
+  HEAD, drift FULLY OK.
 - **Remaining**: build once, deploy the artifact (copy the standalone dir
   rather than rebuilding in-place) — acceptance: a fresh recycle restores
   the EXACT intended BUILD_ID without a new build. **Regression test**:
@@ -169,13 +179,13 @@ Reading guide:
 | # | Feature | Acceptance criteria (measurable) | Regression test | Status |
 |---|---|---|---|---|
 | F-1 | Validated phoneme-level pronunciation feedback | Azure tier passes A-7's harness; UI shows sound-level error + replayable example + targeted retry; word-level and phoneme tiers never merged in metrics | harness + degradation pins | `BLOCKED on A-7` |
-| F-2 | Expert-calibrated exam scoring | band RANGES with uncertainty + sample size on every exam result; calibrated against ≥20 human-rated responses; no false-precision band numbers | battery pin on the uncertainty shape; rubric battery | `READY` (see MAGOOSH-IELTS-RE §2.3) |
+| F-2 | Expert-calibrated exam scoring | band RANGES with uncertainty + sample size on every exam result; calibrated against ≥20 human-rated responses; no false-precision band numbers | battery pin on the uncertainty shape; rubric battery | `READY` — design + contract in `MAGOOSH-PLAN.md` §5/§8 (Task 96); implementation gated |
 | F-3 | Cross-device draft sync | server-side draft store, version history, conflict resolution, explicit consent before grading submit; local autosave keeps working offline | writing battery + new sync battery; offline protocol S4/S5 re-run | `READY` after A-2 (multi-user store decision shapes the schema) |
 | F-4 | Structured listening library | graded B2–C1 audio, multiple accents, transcripts, replayable segments, comprehension items; skill-deltas (not play counts) land in DailyStat | provenance battery extends to audio sources; listening battery | `READY` |
-| F-5 | Voice-shadowing mode | listen→imitate→compare→retry loop; recurring errors auto-link to review cards; uses the same measured tier labels as read-aloud | pronunciation battery extension | `BLOCKED on A-7` (phoneme claims gated) but the word-tier loop is `READY` |
+| F-5 | Voice-shadowing mode | listen→imitate→compare→retry loop; recurring errors auto-link to review cards; uses the same measured tier labels as read-aloud | pronunciation battery extension | `BLOCKED on A-7` (phoneme claims gated) but the word-tier loop is `READY` — the goal-bound session wrapper it joins is designed in `SPEAK-PLAN.md` (Task 96) |
 | F-6 | Farsi-specific transfer-error explanations | content built from REVIEWED learner examples (mistake memory), minimal contrasts + follow-ups; every explanation cites its evidence pattern | mistake-memory battery; content review checklist | `READY` |
 | F-7 | Broader document/web import | PDF/EPUB/article import with source attribution preserved, extraction-failure detection, learner-selected passages before exercise generation | pdf-engine battery + provenance battery extension | `READY` |
-| F-8 | Expression/collocation training | multi-word items as first-class cards; register + phrasal patterns; FSRS revisits them in varied contexts | fsrs parity battery with multi-word items | `READY` (see SPEAK-RE §2.2) |
+| F-8 | Expression/collocation training | multi-word items as first-class cards; register + phrasal patterns; FSRS revisits them in varied contexts | fsrs parity battery with multi-word items | `READY` — seed content + selection contract in `SPEAK-PLAN.md` §3.1/§3.2 (Task 96); implementation gated |
 | F-9 | Optional human tutor review | permission-controlled sharing of SELECTED attempts; tutor comments stored separately from AI grading, labeled at render | isolation battery (new sharing scope tests) | `BLOCKED on A-2` (sharing presumes the multi-user answer) |
 | F-10 | Versioned curriculum/content release | versioned items + prerequisites; content-quality tests run before publish; history preserved to explain any past assignment | curriculum battery + new version-pin test | `READY` |
 
@@ -231,3 +241,38 @@ Reading guide:
 | Alert layer wired | `scripts/alert.sh` + wire-ins in `watchdog.sh`/`ensure-server.sh`/`vault-sync.sh`; `db/alerts.log` rows incl. the live dev-fallback catch; vault digest `rah-web/alerts/recent.log` |
 | Offline/pron/email validation packs | `OFFLINE-TEST-PROTOCOL.md`, `PRONUNCIATION-VALIDATION.md` + harness, `EMAIL-OPERATIONS.md` + battery (7/0/1) |
 | Three RE docs | `ELSA-SPEAK-RE.md`, `SPEAK-RE.md`, `MAGOOSH-IELTS-RE.md` |
+
+---
+
+## Task 96 reconciliation (2026-10-25) — the reviewer's two explicit asks, closed with evidence
+
+The newest review (8.9/10 overall, 9.6/10 engineering, 7.0/10 production
+readiness) asked for two reconciliations before treating the three RE-doc
+prompts as executable feature tasks. Both are closed here, evidence-first:
+
+1. **CI has run against the latest commits — confirmed.** The reviewer's
+   caveat: "the public Actions page I could inspect still lists CI Run #117
+   for Task 94 as its latest visible run." The anonymous Actions API
+   (checked 2026-10-25) shows: **Run #118 = `e4527ec` (Task 95), Run #119 =
+   `27587a8` (Task 95-b), Run #120 = `b89d4ea` (95-b worklog) — all
+   `completed success`.** The reviewer's page was a visibility lag, not a
+   missing run. This reconciliation's own push triggers the next run,
+   recorded in ROADMAP-STATUS.md §17.
+2. **Task 95-b drift-check completion reconciled with this backlog.** A-5
+   above now names all four drift states and carries the 95-b amendment
+   paragraph (found live: served `038dc4c` while HEAD was `e4527ec`;
+   check 4 = served-version-vs-HEAD, WARN, no auto-restart by design).
+   Previously A-5 named only the three Task 95 states — the backlog was
+   one amendment behind the code.
+
+Also shipped under the reviewer's standing rule ("while P0 human gates
+remain open, do documentation, architecture, and test preparation only; do
+not ship new feature code"): the three RE prompts are now **implementation
+plans** — `ELSA-PLAN.md` (P-1 loop: flag→family→FSRS drill→before/after,
+data contract, 10 tests), `SPEAK-PLAN.md` (T-2/T-3/F-5: scenario library,
+earned difficulty gate, exit receipt contract, 10 tests), and
+`MAGOOSH-PLAN.md` (T-8/T-9/F-2: versioned track docs, item explanation
+contract, band-range + calibration-gate contract, 10 tests). Each plan
+names its human inputs; none ships code while a P0 is open. The RE docs
+carry §6 pointers to their plans so the next implementation session starts
+at a contract, not at research.
