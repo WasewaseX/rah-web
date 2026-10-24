@@ -1,0 +1,39 @@
+{
+  "label": "after-92bis-run2",
+  "url": "http://localhost:3000/",
+  "tab": "Arcade",
+  "harness": {
+    "device": "iPhone 13",
+    "cpuThrottle": "4x",
+    "net": "1.6Mbps/150ms RTT"
+  },
+  "at": "2026-10-24T06:50:21.379Z",
+  "bootBlocking": {
+    "supported": true,
+    "count": 4,
+    "tbt": 185,
+    "worst": 164,
+    "tasks": [
+      {
+        "dur": 164,
+        "start": 2005
+      },
+      {
+        "dur": 67,
+        "start": 2201
+      },
+      {
+        "dur": 59,
+        "start": 2508
+      },
+      {
+        "dur": 95,
+        "start": 2619
+      }
+    ]
+  },
+  "lazyTabSettleMs": 77,
+  "lazyFirstChunkMs": null,
+  "lazyChunkBytes": 0,
+  "lazyChunks": []
+}

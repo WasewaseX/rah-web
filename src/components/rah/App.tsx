@@ -116,6 +116,37 @@ export const VIEWS = [
 
 export type ViewId = (typeof VIEWS)[number]["id"];
 
+// Task 92-bis (mobile perf round 2, measured with scripts/interactivity-probe.mjs):
+// a lazy view's first open pays a chunk fetch before its data fetches (measured:
+// chunks landed 213-256ms into a tap on throttled mobile; content settled ~1300ms).
+// Two zero-FCP-cost prefetches recover that: the chunk is requested at
+// POINTERDOWN (fires ~100-300ms before click on touch - the chunk is usually
+// already in flight when the click lands) and all lazy chunks prefetch during
+// idle AFTER authenticated boot (network is idle; FCP unaffected). Duplicate
+// import() calls dedupe to the same chunk - never a double download.
+const LAZY_IMPORTS: Partial<Record<ViewId, () => Promise<unknown>>> = {
+  placement: () => import("./Placement"),
+  write: () => import("./Write"),
+  listen: () => import("./Listen"),
+  speak: () => import("./Speak"),
+  read: () => import("./Read"),
+  progress: () => import("./Progress"),
+  arcade: () => import("./Arcade"),
+};
+let idlePrefetchDone = false;
+function prefetchView(id: ViewId) {
+  LAZY_IMPORTS[id]?.();
+}
+function idlePrefetchAll() {
+  if (idlePrefetchDone) return;
+  idlePrefetchDone = true;
+  const run = () => {
+    for (const p of Object.values(LAZY_IMPORTS)) p();
+  };
+  if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 8000 });
+  else setTimeout(run, 3000);
+}
+
 export default function RahApp() {
   const [view, setView] = useState<ViewId>("home");
   const [state, setState] = useState<AppState | null>(null);
@@ -179,6 +210,9 @@ export default function RahApp() {
         // The theme plugin's choices survive reloads: paint on every state load.
         applyTheme(s.theme ?? null);
         announceUnlocks(s.game?.recent ?? []);
+        // Authenticated boot: network is idle from here - prefetch every lazy
+        // view chunk so the first tab open pays only its data fetches.
+        idlePrefetchAll();
       }
     } catch {
       // offline blip; keep last state
@@ -256,6 +290,7 @@ export default function RahApp() {
               <button
                 key={v.id}
                 onClick={() => go(v.id)}
+                onPointerDown={() => prefetchView(v.id)}
                 className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-all ${
                   active
                     ? "bg-[var(--rah-primary)]/[0.12] text-[#9dc0ff]"
@@ -368,6 +403,7 @@ export default function RahApp() {
               <button
                 key={v.id}
                 onClick={() => go(v.id)}
+                onPointerDown={() => prefetchView(v.id)}
                 className={`flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[10px] font-bold transition-colors ${
                   active ? "bg-[var(--rah-primary)]/[0.14] text-[#9dc0ff]" : "text-[#6e7a8e]"
                 }`}

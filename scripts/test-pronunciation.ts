@@ -3,7 +3,7 @@
 // Run: bun scripts/test-pronunciation.ts
 
 import { scorePronunciation } from "../src/lib/pronunciation";
-import { azureSpeechConfigured } from "../src/lib/azure-speech";
+import { azureSpeechConfigured, azureAssess } from "../src/lib/azure-speech";
 
 let pass = 0;
 let fail = 0;
@@ -89,5 +89,36 @@ const TARGET_A = "I would like to reserve a table for two people at eight in the
   check(azureSpeechConfigured() === false, "azure adapter dormant without env keys");
 }
 
-console.log(`\npronunciation battery: ${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// 11. Azure degradation contract (Task 92-bis): WITH keys set but Azure erroring,
+// azureAssess must REJECT - that rejection is exactly what the assess route's
+// catch branch needs to degrade honestly to the measured word tier. Hermetic:
+// fetch is stubbed, no network touched. Restores env + fetch afterwards.
+void (async () => {
+  const realFetch = globalThis.fetch;
+  process.env.AZURE_SPEECH_KEY = "battery-fake-key";
+  process.env.AZURE_SPEECH_REGION = "battery-fake-region";
+  try {
+    check(azureSpeechConfigured() === true, "azure gate flips true with key+region set");
+    globalThis.fetch = (async () => {
+      throw new Error("battery: azure unreachable");
+    }) as typeof fetch;
+    let rejected = false;
+    let msg = "";
+    try {
+      await azureAssess("YmF0dGVyeQ==", "hello");
+    } catch (e) {
+      rejected = true;
+      msg = (e as Error).message;
+    }
+    check(rejected, "azureAssess REJECTS when azure errors (route degrades to word tier)");
+    check(/battery: azure unreachable/.test(msg), "rejection carries the underlying error");
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.AZURE_SPEECH_KEY;
+    delete process.env.AZURE_SPEECH_REGION;
+    check(azureSpeechConfigured() === false, "env restored - adapter dormant again");
+  }
+
+  console.log(`\npronunciation battery: ${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})();

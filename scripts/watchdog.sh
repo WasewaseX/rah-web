@@ -14,6 +14,7 @@ cd /home/z/my-project || exit 1
 
 TICK=0
 LAST_TS_FILE="backups/.last-autosnap"
+LAST_PILOT_FILE="backups/.last-pilot-week"
 
 while true; do
   if curl -sf -o /dev/null --max-time 5 http://localhost:3000/api/version; then
@@ -54,6 +55,23 @@ while true; do
         echo "$(date -Is) watchdog: privacy sweep CLEAN (purge request can be closed)"
       else
         echo "$(date -Is) watchdog: privacy sweep -> dangling objects STILL served; Support purge still pending"
+      fi
+      # Task 92-bis: the WEEKLY pilot checkpoint, automated. The protocol's one
+      # manual step (run pilot-metrics once per week, append verbatim to the
+      # local series log) now happens on the watchdog's own cadence - the
+      # series can no longer rot waiting for a human to remember. Zero-AI,
+      # read-only; the series file lives in gitignored db/pilot/ (REG-2).
+      mkdir -p db/pilot
+      pilot_now=$(date +%s)
+      pilot_last=$([ -f "$LAST_PILOT_FILE" ] && cat "$LAST_PILOT_FILE" 2>/dev/null || echo 0)
+      if [ "$((pilot_now - pilot_last))" -ge 604800 ]; then
+        echo "$pilot_now" > "$LAST_PILOT_FILE" 2>/dev/null || true
+        {
+          echo ""
+          echo "## Weekly checkpoint (watchdog-automated) — $(date -u +%Y-%m-%d)"
+          node scripts/pilot-metrics.mjs
+        } >> db/pilot/series.md 2>&1
+        echo "$(date -Is) watchdog: weekly pilot checkpoint appended to db/pilot/series.md"
       fi
     } >> watchdog.log 2>&1
   fi

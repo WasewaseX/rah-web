@@ -1,0 +1,39 @@
+{
+  "label": "after-92bis",
+  "url": "http://localhost:3000/",
+  "tab": "Progress",
+  "harness": {
+    "device": "iPhone 13",
+    "cpuThrottle": "4x",
+    "net": "1.6Mbps/150ms RTT"
+  },
+  "at": "2026-10-24T06:49:46.925Z",
+  "bootBlocking": {
+    "supported": true,
+    "count": 4,
+    "tbt": 211,
+    "worst": 198,
+    "tasks": [
+      {
+        "dur": 198,
+        "start": 1983
+      },
+      {
+        "dur": 52,
+        "start": 2307
+      },
+      {
+        "dur": 54,
+        "start": 2359
+      },
+      {
+        "dur": 107,
+        "start": 2669
+      }
+    ]
+  },
+  "lazyTabSettleMs": 83,
+  "lazyFirstChunkMs": null,
+  "lazyChunkBytes": 0,
+  "lazyChunks": []
+}
