@@ -141,3 +141,7 @@ scripts/.perf-baseline.json
 drill-clone/
 pron-validation-clips/
 db/.sweep-state
+scripts/out/
+prisma/migrations.sqlite.bak.20261025-095733/
+prisma/schema.prisma.bak.*
+.env.bak.*

@@ -14,22 +14,43 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PORT=3111
-DB="file:/home/z/my-project/db/battery-isolation.db"
 BASE="http://localhost:$PORT"
 DIST=".next-isolation"
 LOG=/tmp/isolation-server.log
+
+# Engine-agnostic throwaway (Task 97, post-PG-flip): derive the throwaway
+# DATABASE_URL from the deployment's own .env. postgresql -> a throwaway
+# DATABASE (rah_isolation) on the same local PG instance, dropped + created
+# per run - seeding/stamp checks go through psql. file: -> the legacy SQLite
+# path (kept for a possible re-flip; the seed blocks below are PG-dialect and
+# a re-flip must convert them back). Either way the live store is untouched.
+ENV_URL=$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)
+case "$ENV_URL" in
+  postgresql://*)
+    PG_BASE_URL="${ENV_URL%/*}"
+    DB="$PG_BASE_URL/rah_isolation"
+    q() { psql -X -q -t -A "$DB" -c "$1"; }
+    ;;
+  *)
+    echo "ABORT: this battery currently seeds PG-dialect SQL; point .env at postgresql or convert the seed blocks back (Task 97 note)" >&2
+    exit 1
+    ;;
+esac
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  PASS: $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "  FAIL: $1"; }
 check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (want '$3' got '$2')"; fi; }
 
-cleanup() { pkill -f "next dev -p $PORT" 2>/dev/null || true; }
+cleanup() {
+  pkill -f "next dev -p $PORT" 2>/dev/null || true
+  [ -n "${PG_BASE_URL:-}" ] && psql -X "$PG_BASE_URL/postgres" -c "DROP DATABASE IF EXISTS rah_isolation WITH (FORCE)" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
 echo "== per-user isolation battery =="
 export RAH_OPEN_REGISTRATION=1
-rm -f db/battery-isolation.db db/battery-isolation.db-*
+case "$DB" in file:*) rm -f db/battery-isolation.db db/battery-isolation.db-* ;; esac
 DATABASE_URL="$DB" bunx prisma db push --skip-generate > /dev/null 2>&1
 echo "== throwaway db ready =="
 
@@ -53,32 +74,22 @@ A_RES=$(register "iso-a@rah.test" "$JA"); B_RES=$(register "iso-b@rah.test" "$JB
 check "register user A" "$A_RES" "ok"
 check "register user B" "$B_RES" "ok"
 
-# --- resolve user ids + seed scoped rows directly ----------------------------
-python3 - "$DB" <<'PY'
-import sqlite3, sys, os, json
-db = sys.argv[1].replace("file:", "")
-c = sqlite3.connect(db)
-a = c.execute("SELECT id FROM User WHERE email='iso-a@rah.test'").fetchone()[0]
-b = c.execute("SELECT id FROM User WHERE email='iso-b@rah.test'").fetchone()[0]
-def seed(sql, args): c.execute(sql, args)
-# chats
-seed("INSERT INTO ChatMsg (userId, role, content) VALUES (?,?,?)", (a, "user", "A-SECRET-chat"))
-seed("INSERT INTO ChatMsg (userId, role, content) VALUES (?,?,?)", (a, "coach", '{"reply":"A-SECRET-reply"}'))
-seed("INSERT INTO ChatMsg (userId, role, content) VALUES (?,?,?)", (b, "user", "B-chat"))
-# writing: a 2-step revision chain for A, 1 sub for B
-p = c.execute("INSERT INTO WritingSub (userId, prompt, text, result, parentId, revision) VALUES (?,?,?,?,NULL,1)", (a, "pA", "AAA old essay", "{}")).lastrowid
-child = c.execute("INSERT INTO WritingSub (userId, prompt, text, result, parentId, revision) VALUES (?,?,?,?,?,2)", (a, "pA", "AAA new essay", "{}", p)).lastrowid
-c.execute("INSERT INTO WritingSub (userId, prompt, text, result, parentId, revision) VALUES (?,?,?,?,NULL,1)", (b, "pB", "BBB essay", "{}"))
-# speak + reviews
-seed("INSERT INTO SpeakSession (userId, prompt, transcript, round, result) VALUES (?,?,?,?,?)", (a, "pA", "A-SECRET-transcript", 1, "{}"))
-seed("INSERT INTO SpeakSession (userId, prompt, transcript, round, result) VALUES (?,?,?,?,?)", (b, "pB", "B-transcript", 1, "{}"))
-seed("INSERT INTO ReviewLog (userId, cardId, grade, ivl, day, source) VALUES (?,?,?,?,?,?)", (a, "cardA", 3, 1, 1, "review"))
-seed("INSERT INTO ReviewLog (userId, cardId, grade, ivl, day, source) VALUES (?,?,?,?,?,?)", (b, "cardB", 3, 1, 1, "review"))
-c.commit()
-open("/tmp/isolation-ids.json", "w").write(json.dumps({"a": a, "b": b, "parent": p, "child": child}))
-print(f"seeded: a={a} b={b} chain_parent={p}")
-c.close()
-PY
+# --- resolve user ids + seed scoped rows directly (psql; Task 97 PG conversion)
+AID=$(q "SELECT id FROM \"User\" WHERE email='iso-a@rah.test'")
+BID=$(q "SELECT id FROM \"User\" WHERE email='iso-b@rah.test'")
+[ -n "$AID" ] && [ -n "$BID" ] || { echo "ABORT: fixture users missing"; exit 1; }
+q "INSERT INTO \"ChatMsg\" (\"userId\", role, content) VALUES ('$AID', 'user', 'A-SECRET-chat')" >/dev/null
+q "INSERT INTO \"ChatMsg\" (\"userId\", role, content) VALUES ('$AID', 'coach', '{\"reply\":\"A-SECRET-reply\"}')" >/dev/null
+q "INSERT INTO \"ChatMsg\" (\"userId\", role, content) VALUES ('$BID', 'user', 'B-chat')" >/dev/null
+PARENT=$(q "INSERT INTO \"WritingSub\" (\"userId\", prompt, text, result, \"parentId\", revision) VALUES ('$AID', 'pA', 'AAA old essay', '{}', NULL, 1) RETURNING id")
+CHILD=$(q "INSERT INTO \"WritingSub\" (\"userId\", prompt, text, result, \"parentId\", revision) VALUES ('$AID', 'pA', 'AAA new essay', '{}', $PARENT, 2) RETURNING id")
+q "INSERT INTO \"WritingSub\" (\"userId\", prompt, text, result, \"parentId\", revision) VALUES ('$BID', 'pB', 'BBB essay', '{}', NULL, 1)" >/dev/null
+q "INSERT INTO \"SpeakSession\" (\"userId\", prompt, transcript, round, result) VALUES ('$AID', 'pA', 'A-SECRET-transcript', 1, '{}')" >/dev/null
+q "INSERT INTO \"SpeakSession\" (\"userId\", prompt, transcript, round, result) VALUES ('$BID', 'pB', 'B-transcript', 1, '{}')" >/dev/null
+q "INSERT INTO \"ReviewLog\" (\"userId\", \"cardId\", grade, ivl, day, source) VALUES ('$AID', 'cardA', 3, 1, 1, 'review')" >/dev/null
+q "INSERT INTO \"ReviewLog\" (\"userId\", \"cardId\", grade, ivl, day, source) VALUES ('$BID', 'cardB', 3, 1, 1, 'review')" >/dev/null
+printf '%s\n' "{\"a\": \"$AID\", \"b\": \"$BID\", \"parent\": $PARENT, \"child\": $CHILD}" > /tmp/isolation-ids.json
+echo "seeded: a=$AID b=$BID chain_parent=$PARENT"
 AID=$(python3 -c 'import json; print(json.load(open("/tmp/isolation-ids.json"))["a"])')
 PARENT=$(python3 -c 'import json; print(json.load(open("/tmp/isolation-ids.json"))["parent"])')
 CHILD=$(python3 -c 'import json; print(json.load(open("/tmp/isolation-ids.json"))["child"])')
@@ -102,16 +113,11 @@ check "unauthenticated sees nothing" "$ANON" "0"
 # agent route must stamp user A's id, never the 'me' default.
 CA_RES=$(curl -s --max-time 90 -b "$JA" -X POST "$BASE/api/coach-agent" -H 'content-type: application/json' -d '{"message":"isolation stamp probe"}' -o /dev/null -w "%{http_code}")
 check "coach-agent responds for A" "$CA_RES" "200"
-CA_STAMP=$(python3 - "$DB" <<'PY'
-import sqlite3, sys, json
-c = sqlite3.connect(sys.argv[1].replace("file:", ""))
-ids = json.load(open("/tmp/isolation-ids.json"))
-me_rows = c.execute("SELECT COUNT(*) FROM ChatMsg WHERE userId='me' AND content LIKE '%isolation stamp probe%'").fetchone()[0]
-a_rows = c.execute("SELECT COUNT(*) FROM ChatMsg WHERE userId=? AND content LIKE '%isolation stamp probe%'", (ids["a"],)).fetchone()[0]
-print(f"{a_rows}/{me_rows}")
-c.close()
-PY
-)
+CA_STAMP=$(ME_ROWS=$(q "SELECT COUNT(*) FROM \"ChatMsg\" WHERE \"userId\"='me' AND content LIKE '%isolation stamp probe%'") ; A_ROWS=$(q "SELECT COUNT(*) FROM \"ChatMsg\" WHERE \"userId\"='$AID' AND role='user' AND content LIKE '%isolation stamp probe%'") ; echo "$A_ROWS/$ME_ROWS")
+# role='user' pins the LEARNER's own message row (exactly 1). The coach reply
+# row sometimes echoes the probe phrase in its text (model-dependent), so
+# counting all roles made this check flaky - the 92-ter doctrine is about the
+# stamp (never 'me'), which both counts still pin.
 check "coach-agent stamps A's id (a-rows/me-rows)" "$CA_STAMP" "1/0"
 
 # --- writing + revision chain ------------------------------------------------
@@ -138,20 +144,9 @@ check "B does NOT see A's transcript"  "$S_LEAK" "0"
 # One family per user under the SAME kind:tag key; each caller must see only
 # their own, cross-user corrections/forgets must 404, and forget must leave a
 # tombstone so the rejected pair cannot re-aggregate.
-python3 - "$DB" <<'PY'
-import sqlite3, sys, json
-db = sys.argv[1].replace("file:", "")
-c = sqlite3.connect(db)
-a = c.execute("SELECT id FROM User WHERE email='iso-a@rah.test'").fetchone()[0]
-b = c.execute("SELECT id FROM User WHERE email='iso-b@rah.test'").fetchone()[0]
-c.execute("INSERT INTO MistakeFamily (id, userId, kind, tag, label, count, evidence, updatedAt) VALUES (?,?,?,?,?,?,?,datetime('now'))", (a + ":chat:statives", a, "chat", "statives", "Statives A", 3, "A-SECRET-wrong -> A-RIGHT"))
-c.execute("INSERT INTO MistakeFamily (id, userId, kind, tag, label, count, evidence, updatedAt) VALUES (?,?,?,?,?,?,?,datetime('now'))", (b + ":chat:statives", b, "chat", "statives", "Statives B", 1, "B-wrong -> B-right"))
-c.commit()
-open("/tmp/isolation-famids.json", "w").write(json.dumps({"a_fam": a + ":chat:statives"}))
-print("seeded families")
-c.close()
-PY
-A_FAM=$(python3 scripts/iso-id.py /tmp/isolation-famids.json a_fam)
+q "INSERT INTO \"MistakeFamily\" (id, \"userId\", kind, tag, label, count, evidence, \"updatedAt\") VALUES ('$AID:chat:statives', '$AID', 'chat', 'statives', 'Statives A', 3, 'A-SECRET-wrong -> A-RIGHT', now())" >/dev/null
+q "INSERT INTO \"MistakeFamily\" (id, \"userId\", kind, tag, label, count, evidence, \"updatedAt\") VALUES ('$BID:chat:statives', '$BID', 'chat', 'statives', 'Statives B', 1, 'B-wrong -> B-right', now())" >/dev/null
+A_FAM="$AID:chat:statives"
 MM_A1=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives A")
 MM_A2=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py mistakes_secret "Statives B")
 check "A sees own family"                 "$MM_A1" "1"
@@ -164,10 +159,7 @@ X_CORRECT=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" -X POST "$BASE/api/m
 check "B correcting A's family = 404"     "$X_CORRECT" "404"
 X_FORGET=$(curl -s -o /dev/null -w '%{http_code}' -b "$JB" -X DELETE "$BASE/api/mistakes?id=$A_FAM")
 check "B forgetting A's family = 404"     "$X_FORGET" "404"
-A_STILL=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$(echo $DB | sed s/file://)')
-print(c.execute('SELECT COUNT(*) FROM MistakeFamily WHERE id=?', ('$A_FAM',)).fetchone()[0])")
+A_STILL=$(q "SELECT COUNT(*) FROM \"MistakeFamily\" WHERE id='$A_FAM'")
 check "A's family survived B's attempts"  "$A_STILL" "1"
 OK_CORRECT=$(curl -s -o /dev/null -w '%{http_code}' -b "$JA" -X POST "$BASE/api/mistakes" -H 'content-type: application/json' -d "{\"id\":\"$A_FAM\",\"label\":\"Statives A (edited)\"}")
 check "A corrects own family = 200"       "$OK_CORRECT" "200"
@@ -175,23 +167,13 @@ A_EDITED=$(curl -s -b "$JA" "$BASE/api/mistakes" | python3 scripts/iso-parse.py 
 check "correction sets editedAt provenance" "$A_EDITED" "1"
 OK_FORGET=$(curl -s -o /dev/null -w '%{http_code}' -b "$JA" -X DELETE "$BASE/api/mistakes?id=$A_FAM")
 check "A forgets own family = 200"        "$OK_FORGET" "200"
-TOMB=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$(echo $DB | sed s/file://)')
-print(c.execute('SELECT COUNT(*) FROM MistakeForgiven WHERE id=?', ('$A_FAM',)).fetchone()[0])")
+TOMB=$(q "SELECT COUNT(*) FROM \"MistakeForgiven\" WHERE id='$A_FAM'")
 check "forget leaves a tombstone"         "$TOMB" "1"
 
 # --- scoped delete -----------------------------------------------------------
 curl -s -b "$JA" -X DELETE "$BASE/api/chat" > /dev/null
-A_LEFT=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$(echo $DB | sed s/file://)')
-print(c.execute(\"SELECT COUNT(*) FROM ChatMsg WHERE userId=?\", ('$AID',)).fetchone()[0])")
-B_LEFT=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$(echo $DB | sed s/file://)')
-b = c.execute(\"SELECT id FROM User WHERE email='iso-b@rah.test'\").fetchone()[0]
-print(c.execute(\"SELECT COUNT(*) FROM ChatMsg WHERE userId=?\", (b,)).fetchone()[0])")
+A_LEFT=$(q "SELECT COUNT(*) FROM \"ChatMsg\" WHERE \"userId\"='$AID'")
+B_LEFT=$(q "SELECT COUNT(*) FROM \"ChatMsg\" WHERE \"userId\"='$BID'")
 check "A's delete removes only A's chats" "$A_LEFT" "0"
 check "B's chats survive A's delete"      "$B_LEFT" "1"
 
@@ -200,23 +182,14 @@ check "B's chats survive A's delete"      "$B_LEFT" "1"
 # Task 67 keys ALL of them (userId, ...) - this section proves the queue, the
 # trophies, the game records, quests, the rival, the measured bands, the
 # placement history and the imported materials are per-user now.
-python3 - "$DB" <<'PY'
-import sqlite3, sys
-db = sys.argv[1].replace("file:", "")
-c = sqlite3.connect(db)
-a = c.execute("SELECT id FROM User WHERE email='iso-a@rah.test'").fetchone()[0]
-b = c.execute("SELECT id FROM User WHERE email='iso-b@rah.test'").fetchone()[0]
-c.execute("INSERT INTO CardState (userId, cardId, s, d, due, state) VALUES (?,?,?,?,?,?)", (a, "col002", 3, 5, 1, "review"))
-c.execute("INSERT INTO CardState (userId, cardId, s, d, due, state) VALUES (?,?,?,?,?,?)", (b, "col003", 3, 5, 1, "review"))
-c.execute("INSERT INTO Achievement (userId, key, at) VALUES (?,?,datetime('now'))", (a, "millennium"))
-c.execute("INSERT INTO GameStat (userId, key, best, plays, updatedAt) VALUES (?,?,?,?,datetime('now'))", (a, "speed:best", 321, 1))
-c.execute("INSERT INTO Placement (userId, id, answers, phase, level, writingLevel, updatedAt) VALUES (?,?,?,?,?,?,datetime('now'))", (a, "main", "{}", "done", "C1", "C1"))
-c.execute("INSERT INTO Material (id, userId, title, source, text, words, createdAt) VALUES (?,?,?,?,?,?,datetime('now'))", ("m_isoA", a, "A-SECRET-material", "test", "A secret reading passage for isolation testing. " * 4, 24))
-c.execute("INSERT INTO MaterialCard (id, materialId, front, answer, context, note) VALUES (?,?,?,?,?,?)", ("mat:isoA", "m_isoA", "___ passage", "secret", "A secret reading passage.", "hint"))
-c.commit()
-print("seeded state rows")
-c.close()
-PY
+q "INSERT INTO \"CardState\" (\"userId\", \"cardId\", s, d, due, state) VALUES ('$AID', 'col002', 3, 5, 1, 'review')" >/dev/null
+q "INSERT INTO \"CardState\" (\"userId\", \"cardId\", s, d, due, state) VALUES ('$BID', 'col003', 3, 5, 1, 'review')" >/dev/null
+q "INSERT INTO \"Achievement\" (\"userId\", key, at) VALUES ('$AID', 'millennium', now())" >/dev/null
+q "INSERT INTO \"GameStat\" (\"userId\", key, best, plays, \"updatedAt\") VALUES ('$AID', 'speed:best', 321, 1, now())" >/dev/null
+q "INSERT INTO \"Placement\" (\"userId\", id, answers, phase, level, \"writingLevel\", \"updatedAt\") VALUES ('$AID', 'main', '{}', 'done', 'C1', 'C1', now())" >/dev/null
+q "INSERT INTO \"Material\" (id, \"userId\", title, source, text, words, \"createdAt\") VALUES ('m_isoA', '$AID', 'A-SECRET-material', 'test', 'A secret reading passage for isolation testing. A secret reading passage for isolation testing. A secret reading passage for isolation testing. A secret reading passage for isolation testing. ', 24, now())" >/dev/null
+q "INSERT INTO \"MaterialCard\" (id, \"materialId\", front, answer, context, note) VALUES ('mat:isoA', 'm_isoA', '___ passage', 'secret', 'A secret reading passage.', 'hint')" >/dev/null
+echo "seeded state rows"
 A_Q=$(curl -s -b "$JA" "$BASE/api/review/queue" | python3 scripts/iso-parse.py queue_has "col002")
 B_Q=$(curl -s -b "$JB" "$BASE/api/review/queue" | python3 scripts/iso-parse.py queue_has "col002")
 check "A's queue serves A's card"          "$A_Q" "1"
@@ -237,23 +210,11 @@ check "B does NOT see A's speed record"    "$B_BEST" "0"
 # Quests + rival: lazily created per user by /api/state - both users must get
 # their OWN rows under the SAME day and the SAME ids (composite PK allows it).
 curl -s -b "$JA" "$BASE/api/state" > /dev/null; curl -s -b "$JB" "$BASE/api/state" > /dev/null
-QDB=$(echo $DB | sed s/file://)
-QA=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$QDB')
-a = c.execute(\"SELECT id FROM User WHERE email='iso-a@rah.test'\").fetchone()[0]
-print(c.execute('SELECT COUNT(*) FROM Quest WHERE userId=?', (a,)).fetchone()[0])")
-QB=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$QDB')
-b = c.execute(\"SELECT id FROM User WHERE email='iso-b@rah.test'\").fetchone()[0]
-print(c.execute('SELECT COUNT(*) FROM Quest WHERE userId=?', (b,)).fetchone()[0])")
+QA=$(q "SELECT COUNT(*) FROM \"Quest\" WHERE \"userId\"='$AID'")
+QB=$(q "SELECT COUNT(*) FROM \"Quest\" WHERE \"userId\"='$BID'")
 check "A has own quest rows (3)"           "$QA" "3"
 check "B has own quest rows (3)"           "$QB" "3"
-RIVALS=$(python3 -c "
-import sqlite3
-c = sqlite3.connect('$QDB')
-print(c.execute('SELECT COUNT(*) FROM Rival').fetchone()[0])")
+RIVALS=$(q "SELECT COUNT(*) FROM \"Rival\"")
 check "rival rows are per-user (2)"        "$RIVALS" "2"
 A_PL=$(curl -s -b "$JA" "$BASE/api/placement" | python3 scripts/iso-parse.py placement_level)
 B_PL=$(curl -s -b "$JB" "$BASE/api/placement" | python3 scripts/iso-parse.py placement_level)
@@ -270,7 +231,7 @@ check "A sees own material in list"        "$MAT_A" "1"
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null
 curl -s -X POST "$BASE/api/auth/request-code" -H 'content-type: application/json' -d '{"email":"iso-c@rah.test"}' > /dev/null
 sleep 1
-MAIL_ROWS=$(python3 scripts/maillog-count.py "$(echo $DB | sed s/file://)" "iso-c@rah.test")
+MAIL_ROWS=$(q "SELECT COUNT(*) FROM \"MailLog\" WHERE \"to\"='iso-c@rah.test'")
 check "double request-code = ONE ledger row" "$MAIL_ROWS" "1"
 echo ""
 echo "=== ISOLATION BATTERY: $PASS passed, $FAIL failed ==="

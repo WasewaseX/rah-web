@@ -42,6 +42,10 @@ while true; do
     echo "$now" > "$LAST_TS_FILE" 2>/dev/null || true
     {
       echo "$(date -Is) watchdog: daily data snapshot"
+      # Task 97: PG survival dump FIRST (the live store post-flip) - the sidecar
+      # counts JSON feeds freshness-check's PG branch, and the -latest copy in
+      # upload/rah-backups is the recycle-restore artifact.
+      bash scripts/pg-survival.sh dump || bash scripts/alert.sh CRITICAL pg-survival "daily PG dump failed - offsite PG copy stale"
       # Task 86: daily scheduling-loss check (insert-only repair; a no-op on
       # a healthy DB) before snapshotting so the offsite copies stay whole.
       # Task 95: a non-no-op repair is an alert (review P1 #10 - data-integrity
@@ -75,6 +79,13 @@ while true; do
       # Task 95: vault-sync also RESTORES db/pilot/series.md after a recycle
       # (review P0 #4) and SHIPS the checkpoint appended above.
       bash scripts/vault-sync.sh || bash scripts/alert.sh CRITICAL vault-sync "daily vault push failed - offsite copy stale"
+      # Task 97: weekly PG restore drill - prove the latest dump actually
+      # restores with matching counts (the SQLite disaster-drill doctrine,
+      # ported to the PG era).
+      if [ "$((now / 604800))" != "$(cat /home/z/.pg-drill-week 2>/dev/null || echo 0)" ]; then
+        echo "$((now / 604800))" > /home/z/.pg-drill-week 2>/dev/null || true
+        bash scripts/pg-survival.sh verify || true
+      fi
       # Task 90: durable SQLite maintenance - refresh planner stats (stat1 was
       # EMPTY until this ran once; the 0010 composite indexes need it to win
       # skewed plans) + bound the WAL file after heavy days.

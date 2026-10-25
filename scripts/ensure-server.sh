@@ -36,6 +36,7 @@ if [ -f "$SCHEMA" ] && [ -d node_modules/.prisma/client ]; then
 fi
 
 bash scripts/db-guard.sh boot || true   # Task 86 wiring: snapshot-if-used BEFORE any schema work / restore-if-fresh
+bash scripts/pg-survival.sh ensure || true  # Task 97: PG survival - start-or-restore BEFORE the app needs it (no-op when .env is SQLite)
 bash scripts/db-restore.sh || true
 bash scripts/db-migrate-safe.sh || echo "(migrate skipped/failed - see /tmp/db-migrate.log)"
 # Task 86: scheduling-loss repair - a live-but-damaged DB (review history

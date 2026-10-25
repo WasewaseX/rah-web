@@ -18,7 +18,8 @@ Reading guide:
 
 ## Part A — the ten critical fixes
 
-### A-1 · P0 · Finish the GitHub privacy purge — `HUMAN GATE` (filing) + `DONE (Task 95)` (everything around it)
+### A-1 · P0 · Finish the GitHub privacy purge — `SUPERSEDED (Task 97): fresh-repo migration chosen by the account holder` + `DONE (Task 95)` (everything around it)
+- **Task 97 decision (account holder, verbatim)**: "its okay we will just make a fresh repo but later" — the Support-purge route is replaced by a **fresh repository migration**, planned end-to-end in `FRESH-REPO-MIGRATION.md` (orphan-history start so no pre-scrub object ever re-ships, 8-step checklist, closure criteria, 30-day archive-then-delete of the old repo). `PRIVACY-PURGE-REQUEST.md` stays in the tree as the fallback route; the daily sweep + alert layer keep monitoring until migration closes the exposure (still 15/16 dangling + blob served as of 2026-10-25).
 - **Outcome**: old commit objects stop being anonymously retrievable; the
   cached db blob is evicted; the daily sweep returns 0/16 clean twice.
 - **Task 95 shipped**: the ready-to-file request —
@@ -35,10 +36,8 @@ Reading guide:
   change alert. **Who**: the ACCOUNT HOLDER files the request (nobody else
   can — Support requires account identity).
 
-### A-2 · P0 · Make the production database decision — `HUMAN GATE`
-- **Outcome**: a signed decision: single-learner SQLite (Option A) or
-  multi-user PostgreSQL (Option B). Registration stays LOCKED until the
-  decision + (if B) a completed cutover.
+### A-2 · P0 · Make the production database decision — `SIGNED (Task 97): Option B — PostgreSQL`
+- **Account holder's decision, 2026-10-25, verbatim**: "if its possible postgreSQL" — PostgreSQL for multi-user readiness and production growth. Registration stays LOCKED (the engine choice and the unlock decision are separate gates; the unlock remains the account holder's call after the acceptance checks below).
 - **Everything the decision needs is packaged**: `PG-DECISION.md`
   (Option A/B framing), `scripts/pg-cutover.sh` (dry-run default, guarded
   `--flip`, proven rollback), the 30-table rehearsal GREEN (counts +
@@ -51,14 +50,11 @@ Reading guide:
   any unlock (the suite already runs a throwaway stack; adding a PG URL
   profile is a listed task under D-1).
 
-### A-3 · P0 · PostgreSQL production cutover (only if A-2 = Option B) — `BLOCKED on A-2`
-- **Outcome**: `pg-cutover.sh --flip` executed against production, row
-  counts + checksums verified live, rollback path proven, isolation suite
-  green on PG.
-- **Acceptance**: freshness chain extended with a PG leg (five-way match);
-  one full week of PG operation with zero critical alerts before any
-  registration unlock. **Regression test**: `pg-sandbox-proof.py` re-run
-  post-flip + the isolation battery against PG.
+### A-3 · P0 · PostgreSQL production cutover — `DONE (Task 97)`
+- **Executed 2026-10-25** via `pg-cutover.sh --flip` (guarded, double-confirm, `.env` + schema backups timestamped): live learner data copied SQLite→PG verified 30/30 counts + checksum (xp=475 at flip time), provider switched, client regenerated, standalone rebuilt, PG baseline migration history (SQLite history preserved aside).
+- **Acceptance PROVEN**: boot regression ALL PASS on PG (state 200 + coach streaming); main battery **441/441** on a throwaway PG database (battery made engine-agnostic); isolation battery **47/47** on PG (converted to psql seeding; the coach-stamp check tightened to pin the user-role row — the reply sometimes echoes the probe text, a model-echo flake, not an isolation break); guard 58/58 (SQLite rollback chain untouched); email battery 7/0/1 on PG.
+- **Survival layer (the recycle class is real: recycle #8 killed the Task-74 PG env)**: `scripts/pg-survival.sh` (ensure = start-or-restore with CRITICAL alert; dump = daily pg_dump with Session/LoginCode ROWS excluded (REG-2 port) + sidecar counts JSON → db/backups (keep 14) + upload/rah-backups + vault; verify = weekly restore drill). Wired into ensure-server (boot), watchdog (daily dump + weekly drill), vault-sync (dump ships). **Recycle drill PROVEN live**: PG stopped + data dir wiped → ensure restored from the upload dump → app green (xp intact, tripwire intact) with the CRITICAL alert recorded.
+- **Freshness chain extended**: `freshness-check.py` now has a PG branch — LIVE = PostgreSQL primary, snapshot legs = the dump sidecars (4-way MATCH verified: LIVE=SYNC=VAULT=UPLOAD xp=483).
 
 ### A-4 · P0 · Make pilot measurements survive recycling — `DONE (Task 95)`
 - **Outcome**: the weekly pilot series can no longer be destroyed by an
@@ -102,7 +98,9 @@ Reading guide:
   `deploy-drift-check.sh` (exit 0 after a true restore; CRITICAL when
   `.next/BUILD_ID` is missing).
 
-### A-6 · P1 · Complete transactional email configuration — `READY` (machinery tested; provider config is the account holder's 10-minute step)
+### A-6 · P1 · Complete transactional email configuration — `CONFIGURED (Task 97): transport verified; one input remains`
+- **Task 97**: the account holder provided a Resend API key (sending-only restricted key — verified: read endpoints 401 by design). Fetched and followed resend.com/setup.md + send-with-smtp.md: SMTP bridge (`smtp.resend.com:465`, user `resend`, TLS implicit) wired into the EXISTING nodemailer contract via `.env` (gitignored; key never committed, never logged, never in frontend). Sender identity `onboarding@resend.dev` (no custom domain). **Transport PROVEN without spending quota**: `scripts/smtp-verify-once.ts` (nodemailer verify() = connect+TLS+AUTH, zero mails) → OK. Email battery re-run on a throwaway PG database with SMTP mocked off: **7 pass / 0 fail / 1 honest skip** — the ledger contract is engine-proof.
+- **Remaining input**: `MAIL_TEST_TO` = the account holder's real address for the ONE live verification send (free tier: 3,000/mo, 100/day; sends only to the account email until a domain is verified). Tests stay mock-by-default per the $0 rule.
 - **Outcome**: real SMTP/provider configured; verification, failure,
   retry, and duplicate-suppression behavior validated in that mode.
 - **Task 95 shipped**: `EMAIL-OPERATIONS.md` (Resend/Gmail runbooks, SPF/
@@ -114,7 +112,10 @@ Reading guide:
   received; a deliberate wrong-password run records `failed` and surfaces
   a speakable error. **Regression test**: the battery itself.
 
-### A-7 · P1 · Configure and validate the Azure pronunciation tier — `READY` (harness + protocol shipped; key + clips are the account holder's)
+### A-7 · P1 · Validate the phoneme-level pronunciation tier — `RESOLVED INTO THE $0 TRACK (Task 97): OpenPronounce audit DONE; Azure de-escalated`
+- **Account holder's $0 directive**: no paid API may be required for normal operation; Azure at most for an explicitly approved reference comparison. Azure was ALREADY dormant without a key (env-gated adapter) — now it is also OFF the required path in every plan; `azure-pron-validate.ts` is re-labeled as the reference-comparison harness only.
+- **OpenPronounce audited** (`OPENPRONOUNCE-AUDIT.md`, shallow-clone-verified): MIT, maintained, 60+ weight-free tests, two ~1.2 GB Wav2Vec2 checkpoints (first-use download, offline afterwards), FastAPI sidecar with a clean `/pronunciation` contract, CPU ~2–3 GB RAM. Its own README's honesty ("a calibrated heuristic, not a model trained on annotated learner speech"; only English human-calibrated) matches Rah's doctrine exactly.
+- **Acceptance (unchanged in spirit, new target)**: the local tier ships as `experimental:local-phoneme`, never mixed with `measured:asr-alignment`, and is called validated ONLY after a reproducible benchmark with representative learner recordings + human ratings (OpenPronounce's own speechocean762 harness is the calibration vehicle). The word-level tier + 23-test battery remain the measured fallback.
 - **Outcome**: phoneme-level feedback validated against real recordings
   BEFORE any UI claim (the review's exact wording).
 - **Task 95 shipped**: `PRONUNCIATION-VALIDATION.md` (7 acceptance
@@ -178,7 +179,7 @@ Reading guide:
 
 | # | Feature | Acceptance criteria (measurable) | Regression test | Status |
 |---|---|---|---|---|
-| F-1 | Validated phoneme-level pronunciation feedback | Azure tier passes A-7's harness; UI shows sound-level error + replayable example + targeted retry; word-level and phoneme tiers never merged in metrics | harness + degradation pins | `BLOCKED on A-7` |
+| F-1 | Validated phoneme-level pronunciation feedback | the LOCAL tier (OpenPronounce, A-7) passes the human-rating benchmark; UI shows sound-level error + replayable example + targeted retry; word-level and phoneme tiers never merged in metrics; `experimental:local-phoneme` label until then | OPENPRONOUNCE-AUDIT.md benchmark gate + tier-mixing pins | `READY after the benchmark` (design in OPENPRONOUNCE-AUDIT.md §3) |
 | F-2 | Expert-calibrated exam scoring | band RANGES with uncertainty + sample size on every exam result; calibrated against ≥20 human-rated responses; no false-precision band numbers | battery pin on the uncertainty shape; rubric battery | `READY` — design + contract in `MAGOOSH-PLAN.md` §5/§8 (Task 96); implementation gated |
 | F-3 | Cross-device draft sync | server-side draft store, version history, conflict resolution, explicit consent before grading submit; local autosave keeps working offline | writing battery + new sync battery; offline protocol S4/S5 re-run | `READY` after A-2 (multi-user store decision shapes the schema) |
 | F-4 | Structured listening library | graded B2–C1 audio, multiple accents, transcripts, replayable segments, comprehension items; skill-deltas (not play counts) land in DailyStat | provenance battery extends to audio sources; listening battery | `READY` |
@@ -208,17 +209,17 @@ Reading guide:
 
 | # | Store | Take only when | Acceptance | Status |
 |---|---|---|---|---|
-| D-1 | PostgreSQL (primary) | A-2 decides Option B, or multi-user | A-3's criteria + isolation battery on PG | `BLOCKED on A-2` |
+| D-1 | PostgreSQL (primary) | A-2 decides Option B, or multi-user | A-3's criteria + isolation battery on PG | `DONE (Task 97)` as single-node userspace PG (flip + survival layer + recycle drill proven); managed-hosting move remains optional future work |
 | D-2 | Redis/Valkey (shared operational state) | >1 app instance must agree (rate limits, locks, cache) | never authoritative for FSRS/XP/progress; single-node in-process controls stay | `NOT NEEDED` in the single-learner era |
-| D-3 | R2/S3 (private object storage) | hosted durable files (docs, audio, reports) beyond the workspace | metadata+checksums+ownership in the DB; contents in object storage; REG-2 rules extended to it | `READY` after A-1 closes (do NOT let it postpone the purge — the reviewer's exact warning) |
+| D-3 | R2/S3 (private object storage) | hosted durable files (docs, audio, reports) beyond the workspace | metadata+checksums+ownership in the DB; contents in object storage; REG-2 rules extended to it | `READY after A-1 closes (Task 97: closure = the fresh-repo migration)` — do NOT let it postpone the migration |
 
 ## Part E — the three APIs
 
 | # | API | What to do | Acceptance | Status |
 |---|---|---|---|---|
 | E-1 | LLM API (structured outputs + tool calling) | improve evals, cost controls, retries, deterministic validation; NO new provider | eval suite for coach/writing/quiz outputs; cost log per day | `READY` |
-| E-2 | Azure AI Speech pronunciation assessment | configure key+region, run A-7, keep honest fallback | A-7's harness green | `BLOCKED on A-7` |
-| E-3 | Transactional email | configure provider per A-6 runbook, validate the four behaviors | A-6's battery green with SMTP | `BLOCKED on A-6 config` |
+| E-2 | Azure AI Speech pronunciation assessment | **DE-ESCALATED (Task 97, $0 directive)**: reference-comparison harness only (`azure-pron-validate.ts`); never required for operation; the production phoneme path is the OpenPronounce local tier (A-7) | OPENPRONOUNCE-AUDIT.md acceptance + the benchmark gate | `SUPERSEDED by the local tier` |
+| E-3 | Transactional email | **CONFIGURED (Task 97)**: Resend SMTP bridge via the existing nodemailer contract; key server-side only; tests mocked by default; free tier, no overages | battery 7/0/1 on PG + transport verify OK; one live send when MAIL_TEST_TO exists | `DONE (Task 97)` (final live-send check pending the address) |
 
 ---
 
@@ -276,3 +277,19 @@ contract, band-range + calibration-gate contract, 10 tests). Each plan
 names its human inputs; none ships code while a P0 is open. The RE docs
 carry §6 pointers to their plans so the next implementation session starts
 at a contract, not at research.
+
+---
+
+## Task 97 ledger (2026-10-25) — decisions executed: PG flip, Resend, $0 speech, fresh-repo plan
+
+| Claim | Proof to find in the tree / environment |
+|---|---|
+| A-2 signed: Option B (PostgreSQL) | this file §A-2 (verbatim account-holder quote); PG-DECISION.md §3 runbook executed |
+| A-3 cutover DONE + proven | `.env` DATABASE_URL postgresql; prisma/schema.prisma provider postgresql; PG baseline migration history; batteries: 441/441 + 47/47 + 58/58 + email 7/0/1; boot regression ALL PASS on PG; `/api/version` xp=483 tripwire intact |
+| PG survives recycles | `scripts/pg-survival.sh` (ensure/dump/verify) wired in ensure-server + watchdog + vault-sync; dump excludes Session/LoginCode rows (REG-2 port); sidecar JSONs feed freshness; LIVE recycle drill: data dir wiped → auto-restore → app green + CRITICAL alert |
+| Freshness chain PG era | `scripts/freshness-check.py` PG branch: LIVE=PG, legs=db/backups + vault + upload sidecars — 4-way MATCH verified |
+| Resend configured, $0-safe | `.env` SMTP_* (gitignored; key never committed); `scripts/smtp-verify-once.ts` transport OK (zero mails sent); battery 7/0/1 on PG throwaway with SMTP mocked; MAIL_TEST_TO = the one remaining input |
+| $0 speech policy adopted | `OPENPRONOUNCE-AUDIT.md` (clone-verified findings + integration shape + costs); Azure de-escalated to reference-only (E-2); word tier untouched |
+| Fresh-repo migration planned | `FRESH-REPO-MIGRATION.md` (8-step checklist + closure criteria); A-1 status SUPERSEDED; sweep monitoring continues |
+| CI proves PG | `.github/workflows/ci.yml`: postgres:17 service + `db:deploy` of the PG baseline + lint + tsc |
+| Batteries engine-agnostic | `scripts/test-isolated-battery.sh` (PG throwaway rah_battery, drop/create per run); `scripts/test-isolation.sh` (PG psql seeding; coach-stamp check tightened to the user-role row against model-echo flakes) |

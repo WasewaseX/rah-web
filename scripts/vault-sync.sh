@@ -166,6 +166,15 @@ if [ -s "db/alerts.log" ]; then
   tail -c 262144 db/alerts.log > "$DEST/alerts/recent.log"
 fi
 
+# ---- Task 97: the PG dump rides the same push (PG-era offsite copy) ---------
+# upload/rah-backups survives recycles (proven), but the vault is the SECOND
+# offsite leg - the freshness chain's VAULT leg reads its sidecar JSON.
+if [ -s "db/backups/pg-rah-latest.dump" ]; then
+  mkdir -p "$DEST/backups"
+  cp -f db/backups/pg-rah-latest.dump "$DEST/backups/pg-rah-latest.dump" 2>/dev/null || true
+  cp -f db/backups/pg-rah-latest.json "$DEST/backups/pg-rah-latest.json" 2>/dev/null || true
+fi
+
 # ---- freshest snapshot: ALWAYS rebuild it, ship it always -------------------
 # Task 91 fix: the old guard `[ ! -s "$LOCAL_SNAP" ]` only built a snapshot
 # when db/sync/rah-latest.db was ABSENT - an existing (stale) file shipped

@@ -131,8 +131,16 @@ change (no tier mixing).
 
 ## 7. Human inputs still required before implementation
 
-1. A-1 purge filing verified complete (the standing P0).
-2. A-2 database decision signed (families/cards are user-keyed already, so
-   the design is decision-neutral — but no feature work before closure).
-3. A-7 Azure key + clip set, ONLY if the phoneme-annotation layer is wanted
-   in the first slice; the word-tier loop itself needs nothing.
+1. A-1 closure — the account holder chose a **fresh-repo migration**
+   ("later"; checklist ready in `FRESH-REPO-MIGRATION.md`). The privacy P0
+   stays open, and this plan stays implementation-gated, until the old
+   repo's exposure is actually gone (the daily sweep says so).
+2. ~~A-2 database decision~~ **SIGNED — Option B (PostgreSQL), Task 97;
+   A-3 cutover executed.** The loop's data contract is engine-neutral and
+   now runs on PG.
+3. ~~Azure key + clip set~~ **OBSOLETE (Task 97 $0 directive).** Azure is
+   de-escalated to a reference-comparison harness only; if a phoneme
+   annotation layer is wanted in the first slice, the provider is the
+   local OpenPronounce sidecar as an `experimental:local-phoneme` tier
+   (`OPENPRONOUNCE-AUDIT.md` §3) — the word-tier loop itself needs
+   nothing and ships first either way.

@@ -9,8 +9,27 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Task 97: the production database decision signed Option B (PostgreSQL),
+    # and the physical flip made prisma/schema.prisma postgresql-provider.
+    # CI therefore proves migrations + lint + typecheck against a REAL
+    # PostgreSQL service - the same engine production runs (A-3 acceptance:
+    # the PG baseline migration must deploy cleanly).
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rah_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: "file:./db/check.db"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/rah_check"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -18,7 +37,7 @@ jobs:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
-      - name: Prisma generate + migrate deploy (throwaway db)
+      - name: Prisma generate + migrate deploy (PG service)
         run: bun run db:generate && bun run db:deploy
       - name: Lint
         run: bun run lint
