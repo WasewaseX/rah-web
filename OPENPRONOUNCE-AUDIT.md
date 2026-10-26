@@ -8,8 +8,17 @@ Audited from a shallow clone of the public repo (2026-10-25, HEAD
 
 ## 1. Verdict
 
-**ADOPT as the phoneme-tier CANDIDATE behind the provider interface —
-labeled `experimental:local-phoneme` from day one.** It is the only
+> **SUPERSEDED 2026-10-26 (Task 98) — REJECTED for this deployment by the
+> account holder's standing lightweight rule** ("make things lightweight and
+> only use apis to avoid render fails"): two ~1.2 GB checkpoint downloads +
+> a ~2–3 GB RAM inference sidecar cannot fit beside the app + PostgreSQL on
+> the ~4 GB box. The findings below stay as the verified reference for any
+> future box with RAM headroom; the word-level `measured:asr-alignment`
+> tier remains the only validated pronunciation measurement.
+
+**Original verdict (Task 97, superseded): ADOPT as the phoneme-tier CANDIDATE
+behind the provider interface — labeled `experimental:local-phoneme` from day
+one.** It is the only
 evaluated option that is free, self-hosted, offline-capable, licensed for
 reuse (MIT), maintained (last commit ~10 weeks before audit), and honest
 about its own error rates in its own README. It does NOT replace the

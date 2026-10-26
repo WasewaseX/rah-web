@@ -8,6 +8,14 @@
 # revive path, so every boot road converges on the same rule.
 cd /home/z/my-project || exit 1
 
+# Task 98: .env must win over platform-inherited env on EVERY road. The
+# reprovision baked a stale SQLite DATABASE_URL into the supervisor session
+# env; this script used to source .env only on the prod branch, so the dev
+# fallback below silently served SQLite on a PostgreSQL-era tree (dotenv
+# semantics: process env wins). Source it once here, before any branch;
+# the prod branch re-sources it (idempotent).
+set -a; . ./.env 2>/dev/null; set +a
+
 if [ "${RAH_PROD:-1}" != "0" ] && [ -f .next/standalone/server.js ] && [ -f .next/BUILD_ID ]; then
   set -a; . ./.env 2>/dev/null; set +a
   export NODE_ENV=production

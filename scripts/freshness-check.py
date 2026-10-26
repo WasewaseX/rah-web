@@ -9,6 +9,7 @@ legs are the pg-survival.sh dump SIDECAR JSONs (db/backups, vault work tree,
 upload stage). The SQLite legacy path is kept verbatim for a possible re-flip."""
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -45,8 +46,15 @@ def pg_counts(url):
          " (SELECT COUNT(*) FROM \"Session\"),"
          " (SELECT COUNT(*) FROM \"LoginCode\"),"
          " (SELECT id FROM \"User\" ORDER BY \"createdAt\" LIMIT 1)")
+    # Task 98: bare "psql" is not on PATH in the userspace-PG deployment
+    # (binaries live in the pgserver wheel). Resolve the same PGBIN default
+    # pg-survival.sh uses, with PGBIN/env override.
+    psql = shutil.which("psql") or os.path.join(
+        os.environ.get("PGBIN",
+                       "/home/z/rah-pg/pgvenv/lib/python3.12/site-packages/pgserver/pginstall/bin"),
+        "psql")
     row = subprocess.run(
-        ["psql", "-X", "-q", "-t", "-A", "-F", "|", url, "-c", q],
+        [psql, "-X", "-q", "-t", "-A", "-F", "|", url, "-c", q],
         capture_output=True, text=True, timeout=60).stdout.strip()
     xp, streak, rev, days, sess, codes, uid = (row.split("|") + [""] * 7)[:7]
     return {

@@ -11,6 +11,13 @@
 # refresh both snapshot stores and keep the watchdog alive.
 cd /home/z/my-project || exit 1
 
+# Task 98: same doctrine as dev-or-prod.sh - the gitignored .env must win
+# over platform-inherited env on EVERY boot road (prod, dev fallback, and
+# the supervisor's own bun run dev entry). Without this, a stale exported
+# DATABASE_URL from the reprovisioned session env silently reverts a
+# PostgreSQL-era tree to SQLite.
+set -a; . ./.env 2>/dev/null; set +a
+
 # CLIENT-SYNC GUARD (Task 87, the Oct-23 live incident): `prisma migrate deploy`
 # applies SQL but NEVER regenerates the TS client. After any tree sync/reset,
 # a generated client from an older schema boots silently and every query that

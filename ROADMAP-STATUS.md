@@ -358,3 +358,58 @@ The account holder answered with four decisions: the database decision ("if its 
 ### Gates (this wave)
 
 flip proof 30/30 + checksum · boot regression ALL PASS on PG · main battery 441/441 (PG throwaway) · isolation 47/47 (PG throwaway) · guard 58/58 · email 7/0/1 (PG throwaway, SMTP mocked) · SMTP transport verify OK (zero sends) · restore drill PASS (sidecar match) · LIVE recycle drill: wipe → auto-restore → app green + alert · freshness 4-way MATCH xp=483 SCRUBBED · drift OK · `bash -n` on all five touched scripts · secrets sweep before push (the Resend key must appear ONLY in `.env`) · tsc + eslint clean · the account holder's verbatim decisions recorded in the backlog (A-1/A-2) and this file.
+
+## 19. Task 98 — the outage diagnosed + the lightweight rule adopted + PG survived a reprovision (2026-10-26, evidence-first)
+
+The account holder reported "the website is not working" and issued a new
+standing directive: **"no do not make things heavy at all always remember
+this rule make things lightweight and only use apis to avoid render fails."**
+Both were handled in one batch.
+
+1. **Outage root causes (TWO, both reprovision-borne).** The 11:35 workspace
+   reprovision (a) wiped `.next/BUILD_ID`, so `dev-or-prod.sh` fell back to a
+   Turbopack dev server — slow on-demand compilation + HMR websockets that
+   break behind the preview gateway; and (b) rewrote the gitignored `.env`
+   to a 50-byte SQLite-only file, silently reverting the Task 97 PostgreSQL
+   cutover (the PG data dir died with `/home/z/rah-pg`; the platform session
+   env ALSO carries a stale exported SQLite `DATABASE_URL`, the exact
+   dotenv-semantics trap pg-cutover.sh documents).
+2. **Recovery, by the book.** `.env` rebuilt (PG URL `postgresql://postgres@127.0.0.1:5433/rah`
+   + the Resend SMTP bridge, key server-side only, no `MAIL_TEST_TO` so
+   real-send stays gated); pgserver wheel reinstalled into the same pgvenv
+   path; `pg-survival.sh ensure` took the designed RESTORE path (initdb +
+   pg_restore from `upload/rah-backups/pg-rah-latest.dump`) with the CRITICAL
+   alert recorded; migrate deploy reported history intact; prod rebuilt
+   (`BUILD_ID=yl_VlAkAmDZIcn32z01aK`, intended-release recorded);
+   `ensure-server.sh` flipped dev → prod standalone.
+3. **Structural fixes so this class cannot recur.** Both boot scripts now
+   source `.env` BEFORE any branch (Task 98: `.env` wins over
+   platform-inherited env on every road — prod, dev fallback, supervisor
+   entry); `db-snapshot.sh` + `db-snapshot-core.ts` grew engine gates (the
+   boot's `VACUUM INTO` P2010/42601 failure is impossible now — SQLite
+   vacuum chain explicitly skips in the PG era; live snapshots are owned by
+   `pg-survival.sh dump`, artifact copies by db-sync); `freshness-check.py`
+   resolves psql from the pgserver wheel instead of bare PATH.
+4. **Verification chain (all green).** Tripwire intact: `/api/version` from
+   PG reports xp=483/streak=6/reviews=18 (a SQLite-connected
+   postgresql-provider client cannot answer — the Task 97 proof shape);
+   restore drill PASS (483|18|6 == sidecar); freshness 4-way MATCH
+   (LIVE=SYNC=VAULT=UPLOAD, SCRUB yes); drift OK (build == intended); prod
+   chunk serves 200 with bytes (the Task 91 blank-page class); `/api/state`
+   401 gate holds; **boot regression ALL PASS on PG** (state 200 + coach
+   streaming) against the live server; tsc 0, eslint 0, secrets sweep clean
+   (the key appears ONLY in gitignored `.env`).
+5. **The lightweight rule adopted as standing rule #1** (backlog "Standing
+   rules"): nothing that downloads multi-GB weights, runs a GB-scale
+   inference sidecar, or bloats the client bundle may ship on the ~4 GB box;
+   heavy work happens behind APIs, never in the browser, never as a resident
+   local model. **Consequence: the OpenPronounce local tier is REJECTED for
+   this deployment** (2.4 GB checkpoints + 2–3 GB RAM sidecar) — A-7 CLOSED,
+   audit retained as reference with a supersession note, F-1 parked on a
+   lightweight $0 API candidate, F-5/F-3/F-9 unblocked (A-2 done). The
+   word-level `measured:asr-alignment` tier remains the only validated
+   pronunciation measurement; Azure stays reference-only.
+
+### Gates (this wave)
+
+tripwire xp=483 from PG · restore drill PASS · freshness 4-way MATCH · drift OK (build == intended) · chunk 200 + 401 gate · boot regression ALL PASS on PG · db-snapshot engine gate · tsc 0 · eslint 0 · secrets sweep clean (key only in .env) · bash -n on touched scripts · standing rule recorded verbatim

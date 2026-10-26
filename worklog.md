@@ -1730,3 +1730,24 @@ Work Log:
 
 Stage Summary:
 - Production runs PostgreSQL with a proven survival layer; every battery is green ON the new engine; Resend is configured and transport-verified without spending a single email; the $0 speech policy has an audited candidate and an honest experimental tier; the privacy closure is a ready checklist. Standing gates after today: the fresh-repo migration (account holder's timing), the unlock decision (separate from the engine decision, still the account holder's), MAIL_TEST_TO for the one live email send, and pilot weeks.
+
+---
+Task ID: 98
+Agent: main (Z.ai)
+Task: Diagnose "the website is not working"; adopt the account holder's standing lightweight rule; keep the Task 97 PostgreSQL state through a workspace reprovision.
+
+Work Log:
+- Diagnosed TWO reprovision-borne root causes: (1) .next/BUILD_ID wiped -> dev-or-prod.sh fell back to a Turbopack dev server (slow on-demand compile + HMR behind the preview gateway = the "not working"); (2) gitignored .env rewritten to a 50-byte SQLite-only file + a stale platform-exported DATABASE_URL -> the Task 97 PG cutover silently reverted; /home/z/rah-pg (PGDATA + pgvenv) also died.
+- Rebuilt .env: DATABASE_URL=postgresql://postgres@127.0.0.1:5433/rah + Resend SMTP bridge (SMTP_HOST=smtp.resend.com:587, user=resend, sending key server-side only, SMTP_FROM=onboarding@resend.dev, deliberately NO MAIL_TEST_TO so real-send stays gated).
+- Reinstalled pgserver 0.1.4 wheel into /home/z/rah-pg/pgvenv (uv, python 3.12); pg-survival.sh ensure took the RESTORE path: initdb + pg_restore from upload/rah-backups/pg-rah-latest.dump; CRITICAL alert recorded as designed.
+- migrate deploy: history intact, no pending; prisma generate (PG client); bunx tsc + eslint clean.
+- Rebuilt prod via build-prod.sh (BUILD_ID=yl_VlAkAmDZIcn32z01aK, intended-release recorded); ensure-server.sh flipped dev -> prod standalone; version route now returns PG-backed data (xp=483/streak=6/reviews=18).
+- STRUCTURAL FIX (Task 98): dev-or-prod.sh + ensure-server.sh now source .env BEFORE any branch (.env wins over platform-inherited env on every boot road - the documented dotenv trap is closed structurally); db-snapshot.sh + db-snapshot-core.ts grew engine gates (SQLite VACUUM chain skips cleanly in the PG era instead of failing P2010/42601 mid-boot); freshness-check.py resolves psql from the pgserver wheel (shutil.which + PGBIN default, shutil import added).
+- Verification chain: restore drill PASS (483|18|6 == sidecar); freshness 4-way MATCH (LIVE=PG, SYNC=VAULT=UPLOAD sidecars, SCRUB yes); deploy-drift OK; prod chunk 200 with bytes (Task 91 blank-page class covered); /api/state 401 gate; boot regression ALL PASS on PG against the live server (state 200 + coach streaming); secrets sweep clean (key only in gitignored .env).
+- LIGHTWEIGHT RULE adopted as standing rule #1 in TASK-95-BACKLOG.md (verbatim quote recorded): no multi-GB weight downloads, no GB-scale resident sidecars, no client-bundle bloat on the ~4 GB box; heavy work behind APIs only. Consequences: A-7 CLOSED - OpenPronounce local tier REJECTED for this deployment (2.4 GB checkpoints + 2-3 GB RAM vs 4 GB box); OPENPRONOUNCE-AUDIT.md verdict superseded (reference retained); F-1 parked on a lightweight $0 API candidate; F-5/F-3/F-9 unblocked (A-2 done); word-level measured:asr-alignment remains the only validated pronunciation measurement; Azure reference-only.
+
+Stage Summary:
+- Site restored on the PRODUCTION standalone build backed by PostgreSQL; Task 97 state fully recovered (tripwire xp=483/streak=6/reviews=18; restore drill + 4-way freshness green).
+- The outage class is structurally closed: every boot road sources .env; engine gates prevent cross-engine snapshot misuse; the PG survival layer proved itself on a real reprovision (second live restore drill).
+- Standing lightweight rule recorded verbatim in the backlog; speech plans reshaped ($0 + lightweight + API-first; no local model tier).
+- Changed: scripts/dev-or-prod.sh, scripts/ensure-server.sh, scripts/db-snapshot.sh, scripts/db-snapshot-core.ts, scripts/freshness-check.py, TASK-95-BACKLOG.md, OPENPRONOUNCE-AUDIT.md, ELSA-PLAN.md, ROADMAP-STATUS.md (+ gitignored .env rebuilt).

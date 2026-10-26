@@ -13,6 +13,18 @@ if (!target || !target.startsWith("/")) {
   process.exit(1);
 }
 
+// Task 98: defense in depth behind the db-snapshot.sh engine gate - this
+// core is SQLite-only (VACUUM INTO, pragma_* queries are not PG SQL). If
+// the live store is PostgreSQL, refuse loudly instead of pruning the live
+// PG rows and then failing mid-copy (the P2010/42601 boot failure).
+const envUrl = process.env.DATABASE_URL ?? "";
+if (envUrl.startsWith("postgresql://") || envUrl.startsWith("postgres://")) {
+  console.error(
+    "snapshot core: live store is PostgreSQL - this core only snapshots SQLite live stores; use pg-survival.sh dump",
+  );
+  process.exit(1);
+}
+
 const db = new PrismaClient({ log: [] });
 
 try {

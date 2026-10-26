@@ -14,6 +14,21 @@ Reading guide:
 - No feature work starts while a P0 in Part A is open (the reviewer's
   central recommendation, adopted as doctrine).
 
+## Standing rules (account holder directives — bind every task)
+
+1. **LIGHTWEIGHT, ALWAYS (2026-10-26, verbatim: "no do not make things heavy
+   at all always remember this rule make things lightweight and only use apis
+   to avoid render fails")** — the deployment box has ~4 GB total RAM; nothing
+   that downloads multi-GB weights, runs a GB-scale inference sidecar, or
+   bloats the client bundle may ship. Heavy work happens behind APIs (server
+   routes), never in the browser and never as a resident local model. Any
+   proposal that adds resident RAM beyond the app+PG baseline is rejected by
+   default.
+2. **Strict $0** — no paid API, no trial-dependent feature, no metered
+   subscription (Task 97 directive, unchanged).
+3. Claims-vs-diff audit gate — every "shipped" claim is verified against the
+   actual tree.
+
 ---
 
 ## Part A — the ten critical fixes
@@ -112,10 +127,11 @@ Reading guide:
   received; a deliberate wrong-password run records `failed` and surfaces
   a speakable error. **Regression test**: the battery itself.
 
-### A-7 · P1 · Validate the phoneme-level pronunciation tier — `RESOLVED INTO THE $0 TRACK (Task 97): OpenPronounce audit DONE; Azure de-escalated`
-- **Account holder's $0 directive**: no paid API may be required for normal operation; Azure at most for an explicitly approved reference comparison. Azure was ALREADY dormant without a key (env-gated adapter) — now it is also OFF the required path in every plan; `azure-pron-validate.ts` is re-labeled as the reference-comparison harness only.
-- **OpenPronounce audited** (`OPENPRONOUNCE-AUDIT.md`, shallow-clone-verified): MIT, maintained, 60+ weight-free tests, two ~1.2 GB Wav2Vec2 checkpoints (first-use download, offline afterwards), FastAPI sidecar with a clean `/pronunciation` contract, CPU ~2–3 GB RAM. Its own README's honesty ("a calibrated heuristic, not a model trained on annotated learner speech"; only English human-calibrated) matches Rah's doctrine exactly.
-- **Acceptance (unchanged in spirit, new target)**: the local tier ships as `experimental:local-phoneme`, never mixed with `measured:asr-alignment`, and is called validated ONLY after a reproducible benchmark with representative learner recordings + human ratings (OpenPronounce's own speechocean762 harness is the calibration vehicle). The word-level tier + 23-test battery remain the measured fallback.
+### A-7 · P1 · Validate the phoneme-level pronunciation tier — `CLOSED (Task 98): local tier REJECTED by the standing lightweight rule; word-level tier is the validated tier`
+- **Task 98 closure (account holder directive, verbatim: "no do not make things heavy at all always remember this rule make things lightweight and only use apis to avoid render fails")**: the OpenPronounce local tier is REJECTED for this deployment — two ~1.2 GB checkpoint downloads + a ~2–3 GB RAM inference sidecar cannot fit beside the app + PostgreSQL on the ~4 GB box without starving the server (the exact render-failure class the rule exists to prevent). The audit (`OPENPRONOUNCE-AUDIT.md`) stays in the tree as the verified reference; its verdict section records the supersession.
+- **Resulting policy**: the ONLY validated pronunciation measurement is the existing word-level `measured:asr-alignment` tier (server-side, zero added RAM) + its 23-test battery. Azure remains reference-only (`azure-pron-validate.ts`). A phoneme tier may return ONLY as a lightweight $0 API candidate (no resident model, no multi-GB download) and would still ship as `experimental:local-phoneme` behind the human-rated benchmark gate of `PRONUNCIATION-VALIDATION.md`.
+- **Account holder's $0 directive (Task 97, unchanged)**: no paid API may be required for normal operation; Azure at most for an explicitly approved reference comparison.
+- **OpenPronounce audit retained as reference** (`OPENPRONOUNCE-AUDIT.md`, shallow-clone-verified): MIT, maintained, 60+ weight-free tests, honest self-documented error rates — technically sound, too heavy for THIS box. If a future box with headroom exists, the audit is the restart point.
 - **Outcome**: phoneme-level feedback validated against real recordings
   BEFORE any UI claim (the review's exact wording).
 - **Task 95 shipped**: `PRONUNCIATION-VALIDATION.md` (7 acceptance
@@ -179,15 +195,15 @@ Reading guide:
 
 | # | Feature | Acceptance criteria (measurable) | Regression test | Status |
 |---|---|---|---|---|
-| F-1 | Validated phoneme-level pronunciation feedback | the LOCAL tier (OpenPronounce, A-7) passes the human-rating benchmark; UI shows sound-level error + replayable example + targeted retry; word-level and phoneme tiers never merged in metrics; `experimental:local-phoneme` label until then | OPENPRONOUNCE-AUDIT.md benchmark gate + tier-mixing pins | `READY after the benchmark` (design in OPENPRONOUNCE-AUDIT.md §3) |
+| F-1 | Validated phoneme-level pronunciation feedback | **PARKED (Task 98, lightweight rule)**: no candidate fits the ~4 GB box; if a lightweight $0 API candidate appears, it must pass the human-rating benchmark before any UI claim; word-level and phoneme tiers never merged in metrics; `experimental:local-phoneme` label until then | PRONUNCIATION-VALIDATION.md benchmark gate + tier-mixing pins | `BLOCKED on a lightweight $0 candidate` (audit reference: OPENPRONOUNCE-AUDIT.md) |
 | F-2 | Expert-calibrated exam scoring | band RANGES with uncertainty + sample size on every exam result; calibrated against ≥20 human-rated responses; no false-precision band numbers | battery pin on the uncertainty shape; rubric battery | `READY` — design + contract in `MAGOOSH-PLAN.md` §5/§8 (Task 96); implementation gated |
-| F-3 | Cross-device draft sync | server-side draft store, version history, conflict resolution, explicit consent before grading submit; local autosave keeps working offline | writing battery + new sync battery; offline protocol S4/S5 re-run | `READY` after A-2 (multi-user store decision shapes the schema) |
+| F-3 | Cross-device draft sync | server-side draft store, version history, conflict resolution, explicit consent before grading submit; local autosave keeps working offline | writing battery + new sync battery; offline protocol S4/S5 re-run | `READY` (A-2 done Task 97 — PostgreSQL is the store; schema work unblocked) |
 | F-4 | Structured listening library | graded B2–C1 audio, multiple accents, transcripts, replayable segments, comprehension items; skill-deltas (not play counts) land in DailyStat | provenance battery extends to audio sources; listening battery | `READY` |
-| F-5 | Voice-shadowing mode | listen→imitate→compare→retry loop; recurring errors auto-link to review cards; uses the same measured tier labels as read-aloud | pronunciation battery extension | `BLOCKED on A-7` (phoneme claims gated) but the word-tier loop is `READY` — the goal-bound session wrapper it joins is designed in `SPEAK-PLAN.md` (Task 96) |
+| F-5 | Voice-shadowing mode | listen→imitate→compare→retry loop; recurring errors auto-link to review cards; uses the same measured tier labels as read-aloud | pronunciation battery extension | `READY (A-7 closed Task 98)` — the word-tier loop needs no phoneme tier; the goal-bound session wrapper it joins is designed in `SPEAK-PLAN.md` (Task 96) |
 | F-6 | Farsi-specific transfer-error explanations | content built from REVIEWED learner examples (mistake memory), minimal contrasts + follow-ups; every explanation cites its evidence pattern | mistake-memory battery; content review checklist | `READY` |
 | F-7 | Broader document/web import | PDF/EPUB/article import with source attribution preserved, extraction-failure detection, learner-selected passages before exercise generation | pdf-engine battery + provenance battery extension | `READY` |
 | F-8 | Expression/collocation training | multi-word items as first-class cards; register + phrasal patterns; FSRS revisits them in varied contexts | fsrs parity battery with multi-word items | `READY` — seed content + selection contract in `SPEAK-PLAN.md` §3.1/§3.2 (Task 96); implementation gated |
-| F-9 | Optional human tutor review | permission-controlled sharing of SELECTED attempts; tutor comments stored separately from AI grading, labeled at render | isolation battery (new sharing scope tests) | `BLOCKED on A-2` (sharing presumes the multi-user answer) |
+| F-9 | Optional human tutor review | permission-controlled sharing of SELECTED attempts; tutor comments stored separately from AI grading, labeled at render | isolation battery (new sharing scope tests) | `READY` (A-2 done Task 97 — sharing scopes design on PG) |
 | F-10 | Versioned curriculum/content release | versioned items + prerequisites; content-quality tests run before publish; history preserved to explain any past assignment | curriculum battery + new version-pin test | `READY` |
 
 ## Part C — the ten polish items (improve value/explainability/resilience of shipped features)
@@ -218,7 +234,7 @@ Reading guide:
 | # | API | What to do | Acceptance | Status |
 |---|---|---|---|---|
 | E-1 | LLM API (structured outputs + tool calling) | improve evals, cost controls, retries, deterministic validation; NO new provider | eval suite for coach/writing/quiz outputs; cost log per day | `READY` |
-| E-2 | Azure AI Speech pronunciation assessment | **DE-ESCALATED (Task 97, $0 directive)**: reference-comparison harness only (`azure-pron-validate.ts`); never required for operation; the production phoneme path is the OpenPronounce local tier (A-7) | OPENPRONOUNCE-AUDIT.md acceptance + the benchmark gate | `SUPERSEDED by the local tier` |
+| E-2 | Azure AI Speech pronunciation assessment | **DE-ESCALATED (Task 97, $0 directive; Task 98 confirms)**: reference-comparison harness only (`azure-pron-validate.ts`); never required for operation; there is NO production phoneme path — the word-level measured tier is the production measurement | PRONUNCIATION-VALIDATION.md gates + the degradation pins | `REFERENCE-ONLY (dormant without a key)` |
 | E-3 | Transactional email | **CONFIGURED (Task 97)**: Resend SMTP bridge via the existing nodemailer contract; key server-side only; tests mocked by default; free tier, no overages | battery 7/0/1 on PG + transport verify OK; one live send when MAIL_TEST_TO exists | `DONE (Task 97)` (final live-send check pending the address) |
 
 ---
@@ -290,6 +306,7 @@ at a contract, not at research.
 | Freshness chain PG era | `scripts/freshness-check.py` PG branch: LIVE=PG, legs=db/backups + vault + upload sidecars — 4-way MATCH verified |
 | Resend configured, $0-safe | `.env` SMTP_* (gitignored; key never committed); `scripts/smtp-verify-once.ts` transport OK (zero mails sent); battery 7/0/1 on PG throwaway with SMTP mocked; MAIL_TEST_TO = the one remaining input |
 | $0 speech policy adopted | `OPENPRONOUNCE-AUDIT.md` (clone-verified findings + integration shape + costs); Azure de-escalated to reference-only (E-2); word tier untouched |
+| Lightweight rule adopted (Task 98) | Standing rules block above; OpenPronounce local tier rejected for this box (A-7); boot scripts source .env on every road; PG survived the reprovision via the Task 97 dump |
 | Fresh-repo migration planned | `FRESH-REPO-MIGRATION.md` (8-step checklist + closure criteria); A-1 status SUPERSEDED; sweep monitoring continues |
 | CI proves PG | `.github/workflows/ci.yml`: postgres:17 service + `db:deploy` of the PG baseline + lint + tsc |
 | Batteries engine-agnostic | `scripts/test-isolated-battery.sh` (PG throwaway rah_battery, drop/create per run); `scripts/test-isolation.sh` (PG psql seeding; coach-stamp check tightened to the user-role row against model-echo flakes) |

@@ -139,8 +139,10 @@ change (no tier mixing).
    A-3 cutover executed.** The loop's data contract is engine-neutral and
    now runs on PG.
 3. ~~Azure key + clip set~~ **OBSOLETE (Task 97 $0 directive).** Azure is
-   de-escalated to a reference-comparison harness only; if a phoneme
-   annotation layer is wanted in the first slice, the provider is the
-   local OpenPronounce sidecar as an `experimental:local-phoneme` tier
-   (`OPENPRONOUNCE-AUDIT.md` §3) — the word-tier loop itself needs
-   nothing and ships first either way.
+   de-escalated to a reference-comparison harness only; **Task 98: the local
+   OpenPronounce sidecar is REJECTED by the standing lightweight rule**
+   (2.4 GB weights + 2–3 GB RAM on a ~4 GB box) — there is NO phoneme
+   provider now; any future tier must be a lightweight $0 API candidate
+   passing the human-rated benchmark gate (`OPENPRONOUNCE-AUDIT.md` §1
+   supersession, backlog A-7). The word-tier loop itself needs nothing and
+   ships first either way.

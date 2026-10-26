@@ -15,6 +15,22 @@ DIR="backups"
 KEEP=10
 mkdir -p "$DIR"
 
+# Task 98: engine gate. This chain snapshots the LIVE store via Prisma +
+# SQLite VACUUM INTO - it is only valid when the live store IS SQLite. In
+# the PostgreSQL era (.env DATABASE_URL=postgresql://) the live snapshots
+# are owned by pg-survival.sh dump (pg_dump -Fc + sidecar counts, Session/
+# LoginCode rows excluded) and the SQLite rollback artifact db/custom.db is
+# preserved verbatim by db-sync.sh + vault-sync file copies. A PG-connected
+# client cannot open a file: URL and VACUUM INTO is not PG SQL (the boot
+# after the Task 97 flip proved it: P2010, 42601 at "INTO") - so skip
+# cleanly instead of failing every boot.
+ENV_URL="$(grep -E '^DATABASE_URL=' .env 2>/dev/null | head -1 | cut -d= -f2-)"
+case "$ENV_URL" in
+  postgresql://*)
+    echo "snapshot: live store is PostgreSQL - SQLite vacuum chain skipped (live snapshots = pg-survival.sh dump; artifact copies = db-sync.sh)"
+    exit 0 ;;
+esac
+
 [ -s "$DB" ] || { echo "snapshot: no live db at $DB; nothing to do"; exit 0; }
 
 TMP="$DIR/.vacuum-$$.sqlite"
